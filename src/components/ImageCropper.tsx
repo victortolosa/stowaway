@@ -264,7 +264,7 @@ function parseExifOrientation(arrayBuffer: ArrayBuffer): number {
         offset += 2
         if (marker === 0xffe1) {
             // APP1 segment - Exif
-            const exifLength = view.getUint16(offset)
+            // const exifLength = view.getUint16(offset)
             offset += 2
             // Check for 'Exif' string
             if (
@@ -277,7 +277,7 @@ function parseExifOrientation(arrayBuffer: ArrayBuffer): number {
 
                 const little = view.getUint16(offset) === 0x4949
                 offset += 2
-                const tagMark = little ? view.getUint16(offset, true) : view.getUint16(offset)
+                // const tagMark = little ? view.getUint16(offset, true) : view.getUint16(offset)
                 offset += 2
                 const firstIFDOffset = little ? view.getUint32(offset, true) : view.getUint32(offset)
                 offset += firstIFDOffset - 4

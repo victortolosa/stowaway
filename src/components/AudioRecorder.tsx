@@ -94,7 +94,7 @@ export function AudioRecorder({
             stoppedRef.current = false
 
             // Preflight getUserMedia to ensure permission prompt appears in a predictable way
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            if (navigator.mediaDevices) {
                 try {
                     // request and immediately stop to trigger permissions UI where needed
                     // eslint-disable-next-line @typescript-eslint/no-explicit-any
