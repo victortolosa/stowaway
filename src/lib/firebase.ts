@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase/app'
+import { getAnalytics, isSupported } from 'firebase/analytics'
 import { getAuth } from 'firebase/auth'
 import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore'
 import { getStorage } from 'firebase/storage'
@@ -19,16 +20,17 @@ export const auth = getAuth(app)
 export const db = getFirestore(app)
 export const storage = getStorage(app)
 
-// Lazy load analytics only when needed to reduce initial bundle size
-export const getAnalyticsInstance = async () => {
-  if (typeof window !== 'undefined' && import.meta.env.PROD) {
-    const { getAnalytics } = await import('firebase/analytics')
-    return getAnalytics(app)
-  }
-  return null
-}
+export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null
 
-// Enable offline persistence
+// Optional: isSupported() check can be added if needed for specific environments
+isSupported().then(yes => {
+  if (yes) {
+    console.log('Firebase Analytics is supported')
+  }
+})
+
+// Disable persistence temporarily to debug hangs
+/*
 enableIndexedDbPersistence(db).catch((err) => {
   if (err.code === 'failed-precondition') {
     console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.')
@@ -36,3 +38,4 @@ enableIndexedDbPersistence(db).catch((err) => {
     console.warn('The current browser does not support all of the features required to enable persistence')
   }
 })
+*/

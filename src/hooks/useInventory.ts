@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store/auth'
 import { useInventoryStore } from '@/store/inventory'
 import { getUserPlaces, getPlaceContainers, getContainerItems } from '@/services/firebaseService'
@@ -12,37 +12,46 @@ export function useInventory() {
   const { places, containers, items, setPlaces, setContainers, setItems } =
     useInventoryStore()
 
-  useEffect(() => {
+  const loadInventory = useCallback(async () => {
     if (!user?.uid) return
 
-    const loadInventory = async () => {
-      try {
-        // Load user's places
-        const userPlaces = await getUserPlaces(user.uid)
-        setPlaces(userPlaces)
+    try {
+      console.log('useInventory: Starting load for UID:', user.uid)
+      // Load user's places
+      const userPlaces = await getUserPlaces(user.uid)
+      console.log('useInventory: Fetched places:', userPlaces.length)
+      setPlaces(userPlaces)
 
-        // Load containers for each place
-        const allContainers: typeof containers = []
-        for (const place of userPlaces) {
-          const placeContainers = await getPlaceContainers(place.id)
-          allContainers.push(...placeContainers)
-        }
-        setContainers(allContainers)
-
-        // Load items for each container
-        const allItems: typeof items = []
-        for (const container of allContainers) {
-          const containerItems = await getContainerItems(container.id)
-          allItems.push(...containerItems)
-        }
-        setItems(allItems)
-      } catch (error) {
-        console.error('Error loading inventory:', error)
+      if (userPlaces.length === 0) {
+        setContainers([])
+        setItems([])
+        return
       }
-    }
 
-    loadInventory()
+      // Load all containers for all places in parallel
+      const containersPromises = userPlaces.map(place => getPlaceContainers(place.id))
+      const containersResults = await Promise.all(containersPromises)
+      const allContainers = containersResults.flat()
+      setContainers(allContainers)
+
+      if (allContainers.length === 0) {
+        setItems([])
+        return
+      }
+
+      // Load all items for all containers in parallel
+      const itemsPromises = allContainers.map(container => getContainerItems(container.id))
+      const itemsResults = await Promise.all(itemsPromises)
+      const allItems = itemsResults.flat()
+      setItems(allItems)
+    } catch (error) {
+      console.error('Error loading inventory:', error)
+    }
   }, [user?.uid, setPlaces, setContainers, setItems])
 
-  return { places, containers, items }
+  useEffect(() => {
+    loadInventory()
+  }, [loadInventory])
+
+  return { places, containers, items, refresh: loadInventory }
 }

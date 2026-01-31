@@ -89,20 +89,114 @@ We will utilize a **Progressive Web App (PWA)** architecture for cross-platform 
 
 ## 4. Specific Feature Implementation
 
-### 1. Image Capture & Optimization
+### 1. Image Capture & Optimization ✅ COMPLETED (Sprint 3)
 
-* **Capture:** Native `<input type="file" capture="environment" />` to use OS-native camera features.
-* **Cropping:** `react-easy-crop`.
-* **Compression:** `browser-image-compression` (Max size 1MB, 1920px width) to save bandwidth.
+* ✅ **Capture:** Native `<input type="file" capture="environment" />` to use OS-native camera features.
+* ✅ **Cropping:** `react-easy-crop` - Full cropping UI with zoom/rotate controls.
+* ✅ **Compression:** `browser-image-compression` (Max size 1MB, 1920px width) to save bandwidth.
+* ✅ **Cache Control:** 1-year browser caching for uploaded images.
+* ✅ **Orphan Cleanup:** Automatic storage cleanup on failed database writes.
 
-### 2. Audio Recording
+**Implementation Files:**
+- `src/components/ImageCropper.tsx` - Cropping component
+- `src/hooks/useImageCompression.ts` - Compression hook
+- `src/services/firebaseService.ts` - Enhanced with cache control & cleanup
+- `src/components/CreateItemModal.tsx` - Updated with full image pipeline
+- `src/components/CreateContainerModal.tsx` - Updated with full image pipeline
+
+**Status:** ✅ COMPLETE - Both item and container photos implemented
+
+### 2. Audio Recording ⏳ PENDING (Sprint 4)
 
 * **Library:** `react-media-recorder`.
 * **Codec:** `audio/webm;codecs=opus`. Highly efficient; 30 seconds  100KB.
 
-### 3. QR Scanning
+**Next Steps:**
+- Create `AudioRecorder` component
+- Create `AudioPlayer` component
+- Integrate into `CreateItemModal`
+- Update Item detail page for playback
 
-* **Library:** `react-qr-reader`. Used for instant container redirection.
+### 3. QR Scanning ⏳ PENDING (Sprint 5)
+
+* **Library:** `html5-qrcode`. Used for instant container redirection.
+
+**Next Steps:**
+- Create `QRGenerator` component (with jspdf for labels)
+- Create `QRScanner` component
+- Add scan route and page
+- Wire up Dashboard "Scan QR" button
 
 ---
+
+# Roadmap & Progress
+
+## ✅ Epic 1: Foundation (COMPLETE)
+
+* ✅ **Sprint 1:** Firebase setup, Google Auth, and "Places" dashboard. Enable offline persistence.
+* ✅ **Sprint 2:** Container creation and Item logging. Implement image compression and breadcrumb navigation.
+
+**Status:** All CRUD operations working. Dashboard, places, containers, and items fully functional.
+
+---
+
+## 🔄 Epic 2: The Sensory Layer (IN PROGRESS)
+
+### ✅ Sprint 3: Image Optimization - COMPLETE
+
+**Completed:**
+- ImageCropper component with zoom/rotate
+- useImageCompression hook with progress tracking  
+- Firebase cache control headers (1-year caching)
+- Orphan cleanup for failed uploads
+- CreateItemModal updated with native camera support
+- CreateContainerModal updated with native camera support
+
+**All tasks complete!**
+
+---
+
+### ⏳ Sprint 4: Audio Recording - PENDING
+
+**Next Steps:**
+- Create AudioRecorder component using `react-media-recorder`
+- Create AudioPlayer component
+- Integrate voice notes into CreateItemModal
+- Add playback to Item detail page
+
+**Library to install:** `react-media-recorder`
+
+---
+
+### ⏳ Sprint 5: QR System - PENDING  
+
+**Next Steps:**
+- QR code generation with `jspdf` for printable labels
+- QR scanner using `html5-qrcode`
+- Add /scan route and page
+- Wire up Dashboard "Scan QR" button
+
+**Libraries already installed:** `html5-qrcode`, `jspdf`
+
+---
+
+## ⏳ Epic 3: Search & Launch (PENDING)
+
+### Sprint 6: Enhanced Search
+
+* **Fuzzy search:** Implement `fuse.js` for typo-tolerant search
+* **Voice-to-Text:** (Optional) Cloud Functions for STT transcription
+* **PWA:** Final manifest configuration and offline testing
+
+**Library already installed:** `fuse.js`
+
+---
+
+## 🔴 CURRENT POSITION
+
+**Last Completed:** Sprint 3 - Image Capture & Optimization (FULLY COMPLETE)  
+**Pick Up Here:** Start Sprint 4 (Audio Recording) OR Sprint 5 (QR Codes) OR Sprint 6 (Search)
+
+**Detailed plan available at:**  
+`/Users/victortolosa/.gemini/antigravity/brain/70a56811-1e71-474c-bb5f-b8f98c32cd3d/implementation_plan.md`
 

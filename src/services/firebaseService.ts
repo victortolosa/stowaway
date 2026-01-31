@@ -22,15 +22,18 @@ import { Place, Container, Item } from '@/types'
  * PLACES OPERATIONS
  */
 export async function createPlace(place: Omit<Place, 'id' | 'createdAt' | 'updatedAt'>) {
+  console.log('FirebaseService: Attempting to create place in project:', db.app.options.projectId)
+  console.log('Place Data:', place)
   try {
     const docRef = await addDoc(collection(db, 'places'), {
       ...place,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     })
+    console.log('FirebaseService: Place created successfully with ID:', docRef.id)
     return docRef.id
   } catch (error) {
-    console.error('Error creating place:', error)
+    console.error('FirebaseService: Error creating place:', error)
     throw error
   }
 }
@@ -188,8 +191,21 @@ export async function deleteItem(itemId: string) {
  */
 export async function uploadImage(file: File, path: string): Promise<string> {
   try {
+    // Validate file size (max 10MB before compression)
+    const maxSizeBytes = 10 * 1024 * 1024 // 10MB
+    if (file.size > maxSizeBytes) {
+      throw new Error('Image size must be less than 10MB')
+    }
+
     const storageRef = ref(storage, path)
-    await uploadBytes(storageRef, file)
+
+    // Add cache control metadata for browser caching
+    const metadata = {
+      cacheControl: 'public, max-age=31536000', // Cache for 1 year
+      contentType: file.type,
+    }
+
+    await uploadBytes(storageRef, file, metadata)
     return getDownloadURL(storageRef)
   } catch (error) {
     console.error('Error uploading image:', error)
@@ -200,10 +216,43 @@ export async function uploadImage(file: File, path: string): Promise<string> {
 export async function uploadAudio(file: File, path: string): Promise<string> {
   try {
     const storageRef = ref(storage, path)
-    await uploadBytes(storageRef, file)
+
+    // Add cache control metadata
+    const metadata = {
+      cacheControl: 'public, max-age=31536000', // Cache for 1 year
+      contentType: file.type,
+    }
+
+    await uploadBytes(storageRef, file, metadata)
     return getDownloadURL(storageRef)
   } catch (error) {
     console.error('Error uploading audio:', error)
+    throw error
+  }
+}
+
+export async function uploadAudioWithCleanup(
+  file: File,
+  path: string,
+  onSuccess: (url: string) => Promise<void>
+): Promise<string> {
+  let uploadedUrl: string | null = null
+
+  try {
+    uploadedUrl = await uploadAudio(file, path)
+
+    await onSuccess(uploadedUrl)
+
+    return uploadedUrl
+  } catch (error) {
+    if (uploadedUrl) {
+      try {
+        await deleteStorageFile(path)
+        console.log('Cleaned up orphaned audio file:', path)
+      } catch (cleanupError) {
+        console.error('Failed to cleanup orphaned audio file:', cleanupError)
+      }
+    }
     throw error
   }
 }
@@ -214,6 +263,39 @@ export async function deleteStorageFile(path: string) {
     await deleteObject(storageRef)
   } catch (error) {
     console.error('Error deleting file:', error)
+    throw error
+  }
+}
+
+/**
+ * Upload image with automatic cleanup if database write fails
+ * Returns the download URL, or throws and cleans up the uploaded file
+ */
+export async function uploadImageWithCleanup(
+  file: File,
+  path: string,
+  onSuccess: (url: string) => Promise<void>
+): Promise<string> {
+  let uploadedUrl: string | null = null
+
+  try {
+    // Upload the image
+    uploadedUrl = await uploadImage(file, path)
+
+    // Attempt the database operation
+    await onSuccess(uploadedUrl)
+
+    return uploadedUrl
+  } catch (error) {
+    // If anything failed and we uploaded the file, clean it up
+    if (uploadedUrl) {
+      try {
+        await deleteStorageFile(path)
+        console.log('Cleaned up orphaned file:', path)
+      } catch (cleanupError) {
+        console.error('Failed to cleanup orphaned file:', cleanupError)
+      }
+    }
     throw error
   }
 }

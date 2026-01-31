@@ -1,61 +1,160 @@
+import { useState } from 'react'
 import { useAuthStore } from '@/store/auth'
 import { useInventory } from '@/hooks'
+import { CreatePlaceModal, ConfirmDeleteModal } from '@/components'
+import { useNavigate } from 'react-router-dom'
+import { deletePlace } from '@/services/firebaseService'
+import { Place } from '@/types'
+import { Trash2, Plus, ChevronRight, Home, Briefcase, Archive, MapPin } from 'lucide-react'
 
-/**
- * Places - Management view for all storage locations
- * Shows:
- * - List of all places
- * - Create new place
- * - Edit/delete places
- * - Quick access to containers in each place
- */
 export function Places() {
   const user = useAuthStore((state) => state.user)
-  const { places, containers } = useInventory()
+  const { places, containers, refresh } = useInventory()
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+
+  // Edit State
+  const [editingPlace, setEditingPlace] = useState<Place | null>(null)
+
+  // Delete State
+  const [deletingPlace, setDeletingPlace] = useState<Place | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const navigate = useNavigate()
 
   if (!user) {
     return <div>Please log in</div>
   }
 
+  const handleDelete = async () => {
+    if (!deletingPlace) return
+    setIsDeleting(true)
+    try {
+      await deletePlace(deletingPlace.id)
+      await refresh()
+      setDeletingPlace(null)
+    } catch (error) {
+      console.error('Failed to delete place:', error)
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const getPlaceIcon = (type: string) => {
+    switch (type) {
+      case 'home': return Home
+      case 'office': return Briefcase
+      case 'storage': return Archive
+      default: return MapPin
+    }
+  }
+
+  const getPlaceColor = (index: number) => {
+    const colors = ['#14B8A6', '#F59E0B', '#3B82F6', '#8B5CF6']
+    return colors[index % colors.length]
+  }
+
   return (
-    <div className="p-6">
+    <div className="p-5">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Places</h1>
-        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
-          Add Place
+        <h1 className="font-display text-[28px] font-bold text-text-primary">Places</h1>
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="bg-accent-pink rounded-button px-[14px] py-2 flex items-center gap-1.5"
+        >
+          <Plus size={16} className="text-white" strokeWidth={2} />
+          <span className="font-body text-[13px] font-semibold text-white">Add</span>
         </button>
       </div>
 
       {places.length === 0 ? (
-        <div className="bg-white p-8 rounded-lg shadow text-center">
-          <p className="text-gray-600 mb-4">No places yet</p>
-          <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+        <div className="bg-bg-surface rounded-card p-8 text-center">
+          <p className="font-body text-text-secondary mb-4">No places yet</p>
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="font-body text-[14px] font-semibold text-accent-pink"
+          >
             Create Your First Place
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {places.map((place) => {
+        <div className="flex flex-col gap-3">
+          {places.map((place, index) => {
             const placeContainers = containers.filter((c) => c.placeId === place.id)
+            const PlaceIcon = getPlaceIcon(place.type)
+
             return (
-              <div key={place.id} className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-xl font-bold mb-2">{place.name}</h3>
-                <p className="text-sm text-gray-600 mb-4">Type: {place.type}</p>
-                <p className="text-sm text-gray-600 mb-4">
-                  {placeContainers.length} container{placeContainers.length !== 1 ? 's' : ''}
-                </p>
-                <div className="flex gap-2">
-                  <button className="flex-1 bg-blue-600 text-white px-3 py-2 rounded hover:bg-blue-700 text-sm">
-                    View
-                  </button>
-                  <button className="flex-1 bg-gray-200 text-gray-700 px-3 py-2 rounded hover:bg-gray-300 text-sm">
-                    Edit
-                  </button>
+              <div
+                key={place.id}
+                onClick={() => navigate(`/places/${place.id}`)}
+                className="bg-bg-surface rounded-card p-4 flex items-center gap-[14px] cursor-pointer active:opacity-90 transition relative group"
+              >
+                <div
+                  className="w-14 h-14 rounded-[14px] flex items-center justify-center flex-shrink-0"
+                  style={{ backgroundColor: getPlaceColor(index) }}
+                >
+                  <PlaceIcon size={28} className="text-white" strokeWidth={2} />
                 </div>
+
+                <div className="flex-1 min-w-0 flex flex-col gap-1">
+                  <h3 className="font-body text-[16px] font-semibold text-text-primary">
+                    {place.name}
+                  </h3>
+                  <p className="font-body text-[13px] text-text-secondary">
+                    {placeContainers.length} container{placeContainers.length !== 1 ? 's' : ''}
+                  </p>
+                </div>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setDeletingPlace(place)
+                  }}
+                  className="p-2 text-text-tertiary hover:text-accent-danger transition-colors z-10"
+                >
+                  <Trash2 size={20} className="" strokeWidth={2} />
+                </button>
+
+                <ChevronRight size={20} className="text-text-tertiary" strokeWidth={2} />
               </div>
             )
           })}
         </div>
+      )}
+
+      {/* Create Modal */}
+      <CreatePlaceModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onPlaceCreated={() => {
+          refresh()
+          setIsCreateModalOpen(false)
+        }}
+      />
+
+      {/* Edit Modal - Triggered from inside PlaceDetail generally, but kept here for now if we want to add "Edit" action to list later */}
+      {editingPlace && (
+        <CreatePlaceModal
+          isOpen={!!editingPlace}
+          onClose={() => setEditingPlace(null)}
+          onPlaceCreated={() => {
+            refresh()
+            setEditingPlace(null)
+          }}
+          editMode
+          initialData={editingPlace}
+        />
+      )}
+
+      {/* Delete Confirmation */}
+      {deletingPlace && (
+        <ConfirmDeleteModal
+          isOpen={!!deletingPlace}
+          onClose={() => setDeletingPlace(null)}
+          onConfirm={handleDelete}
+          title="Delete Place"
+          message={`Are you sure you want to delete "${deletingPlace.name}"? This will also delete all containers and items within it.`}
+          isDeleting={isDeleting}
+        />
       )}
     </div>
   )

@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/auth'
+import { ProtectedRoute, Layout } from '@/components'
 import './styles/globals.css'
 
 // Lazy load pages for better code splitting
@@ -10,6 +11,11 @@ const Dashboard = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m
 const Places = lazy(() => import('@/pages/Places').then(m => ({ default: m.Places })))
 const Container = lazy(() => import('@/pages/Container').then(m => ({ default: m.Container })))
 const Item = lazy(() => import('@/pages/Item').then(m => ({ default: m.Item })))
+const Login = lazy(() => import('@/pages/Login').then(m => ({ default: m.Login })))
+const SignUp = lazy(() => import('@/pages/SignUp').then(m => ({ default: m.SignUp })))
+const PlaceDetail = lazy(() => import('@/pages/PlaceDetail').then(m => ({ default: m.PlaceDetail })))
+const Search = lazy(() => import('@/pages/Search').then(m => ({ default: m.Search })))
+const Profile = lazy(() => import('@/pages/Profile').then(m => ({ default: m.Profile })))
 
 function App() {
   const { setUser, setLoading } = useAuthStore()
@@ -26,16 +32,30 @@ function App() {
   return (
     <Router>
       <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        <div className="min-h-screen flex items-center justify-center bg-page">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
         </div>
       }>
         <Routes>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/places" element={<Places />} />
-          <Route path="/containers/:id" element={<Container />} />
-          <Route path="/items/:id" element={<Item />} />
+          {/* Public routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<SignUp />} />
+
+          {/* Protected routes wrapped in Layout */}
+          <Route element={
+            <ProtectedRoute>
+              <Layout />
+            </ProtectedRoute>
+          }>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/places" element={<Places />} />
+            <Route path="/places/:id" element={<PlaceDetail />} />
+            <Route path="/containers/:id" element={<Container />} />
+            <Route path="/items/:id" element={<Item />} />
+            <Route path="/search" element={<Search />} />
+            <Route path="/profile" element={<Profile />} />
+          </Route>
         </Routes>
       </Suspense>
     </Router>

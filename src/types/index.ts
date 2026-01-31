@@ -1,5 +1,6 @@
 export interface Place {
   id: string
+  userId: string
   name: string
   type: 'home' | 'office' | 'storage' | 'other'
   createdAt: Date

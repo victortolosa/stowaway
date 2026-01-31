@@ -7,23 +7,45 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: {
-          50: '#f0f9ff',
-          100: '#e0f2fe',
-          200: '#bae6fd',
-          300: '#7dd3fc',
-          400: '#38bdf8',
-          500: '#0ea5e9',
-          600: '#0284c7',
-          700: '#0369a1',
-          800: '#075985',
-          900: '#0c3d66',
-        }
+        // Base backgrounds
+        'bg-page': '#FFFFFF',
+        'bg-surface': '#F4F4F5', // Zinc-100
+        'bg-elevated': '#E4E4E7', // Zinc-200
+
+        // Text
+        'text-primary': '#18181B', // Zinc-900
+        'text-secondary': '#71717A', // Zinc-500
+        'text-tertiary': '#A1A1AA', // Zinc-400
+        'text-muted': '#D4D4D8', // Zinc-300
+        'text-on-accent': '#FFFFFF',
+
+        // Accents
+        'accent-pink': '#FFC0CB', // Primary Action
+        'accent-teal': '#14B8A6', // Places
+        'accent-blue': '#3B82F6', // Containers
+        'accent-amber': '#F59E0B',
+        'accent-orange': '#F97316',
+        'accent-danger': '#EF4444', // Destructive
+
+        // Borders
+        'border-standard': '#D4D4D8',
       },
-      spacing: {
-        'safe': 'max(1rem, env(safe-area-inset-bottom))',
+      fontFamily: {
+        'body': ['Inter', 'system-ui', 'sans-serif'],
+        'display': ['Plus Jakarta Sans', 'system-ui', 'sans-serif'],
+      },
+      borderRadius: {
+        'button': '16px',
+        'card': '20px',
+        'input': '26px',
+        'pill': '52px',
+      },
+      // Removed custom max-w-mobile to use standard max-w-md
+      boxShadow: {
+        'card': '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+        'floating': '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
       }
-    }
+    },
   },
   plugins: [],
 }
