@@ -11,11 +11,11 @@ export function Search() {
 
   const searchResults = query.trim()
     ? items.filter(
-        (item) =>
-          item.name.toLowerCase().includes(query.toLowerCase()) ||
-          item.description?.toLowerCase().includes(query.toLowerCase()) ||
-          item.tags.some((tag) => tag.toLowerCase().includes(query.toLowerCase()))
-      )
+      (item) =>
+        item.name.toLowerCase().includes(query.toLowerCase()) ||
+        item.description?.toLowerCase().includes(query.toLowerCase()) ||
+        item.tags.some((tag) => tag.toLowerCase().includes(query.toLowerCase()))
+    )
     : []
 
   const getItemLocation = (itemId: string) => {
@@ -28,7 +28,7 @@ export function Search() {
 
   return (
     <div className="min-h-screen bg-bg-page pb-[106px]">
-      <div className="max-w-mobile mx-auto p-5">
+      <div className="max-w-mobile mx-auto p-4">
         {/* Search Header */}
         <div className="flex items-center gap-3 mb-5">
           <button onClick={() => navigate('/dashboard')}>

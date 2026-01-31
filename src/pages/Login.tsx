@@ -26,7 +26,7 @@ export function Login() {
   return (
     <div className="min-h-screen bg-bg-page flex flex-col">
       {/* Content */}
-      <div className="flex-1 flex flex-col justify-between px-6 py-10">
+      <div className="flex-1 flex flex-col justify-between px-4 py-10">
         {/* Top Section */}
         <div className="flex flex-col gap-8">
           {/* Logo Section */}

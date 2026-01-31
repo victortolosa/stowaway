@@ -54,7 +54,7 @@ export function Places() {
   }
 
   return (
-    <div className="p-5">
+    <div className="p-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="font-display text-[28px] font-bold text-text-primary">Places</h1>
         <button

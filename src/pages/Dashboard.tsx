@@ -46,7 +46,7 @@ export function Dashboard() {
   }
 
   return (
-    <div className="p-5 flex flex-col gap-6">
+    <div className="p-4 flex flex-col gap-6">
 
       {/* Header */}
       <div className="flex justify-between items-center">

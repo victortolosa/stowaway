@@ -71,7 +71,7 @@ export function Container() {
   }
 
   return (
-    <div className="p-5">
+    <div className="p-4">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <button

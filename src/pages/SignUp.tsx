@@ -26,7 +26,7 @@ export function SignUp() {
   return (
     <div className="min-h-screen bg-bg-page flex flex-col">
       {/* Content */}
-      <div className="flex-1 flex flex-col justify-between px-6 pt-10 pb-6">
+      <div className="flex-1 flex flex-col justify-between px-4 pt-10 pb-6">
         {/* Top Section */}
         <div className="flex flex-col gap-8">
           {/* Logo Section */}

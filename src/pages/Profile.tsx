@@ -20,7 +20,7 @@ export function Profile() {
 
   return (
     <div className="min-h-screen bg-bg-page pb-[106px]">
-      <div className="max-w-mobile mx-auto p-5">
+      <div className="max-w-mobile mx-auto p-4">
         {/* Header */}
         <h1 className="font-display text-2xl font-bold text-text-primary mb-6">Profile</h1>
 

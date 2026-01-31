@@ -78,7 +78,7 @@ export function Item() {
       </div>
 
       {/* Content */}
-      <div className="px-6 pt-6 space-y-6">
+      <div className="px-4 pt-6 space-y-6">
         {/* Item Header */}
         <div className="space-y-2">
           <h1 className="font-display text-[24px] font-bold text-text-primary leading-tight">
