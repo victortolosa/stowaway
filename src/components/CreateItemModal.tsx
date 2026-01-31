@@ -3,11 +3,12 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as Dialog from '@radix-ui/react-dialog'
+import { AnimatePresence } from 'framer-motion'
 import { X, Camera, Image as ImageIcon, Mic } from 'lucide-react'
 import { createItem, updateItem, uploadImage, uploadAudio, deleteStorageFile } from '@/services/firebaseService'
 import { useAuthStore } from '@/store/auth'
 import { useImageCompression } from '@/hooks'
-import { ImageCropper, AudioRecorder } from '@/components'
+import { ImageCropper, AudioRecorder, AudioPlayer } from '@/components'
 import { Item } from '@/types'
 
 const itemSchema = z.object({
@@ -41,6 +42,7 @@ export function CreateItemModal({
     const [showCropper, setShowCropper] = useState(false)
     const [imageToCrop, setImageToCrop] = useState<string | null>(null)
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
+    const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null)
     const [showAudioRecorder, setShowAudioRecorder] = useState(false)
 
     const { compress, isCompressing, progress } = useImageCompression()
@@ -64,6 +66,8 @@ export function CreateItemModal({
             setPhotoFile(null)
             setPhotoPreview(initialData.photos[0] || null)
             setAudioBlob(null)
+            if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
+            setAudioPreviewUrl(null)
             setShowAudioRecorder(false)
         } else if (isOpen && !editMode) {
             reset({
@@ -73,16 +77,25 @@ export function CreateItemModal({
             setPhotoFile(null)
             setPhotoPreview(null)
             setAudioBlob(null)
+            if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
+            setAudioPreviewUrl(null)
             setShowAudioRecorder(false)
         }
     }, [isOpen, editMode, initialData, reset])
+
+    // Cleanup audio preview URL on unmount
+    useEffect(() => {
+        return () => {
+            if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
+        }
+    }, [audioPreviewUrl])
 
     const onSubmit = async (data: ItemFormValues) => {
         if (!user) return
 
         setIsSubmitting(true)
+        const uploadedPaths: string[] = []
         try {
-            const uploadedPaths: string[] = []
             let photoUrl = ''
             let audioUrl = ''
 
@@ -138,6 +151,8 @@ export function CreateItemModal({
             setPhotoFile(null)
             setPhotoPreview(null)
             setAudioBlob(null)
+            if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
+            setAudioPreviewUrl(null)
             setShowAudioRecorder(false)
             onItemCreated()
             onClose()
@@ -145,8 +160,8 @@ export function CreateItemModal({
             console.error('Failed to save item:', error)
             // Attempt to cleanup any uploaded files
             try {
-                if (typeof uploadedPaths !== 'undefined' && uploadedPaths.length > 0) {
-                    await Promise.all(uploadedPaths.map((p) => deleteStorageFile(p)))
+                if (uploadedPaths.length > 0) {
+                    await Promise.all(uploadedPaths.map((p: string) => deleteStorageFile(p)))
                 }
             } catch (cleanupErr) {
                 console.error('Failed to cleanup uploaded files after item save failure:', cleanupErr)
@@ -331,34 +346,31 @@ export function CreateItemModal({
                                     <AudioRecorder
                                         onRecordingComplete={(blob) => {
                                             setAudioBlob(blob)
+                                            const url = URL.createObjectURL(blob)
+                                            setAudioPreviewUrl(url)
                                             setShowAudioRecorder(false)
                                         }}
                                         maxDuration={60}
                                     />
                                 )}
 
-                                {audioBlob && (
-                                    <div className="bg-bg-surface rounded-button p-4 flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-accent-pink/10 rounded-full flex items-center justify-center">
-                                            <Mic size={18} className="text-accent-pink" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="font-body text-[14px] font-medium text-text-primary">
-                                                Voice Note Ready
-                                            </p>
-                                            <p className="font-body text-[12px] text-text-secondary">
-                                                {(audioBlob.size / 1024).toFixed(1)} KB
-                                            </p>
-                                        </div>
+                                {audioBlob && audioPreviewUrl && (
+                                    <div className="relative">
+                                        <AudioPlayer
+                                            audioUrl={audioPreviewUrl}
+                                            className="border border-border-light"
+                                        />
                                         <button
                                             type="button"
                                             onClick={() => {
                                                 setAudioBlob(null)
+                                                if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
+                                                setAudioPreviewUrl(null)
                                                 setShowAudioRecorder(false)
                                             }}
-                                            className="w-8 h-8 bg-bg-elevated rounded-full flex items-center justify-center text-text-secondary hover:text-text-primary transition"
+                                            className="absolute -top-2 -right-2 w-7 h-7 bg-bg-elevated rounded-full shadow-sm flex items-center justify-center text-text-secondary hover:text-text-primary transition border border-border-light z-10"
                                         >
-                                            <X size={16} />
+                                            <X size={14} />
                                         </button>
                                     </div>
                                 )}
@@ -386,14 +398,16 @@ export function CreateItemModal({
             </Dialog.Root>
 
             {/* Image Cropper Modal */}
-            {showCropper && imageToCrop && (
-                <ImageCropper
-                    imageSrc={imageToCrop}
-                    onComplete={handleCropComplete}
-                    onCancel={handleCropCancel}
-                    aspectRatio={4 / 3}
-                />
-            )}
+            <AnimatePresence>
+                {showCropper && imageToCrop && (
+                    <ImageCropper
+                        imageSrc={imageToCrop}
+                        onComplete={handleCropComplete}
+                        onCancel={handleCropCancel}
+                        aspectRatio={4 / 3}
+                    />
+                )}
+            </AnimatePresence>
         </>
     )
 }

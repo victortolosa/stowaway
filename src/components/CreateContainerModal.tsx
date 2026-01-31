@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as Dialog from '@radix-ui/react-dialog'
+import { AnimatePresence } from 'framer-motion'
 import { X, Camera, Image as ImageIcon } from 'lucide-react'
 import { createContainer, updateContainer, uploadImageWithCleanup } from '@/services/firebaseService'
 import { useAuthStore } from '@/store/auth'
@@ -296,14 +297,16 @@ export function CreateContainerModal({
             </Dialog.Root>
 
             {/* Image Cropper Modal */}
-            {showCropper && imageToCrop && (
-                <ImageCropper
-                    imageSrc={imageToCrop}
-                    onComplete={handleCropComplete}
-                    onCancel={handleCropCancel}
-                    aspectRatio={4 / 3}
-                />
-            )}
+            <AnimatePresence>
+                {showCropper && imageToCrop && (
+                    <ImageCropper
+                        imageSrc={imageToCrop}
+                        onComplete={handleCropComplete}
+                        onCancel={handleCropCancel}
+                        aspectRatio={4 / 3}
+                    />
+                )}
+            </AnimatePresence>
         </>
     )
 }

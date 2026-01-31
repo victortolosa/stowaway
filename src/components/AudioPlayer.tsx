@@ -19,20 +19,27 @@ export function AudioPlayer({ audioUrl, className = '' }: AudioPlayerProps) {
         const audio = audioRef.current
         if (!audio) return
 
+        // Reset UI when source changes
+        setIsPlaying(false)
+        setCurrentTime(0)
+        setDuration(0)
+
         const updateTime = () => setCurrentTime(audio.currentTime)
-        const updateDuration = () => setDuration(audio.duration)
+        const updateDuration = () => setDuration(Number.isFinite(audio.duration) ? audio.duration : 0)
         const handleEnded = () => setIsPlaying(false)
 
         audio.addEventListener('timeupdate', updateTime)
         audio.addEventListener('loadedmetadata', updateDuration)
         audio.addEventListener('ended', handleEnded)
 
+        try { audio.load() } catch {}
+
         return () => {
             audio.removeEventListener('timeupdate', updateTime)
             audio.removeEventListener('loadedmetadata', updateDuration)
             audio.removeEventListener('ended', handleEnded)
         }
-    }, [])
+    }, [audioUrl])
 
     const togglePlayPause = () => {
         const audio = audioRef.current
@@ -40,17 +47,24 @@ export function AudioPlayer({ audioUrl, className = '' }: AudioPlayerProps) {
 
         if (isPlaying) {
             audio.pause()
+            setIsPlaying(false)
         } else {
             audio.play()
+                .then(() => setIsPlaying(true))
+                .catch((err) => {
+                    console.error('Playback failed:', err)
+                    setIsPlaying(false)
+                })
         }
-        setIsPlaying(!isPlaying)
     }
 
     const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
         const audio = audioRef.current
         if (!audio) return
 
-        const newTime = Number(e.target.value)
+        let newTime = Number(e.target.value)
+        if (Number.isNaN(newTime) || newTime < 0) newTime = 0
+        if (duration && newTime > duration) newTime = duration
         audio.currentTime = newTime
         setCurrentTime(newTime)
     }

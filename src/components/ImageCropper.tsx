@@ -1,6 +1,8 @@
 import { useState, useCallback } from 'react'
 import Cropper, { Area } from 'react-easy-crop'
-import { Crop, RotateCw, X, Check } from 'lucide-react'
+import { Crop, RotateCw, X, Check, Loader2 } from 'lucide-react'
+import * as Dialog from '@radix-ui/react-dialog'
+import { motion } from 'framer-motion'
 
 interface ImageCropperProps {
     imageSrc: string
@@ -106,75 +108,123 @@ export function ImageCropper({
     }
 
     return (
-        <div className="fixed inset-0 z-50 bg-black">
-            {/* Cropper Area */}
-            <div className="relative h-[calc(100vh-200px)]">
-                <Cropper
-                    image={imageSrc}
-                    crop={crop}
-                    zoom={zoom}
-                    rotation={rotation}
-                    aspect={aspectRatio}
-                    onCropChange={setCrop}
-                    onZoomChange={setZoom}
-                    onCropComplete={onCropComplete}
-                    style={{
-                        containerStyle: {
-                            backgroundColor: '#000',
-                        },
-                    }}
-                />
-            </div>
-
-            {/* Controls */}
-            <div className="absolute bottom-0 left-0 right-0 bg-bg-page p-5 space-y-4">
-                {/* Zoom Slider */}
-                <div className="flex items-center gap-3">
-                    <Crop size={20} className="text-text-secondary" />
-                    <input
-                        type="range"
-                        min={1}
-                        max={3}
-                        step={0.1}
-                        value={zoom}
-                        onChange={(e) => setZoom(Number(e.target.value))}
-                        className="flex-1 h-2 bg-bg-surface rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent-pink"
-                    />
-                    <span className="text-text-secondary text-sm w-12 text-right">
-                        {Math.round(zoom * 100)}%
-                    </span>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-3">
-                    <button
-                        onClick={onCancel}
-                        className="flex-1 h-12 bg-bg-surface rounded-button flex items-center justify-center gap-2 text-text-primary font-medium active:bg-bg-elevated transition"
-                        disabled={isProcessing}
+        <Dialog.Root open={true} onOpenChange={(open) => !open && onCancel()}>
+            <Dialog.Portal>
+                <Dialog.Overlay className="fixed inset-0 bg-black/90 z-[60] backdrop-blur-sm" />
+                <Dialog.Content className="fixed inset-0 z-[70] flex flex-col focus:outline-none overflow-hidden">
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ duration: 0.2, ease: 'easeOut' }}
+                        className="flex flex-col h-full"
                     >
-                        <X size={20} />
-                        Cancel
-                    </button>
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-4 bg-black/50 backdrop-blur-md border-b border-white/10">
+                            <h2 className="text-white font-medium">Crop Photo</h2>
+                            <button
+                                onClick={onCancel}
+                                className="p-2 text-white/70 hover:text-white transition rounded-full hover:bg-white/10"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
 
-                    <button
-                        onClick={handleRotate}
-                        className="h-12 w-12 bg-bg-surface rounded-button flex items-center justify-center active:bg-bg-elevated transition"
-                        disabled={isProcessing}
-                    >
-                        <RotateCw size={20} className="text-text-primary" />
-                    </button>
+                        {/* Cropper Area */}
+                        <div className="relative flex-1 bg-black">
+                            <Cropper
+                                image={imageSrc}
+                                crop={crop}
+                                zoom={zoom}
+                                rotation={rotation}
+                                aspect={aspectRatio}
+                                onCropChange={setCrop}
+                                onZoomChange={setZoom}
+                                onCropComplete={onCropComplete}
+                                style={{
+                                    containerStyle: {
+                                        backgroundColor: '#000',
+                                    },
+                                    cropAreaStyle: {
+                                        border: '2px solid white',
+                                        boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.7)',
+                                    },
+                                }}
+                            />
+                        </div>
 
-                    <button
-                        onClick={createCroppedImage}
-                        disabled={isProcessing}
-                        className="flex-1 h-12 bg-accent-pink rounded-button flex items-center justify-center gap-2 text-white font-medium active:opacity-90 transition disabled:opacity-50"
-                    >
-                        <Check size={20} />
-                        {isProcessing ? 'Processing...' : 'Done'}
-                    </button>
-                </div>
-            </div>
-        </div>
+                        {/* Controls Container */}
+                        <div className="p-6 pb-safe-area bg-bg-page border-t border-text-tertiary/10 space-y-6">
+                            {/* Zoom Slider */}
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2 text-text-secondary">
+                                        <Crop size={16} />
+                                        <span className="text-sm font-medium">Zoom</span>
+                                    </div>
+                                    <span className="text-text-secondary text-xs font-mono">
+                                        {Math.round(zoom * 100)}%
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        onClick={() => setZoom(Math.max(1, zoom - 0.1))}
+                                        className="text-text-tertiary hover:text-accent-pink transition"
+                                    >
+                                        <span className="text-xl font-bold">−</span>
+                                    </button>
+                                    <input
+                                        type="range"
+                                        min={1}
+                                        max={3}
+                                        step={0.01}
+                                        value={zoom}
+                                        onChange={(e) => setZoom(Number(e.target.value))}
+                                        className="flex-1 h-1.5 bg-bg-surface rounded-full appearance-none cursor-pointer accent-accent-pink"
+                                    />
+                                    <button
+                                        onClick={() => setZoom(Math.min(3, zoom + 0.1))}
+                                        className="text-text-tertiary hover:text-accent-pink transition"
+                                    >
+                                        <span className="text-xl font-bold">+</span>
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex gap-4">
+                                <button
+                                    onClick={handleRotate}
+                                    className="flex items-center justify-center h-12 w-12 bg-bg-surface border border-text-tertiary/10 rounded-xl active:bg-bg-elevated transition shadow-sm"
+                                    disabled={isProcessing}
+                                    title="Rotate"
+                                >
+                                    <RotateCw size={20} className="text-text-primary" />
+                                </button>
+
+                                <button
+                                    onClick={createCroppedImage}
+                                    disabled={isProcessing}
+                                    className="flex-1 h-12 bg-accent-pink rounded-xl flex items-center justify-center gap-2 text-text-primary font-bold shadow-lg shadow-accent-pink/20 active:scale-[0.98] transition-all disabled:opacity-50"
+                                >
+                                    {isProcessing ? (
+                                        <>
+                                            <Loader2 size={18} className="animate-spin" />
+                                            <span>Processing...</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Check size={20} />
+                                            <span>Apply Crop</span>
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                </Dialog.Content>
+            </Dialog.Portal>
+        </Dialog.Root>
     )
 }
 
