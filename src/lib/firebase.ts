@@ -50,20 +50,36 @@ if (missingKeys.length > 0) {
   }
 }
 
-const app = initializeApp(firebaseConfig)
+// Safe initialization wrapper
+let app: any;
+let auth: any;
+let db: any;
+let storage: any;
+let analytics: any = null;
 
-export const auth = getAuth(app)
-export const db = getFirestore(app)
-export const storage = getStorage(app)
+try {
+  app = initializeApp(firebaseConfig)
+  auth = getAuth(app)
+  db = getFirestore(app)
+  storage = getStorage(app)
 
-export const analytics = typeof window !== 'undefined' ? getAnalytics(app) : null
-
-// Optional: isSupported() check can be added if needed for specific environments
-isSupported().then(yes => {
-  if (yes) {
-    console.log('Firebase Analytics is supported')
+  if (typeof window !== 'undefined') {
+    isSupported().then(yes => {
+      if (yes) {
+        analytics = getAnalytics(app);
+        console.log('Firebase Analytics initialized');
+      }
+    });
   }
-})
+} catch (e: any) {
+  const errorMsg = `FIREBASE_CRITICAL_ERROR: ${e.message || e}`;
+  console.error(errorMsg, e);
+  if (typeof window !== 'undefined') {
+    (window as any).FIREBASE_INIT_ERROR = ((window as any).FIREBASE_INIT_ERROR || '') + '\n' + errorMsg;
+  }
+}
+
+export { auth, db, storage, analytics };
 
 // Disable persistence temporarily to debug hangs
 /*
