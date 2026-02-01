@@ -367,24 +367,32 @@ src/
 
 ---
 
-### ⏳ Sprint 5: QR System - PENDING
+### ⏳ Sprint 6: Production Stabilization - IN PROGRESS
 
-**Scope:** QR code generation, printable labels, and scanning for container lookup.
+**Goal:** Resolve production white screen issues and improve error resilience.
 
-**Key Deliverables:**
-- `QRCodeGenerator` - Generate QR codes with container ID payload
-- `QRLabelModal` - Preview, print, and download PDF labels
-- `PrintableLabelSheet` - Support single and batch label formats (Avery 5160/5163)
-- `QRScanner` - Camera-based scanning with `html5-qrcode`
-- `/scan` route and page
-- Print button on Container detail page
-- Batch print on Place detail page
+#### 1. Environment Variable Validation
+Add a check in `src/lib/firebase.ts` to ensure all required VITE_ variables are present. If missing, throw a descriptive error or log a warning that persists even if console is dropped (e.g., using a global variable).
 
-**Libraries:** `html5-qrcode` ✅, `jspdf` ✅, `html2canvas` ✅, `qrcode` ❌ (need to install)
+#### 2. Root Error Boundary
+Implement a global `ErrorBoundary` component in `src/App.tsx` to catch initialization errors and display a helpful message instead of a blank white screen.
 
-**See Section 4.3 for detailed implementation plan.**
+#### 3. Diagnostic Page (Optional/Secret)
+Add a `/debug` route that shows the status of critical services (Firebase, Auth, Storage) without exposing actual keys.
+
+#### 4. GitHub Secrets Verification
+Inform the user that the following secrets MUST be defined in **GitHub Settings > Secrets and Variables > Actions**:
+- `VITE_FIREBASE_API_KEY`
+- `VITE_FIREBASE_AUTH_DOMAIN`
+- `VITE_FIREBASE_PROJECT_ID`
+- `VITE_FIREBASE_STORAGE_BUCKET`
+- `VITE_FIREBASE_MESSAGING_SENDER_ID`
+- `VITE_FIREBASE_APP_ID`
+- `VITE_FIREBASE_MEASUREMENT_ID`
 
 ---
+
+### ⏳ Sprint 5: QR System - PENDING
 
 ## ⏳ Epic 3: Search & Launch (PENDING)
 

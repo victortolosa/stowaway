@@ -3,6 +3,7 @@ export * from './ui'
 
 // App Components
 export * from './ProtectedRoute'
+export * from './RootErrorBoundary'
 export * from './CreatePlaceModal'
 export * from './CreateContainerModal'
 export * from './CreateItemModal'

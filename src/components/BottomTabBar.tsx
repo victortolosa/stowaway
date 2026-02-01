@@ -33,7 +33,7 @@ export function BottomTabBar() {
                 )}
                 <Icon
                   size={24}
-                  className={active ? 'text-accent-pink drop-shadow-sm' : 'text-text-tertiary hover:text-text-secondary transition-colors'}
+                  className={active ? 'text-accent-aqua drop-shadow-sm' : 'text-text-tertiary hover:text-text-secondary transition-colors'}
                   strokeWidth={active ? 2.5 : 2}
                 />
                 {/* Removed label for cleaner look, or verify if user wants it. Keeping it hidden if active for minimal style or showing dot. 
@@ -42,7 +42,7 @@ export function BottomTabBar() {
                     I'll keep the label but make it smaller.
                 */}
                 <span
-                  className={`font-display text-[10px] tracking-wide transition-all duration-300 ${active ? 'font-bold text-accent-pink translate-y-0 opacity-100' : 'font-medium text-text-tertiary translate-y-0.5'
+                  className={`font-display text-[10px] tracking-wide transition-all duration-300 ${active ? 'font-bold text-accent-aqua translate-y-0 opacity-100' : 'font-medium text-text-tertiary translate-y-0.5'
                     }`}
                 >
                   {tab.label}
