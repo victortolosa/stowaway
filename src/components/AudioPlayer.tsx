@@ -15,14 +15,19 @@ export function AudioPlayer({ audioUrl, className = '' }: AudioPlayerProps) {
     const [currentTime, setCurrentTime] = useState(0)
     const [duration, setDuration] = useState(0)
 
-    useEffect(() => {
-        const audio = audioRef.current
-        if (!audio) return
+    const [prevAudioUrl, setPrevAudioUrl] = useState(audioUrl)
 
-        // Reset UI when source changes
+    // Reset UI when source changes
+    if (audioUrl !== prevAudioUrl) {
+        setPrevAudioUrl(audioUrl)
         setIsPlaying(false)
         setCurrentTime(0)
         setDuration(0)
+    }
+
+    useEffect(() => {
+        const audio = audioRef.current
+        if (!audio) return
 
         const updateTime = () => setCurrentTime(audio.currentTime)
         const updateDuration = () => setDuration(Number.isFinite(audio.duration) ? audio.duration : 0)
@@ -32,7 +37,9 @@ export function AudioPlayer({ audioUrl, className = '' }: AudioPlayerProps) {
         audio.addEventListener('loadedmetadata', updateDuration)
         audio.addEventListener('ended', handleEnded)
 
-        try { audio.load() } catch { }
+        try { audio.load() } catch {
+            /* ignore */
+        }
 
         return () => {
             audio.removeEventListener('timeupdate', updateTime)

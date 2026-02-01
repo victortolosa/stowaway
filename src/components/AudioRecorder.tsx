@@ -21,16 +21,20 @@ export function AudioRecorder({
     const stoppedRef = useRef(false)
 
     // Check for secure context and media device support
-    const [isSecureContext, setIsSecureContext] = useState(true)
-    const [hasMediaDevices, setHasMediaDevices] = useState(true)
+    const [isSecureContext] = useState(() => typeof window !== 'undefined' ? window.isSecureContext : true)
+    const [hasMediaDevices] = useState(() => typeof window !== 'undefined' ? !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) : true)
     const [availableMics, setAvailableMics] = useState<MediaDeviceInfo[]>([])
-    const [isStandalone, setIsStandalone] = useState(false)
-    const [isIOS, setIsIOS] = useState(false)
+    const [isStandalone] = useState(() => {
+        if (typeof window === 'undefined') return false
+        const standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches
+        return Boolean(standalone || (navigator as any).standalone)
+    })
+    const [isIOS] = useState(() => {
+        if (typeof navigator === 'undefined') return false
+        return /iP(ad|hone|od)/.test(navigator.userAgent)
+    })
 
     useEffect(() => {
-        setIsSecureContext(window.isSecureContext)
-        setHasMediaDevices(!!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia))
-
         // Check for available devices
         if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
             navigator.mediaDevices.enumerateDevices()
@@ -41,15 +45,6 @@ export function AudioRecorder({
                 })
                 .catch((err: any) => console.error("Error enumerating devices:", err))
         }
-
-        // PWA / standalone detection and iOS detection
-        try {
-            const standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches
-            setIsStandalone(Boolean(standalone || (navigator as any).standalone))
-        } catch { }
-        try {
-            setIsIOS(/iP(ad|hone|od)/.test(navigator.userAgent))
-        } catch { }
     }, [])
 
     const {
@@ -137,7 +132,9 @@ export function AudioRecorder({
                 if (document.hidden && status === 'recording') {
                     stopRecording()
                 }
-            } catch { }
+            } catch {
+                /* ignore */
+            }
         }
 
         document.addEventListener('visibilitychange', handleVisibility)
@@ -165,7 +162,9 @@ export function AudioRecorder({
         if (audioRef.current) {
             audioRef.current.pause()
             audioRef.current.onended = null
-            try { if (mediaBlobUrl) URL.revokeObjectURL(mediaBlobUrl) } catch { }
+            try { if (mediaBlobUrl) URL.revokeObjectURL(mediaBlobUrl) } catch {
+                /* ignore */
+            }
             audioRef.current.src = ''
             audioRef.current = null
         }

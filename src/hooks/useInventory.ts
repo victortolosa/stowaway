@@ -47,7 +47,7 @@ export function useInventory() {
     } catch (error) {
       console.error('Error loading inventory:', error)
     }
-  }, [user?.uid, setPlaces, setContainers, setItems])
+  }, [user, setPlaces, setContainers, setItems])
 
   useEffect(() => {
     loadInventory()
