@@ -79,6 +79,23 @@ try {
   }
 }
 
+// Ensure exports are not undefined to prevent immediate crashes in the app
+// This allows the RootErrorBoundary to actually render and show the error message
+if (!auth) {
+  auth = {
+    currentUser: null,
+    // Dummy implementation to prevent crash on execution
+    // @ts-ignore
+    onAuthStateChanged: (cb) => {
+      return () => { }; // Return dummy unsubscribe function
+    },
+    signOut: async () => { },
+  };
+}
+
+if (!db) db = {} as any;
+if (!storage) storage = {} as any;
+
 export { auth, db, storage, analytics };
 
 // Disable persistence temporarily to debug hangs
