@@ -19,16 +19,36 @@ const firebaseConfig = {
 const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'appId'] as const;
 const missingKeys = requiredKeys.filter(key => !firebaseConfig[key]);
 
+// Safely log configuration state for debugging
+if (import.meta.env.PROD || true) {
+  console.group('Firebase Configuration Diagnostics');
+  console.log('Status:', missingKeys.length === 0 ? 'VALID' : 'INVALID');
+  if (missingKeys.length > 0) {
+    console.error('Missing Keys:', missingKeys.join(', '));
+  }
+
+  // Safe logging of key presence and partial values
+  Object.keys(firebaseConfig).forEach(key => {
+    const value = firebaseConfig[key as keyof typeof firebaseConfig];
+    if (!value) {
+      console.warn(`${key}: MISSING`);
+    } else {
+      const valStr = String(value);
+      const prefix = valStr.substring(0, 6);
+      const suffix = valStr.substring(valStr.length - 4);
+      console.log(`${key}: PRESENT (Length: ${valStr.length}, Prefix: ${prefix}..., Suffix: ...${suffix})`);
+    }
+  });
+  console.groupEnd();
+}
+
 if (missingKeys.length > 0) {
   const errorMsg = `CRITICAL: Missing Firebase configuration keys: ${missingKeys.join(', ')}. Check your .env file or GitHub Secrets.`;
   console.error(errorMsg);
-  // In production, we want this to be loud if it causes an initialization failure
   if (import.meta.env.PROD) {
     (window as any).FIREBASE_INIT_ERROR = errorMsg;
   }
 }
-
-console.log('Firebase Config Status:', missingKeys.length === 0 ? 'VALID' : 'INVALID');
 
 const app = initializeApp(firebaseConfig)
 

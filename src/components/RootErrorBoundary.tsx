@@ -41,14 +41,14 @@ export class RootErrorBoundary extends Component<Props, State> {
                         </div>
 
                         <h1 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h1>
-                        <p className="text-gray-600 mb-6">
-                            The application encountered an unexpected error and could not start.
+                        <p className="text-gray-600 mb-6 text-sm">
+                            The application encountered a configuration error and could not start correctly.
                         </p>
 
                         {initError && (
                             <div className="bg-amber-50 border border-amber-100 rounded-lg p-4 mb-6 text-left">
-                                <p className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-1">Configuration Error</p>
-                                <p className="text-sm text-amber-700 leading-relaxed font-mono">
+                                <p className="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-2">Diagnostic Information</p>
+                                <p className="text-xs text-amber-900 leading-relaxed font-mono break-all whitespace-pre-wrap">
                                     {initError}
                                 </p>
                             </div>
@@ -56,7 +56,7 @@ export class RootErrorBoundary extends Component<Props, State> {
 
                         {!initError && this.state.error && (
                             <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left overflow-auto max-h-32">
-                                <p className="text-xs text-gray-400 font-mono">
+                                <p className="text-xs text-gray-500 font-mono italic">
                                     {this.state.error.message}
                                 </p>
                             </div>
@@ -64,13 +64,13 @@ export class RootErrorBoundary extends Component<Props, State> {
 
                         <button
                             onClick={() => window.location.reload()}
-                            className="w-full py-3 bg-accent-aqua text-white font-bold rounded-xl shadow-lg shadow-accent-aqua/20 active:scale-[0.98] transition-all"
+                            className="w-full py-4 bg-accent-aqua text-white font-bold rounded-2xl shadow-lg shadow-accent-aqua/20 active:scale-[0.98] transition-all"
                         >
-                            Reload Application
+                            Retry Loading
                         </button>
 
-                        <p className="mt-4 text-xs text-gray-400">
-                            If the problem persists, please contact support.
+                        <p className="mt-6 text-[10px] text-gray-400 leading-tight">
+                            If you are seeing this in production, please check your environment variables (VITE_ prefixed).
                         </p>
                     </div>
                 </div>
