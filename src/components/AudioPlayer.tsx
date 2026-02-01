@@ -32,7 +32,7 @@ export function AudioPlayer({ audioUrl, className = '' }: AudioPlayerProps) {
         audio.addEventListener('loadedmetadata', updateDuration)
         audio.addEventListener('ended', handleEnded)
 
-        try { audio.load() } catch {}
+        try { audio.load() } catch { }
 
         return () => {
             audio.removeEventListener('timeupdate', updateTime)
@@ -87,7 +87,7 @@ export function AudioPlayer({ audioUrl, className = '' }: AudioPlayerProps) {
                 <button
                     type="button"
                     onClick={togglePlayPause}
-                    className="w-10 h-10 bg-accent-pink rounded-full flex items-center justify-center text-white active:opacity-90 transition flex-shrink-0"
+                    className="w-10 h-10 bg-accent-aqua rounded-full flex items-center justify-center text-white active:opacity-90 transition flex-shrink-0"
                 >
                     {isPlaying ? (
                         <Pause size={16} fill="white" />
@@ -104,9 +104,9 @@ export function AudioPlayer({ audioUrl, className = '' }: AudioPlayerProps) {
                         max={duration || 0}
                         value={currentTime}
                         onChange={handleSeek}
-                        className="w-full h-1.5 bg-bg-elevated rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent-pink"
+                        className="w-full h-1.5 bg-bg-elevated rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-accent-aqua"
                         style={{
-                            background: `linear-gradient(to right, var(--color-accent-pink) 0%, var(--color-accent-pink) ${progress}%, var(--color-bg-elevated) ${progress}%, var(--color-bg-elevated) 100%)`
+                            background: `linear-gradient(to right, var(--color-accent-aqua) 0%, var(--color-accent-aqua) ${progress}%, var(--color-bg-elevated) ${progress}%, var(--color-bg-elevated) 100%)`
                         }}
                     />
 

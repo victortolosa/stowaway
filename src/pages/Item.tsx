@@ -6,17 +6,8 @@ import { CreateItemModal, ConfirmDeleteModal, AudioPlayer } from '@/components'
 import { useInventory } from '@/hooks'
 import { deleteItem } from '@/services/firebaseService'
 import { ArrowLeft, ChevronRight, Pencil, Plus } from 'lucide-react'
+import { Button, Badge } from '@/components/ui'
 
-/**
- * Item Detail - View full item information and metadata
- * Shows:
- * - Item photo hero section
- * - Item name and location breadcrumb
- * - Tags
- * - Voice notes (if any)
- * - Description
- * - Move/Edit actions
- */
 export function Item() {
   const { id } = useParams<{ id: string }>()
   const user = useAuthStore((state) => state.user)
@@ -24,7 +15,6 @@ export function Item() {
   const { refresh } = useInventory()
   const navigate = useNavigate()
 
-  // Modal States
   const [isEditing, setIsEditing] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
@@ -78,7 +68,7 @@ export function Item() {
       </div>
 
       {/* Content */}
-      <div className="px-4 pt-6 space-y-6">
+      <div className="pt-6 space-y-6">
         {/* Item Header */}
         <div className="space-y-2">
           <h1 className="font-display text-[24px] font-bold text-text-primary leading-tight">
@@ -96,12 +86,9 @@ export function Item() {
           {item.tags.length > 0 && (
             <div className="flex flex-wrap gap-2 pt-1">
               {item.tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="bg-accent-pink/10 text-accent-pink px-3 py-1 rounded-md font-body text-sm font-medium"
-                >
+                <Badge key={tag} variant="primary" size="md">
                   {tag}
-                </span>
+                </Badge>
               ))}
             </div>
           )}
@@ -131,21 +118,23 @@ export function Item() {
 
         {/* Actions Section */}
         <div className="space-y-3 pt-2">
-          <button className="w-full bg-bg-surface rounded-button h-[52px] px-5 flex items-center justify-center gap-3">
-            <Plus size={20} className="text-text-primary" />
-            <span className="font-body text-base font-medium text-text-primary">
-              Move to Different Container
-            </span>
-          </button>
-          <button
-            onClick={() => setIsEditing(true)}
-            className="w-full bg-accent-pink rounded-button h-[52px] px-5 flex items-center justify-center gap-3"
+          <Button
+            variant="secondary"
+            size="lg"
+            fullWidth
+            leftIcon={Plus}
           >
-            <Pencil size={20} className="text-text-on-accent" />
-            <span className="font-body text-base font-semibold text-text-on-accent">
-              Edit Item
-            </span>
-          </button>
+            Move to Different Container
+          </Button>
+          <Button
+            variant="primary"
+            size="lg"
+            fullWidth
+            leftIcon={Pencil}
+            onClick={() => setIsEditing(true)}
+          >
+            Edit Item
+          </Button>
         </div>
       </div>
 

@@ -4,6 +4,7 @@ import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/auth'
 import { BottomTabBar } from '@/components'
 import { User, LogOut } from 'lucide-react'
+import { Card } from '@/components/ui'
 
 export function Profile() {
   const navigate = useNavigate()
@@ -21,12 +22,10 @@ export function Profile() {
   return (
     <div className="min-h-screen bg-bg-page pb-[106px]">
       <div className="max-w-mobile mx-auto p-4">
-        {/* Header */}
         <h1 className="font-display text-2xl font-bold text-text-primary mb-6">Profile</h1>
 
-        {/* User Info */}
-        <div className="bg-bg-card rounded-card p-6 mb-6 flex items-center gap-4">
-          <div className="w-16 h-16 bg-accent-primary rounded-full flex items-center justify-center">
+        <Card padding="lg" className="mb-6 flex items-center gap-4">
+          <div className="w-16 h-16 bg-accent-aqua rounded-full flex items-center justify-center">
             {user?.photoURL ? (
               <img src={user.photoURL} alt="Profile" className="w-16 h-16 rounded-full" />
             ) : (
@@ -39,17 +38,17 @@ export function Profile() {
             </h2>
             <p className="font-body text-sm text-text-secondary">{user?.email}</p>
           </div>
-        </div>
+        </Card>
 
-        {/* Settings */}
         <div className="space-y-3">
-          <button
+          <Card
+            variant="interactive"
             onClick={handleLogout}
-            className="w-full bg-bg-card rounded-card p-4 flex items-center gap-3 active:bg-bg-elevated transition"
+            className="flex items-center gap-3"
           >
-            <LogOut size={20} className="text-red-600" />
-            <span className="font-body text-base text-red-600 font-medium">Sign Out</span>
-          </button>
+            <LogOut size={20} className="text-accent-danger" />
+            <span className="font-body text-base text-accent-danger font-medium">Sign Out</span>
+          </Card>
         </div>
       </div>
 

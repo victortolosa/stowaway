@@ -16,11 +16,9 @@ export function BottomTabBar() {
 
   return (
     <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50">
-      {/* Tab Bar Section padding: [12, 24, 34, 24] */}
-      {/* Add a gradient fade or solid background if needed. For floating pill, maybe just transparency or gradient */}
-      <div className="bg-gradient-to-t from-bg-page via-bg-page to-transparent pt-3 px-6 pb-[34px]">
-        {/* Tab Bar: height 60, corner radius 100, padding 8 */}
-        <div className="bg-bg-surface rounded-full h-[60px] p-2 flex items-center justify-around shadow-floating">
+      <div className="bg-transparent pb-[34px] px-6">
+        {/* Tab Bar: height 64 (taller), glassy, blur, border, shadow-floating */}
+        <div className="bg-white/80 backdrop-blur-xl border border-white/40 rounded-full h-[64px] p-2 flex items-center justify-around shadow-floating ring-1 ring-black/5">
           {tabs.map((tab) => {
             const Icon = tab.icon
             const active = isActive(tab.path)
@@ -28,15 +26,23 @@ export function BottomTabBar() {
               <button
                 key={tab.id}
                 onClick={() => navigate(tab.path)}
-                className="flex flex-col items-center gap-1 py-[6px] px-4"
+                className="flex flex-col items-center justify-center gap-1 w-14 h-full relative"
               >
+                {active && (
+                  <div className="absolute -top-1 w-8 h-1 bg-accent-aqua rounded-full blur-[2px] opacity-60" />
+                )}
                 <Icon
-                  size={22}
-                  className={active ? 'text-accent-pink' : 'text-text-tertiary'}
-                  strokeWidth={2}
+                  size={24}
+                  className={active ? 'text-accent-pink drop-shadow-sm' : 'text-text-tertiary hover:text-text-secondary transition-colors'}
+                  strokeWidth={active ? 2.5 : 2}
                 />
+                {/* Removed label for cleaner look, or verify if user wants it. Keeping it hidden if active for minimal style or showing dot. 
+                    Let's keep the label but make it very subtle or remove for "best-in-class" clean look if agreed, 
+                    but strictly following "Reskin" usually implies keeping functionality. 
+                    I'll keep the label but make it smaller.
+                */}
                 <span
-                  className={`font-body text-[11px] ${active ? 'font-semibold text-accent-pink' : 'font-medium text-text-tertiary'
+                  className={`font-display text-[10px] tracking-wide transition-all duration-300 ${active ? 'font-bold text-accent-pink translate-y-0 opacity-100' : 'font-medium text-text-tertiary translate-y-0.5'
                     }`}
                 >
                   {tab.label}

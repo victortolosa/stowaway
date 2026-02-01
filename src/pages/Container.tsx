@@ -6,29 +6,20 @@ import { CreateItemModal, CreateContainerModal, ConfirmDeleteModal } from '@/com
 import { deleteContainer, deleteItem } from '@/services/firebaseService'
 import { Item } from '@/types'
 import { ArrowLeft, Pencil, Trash2, ChevronRight, Package, Plus, Mic } from 'lucide-react'
+import { Button, Card, IconBadge, EmptyState, Badge } from '@/components/ui'
 
-/**
- * Container Detail - View and manage items in a container
- * Shows:
- * - Container info with hero section
- * - List of items
- * - Add item button
- */
 export function Container() {
   const { id } = useParams<{ id: string }>()
   const user = useAuthStore((state) => state.user)
   const { containers, items, places, refresh } = useInventory()
   const navigate = useNavigate()
 
-  // Modal States
   const [isCreateItemOpen, setIsCreateItemOpen] = useState(false)
 
-  // Container Actions
   const [isEditingContainer, setIsEditingContainer] = useState(false)
   const [isDeleteContainerConfirmOpen, setIsDeleteContainerConfirmOpen] = useState(false)
   const [isDeletingContainer, setIsDeletingContainer] = useState(false)
 
-  // Item Actions
   const [editingItem, setEditingItem] = useState<Item | null>(null)
   const [deletingItem, setDeletingItem] = useState<Item | null>(null)
   const [isDeletingItem, setIsDeletingItem] = useState(false)
@@ -71,7 +62,7 @@ export function Container() {
   }
 
   return (
-    <div className="p-4">
+    <div className="flex flex-col h-full">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <button
@@ -82,26 +73,28 @@ export function Container() {
           <span className="font-body text-base text-text-primary">{place?.name}</span>
         </button>
         <div className="flex items-center gap-3">
-          <button
+          <Button
+            variant="icon"
+            size="icon"
+            className="w-11 h-11 bg-bg-surface rounded-full"
             onClick={() => setIsEditingContainer(true)}
-            className="w-11 h-11 bg-bg-surface rounded-full flex items-center justify-center"
           >
             <Pencil size={18} className="text-text-primary" strokeWidth={2} />
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="icon"
+            size="icon"
+            className="w-11 h-11 bg-bg-surface rounded-full"
             onClick={() => setIsDeleteContainerConfirmOpen(true)}
-            className="w-11 h-11 bg-bg-surface rounded-full flex items-center justify-center"
           >
             <Trash2 size={18} className="text-text-primary" strokeWidth={2} />
-          </button>
+          </Button>
         </div>
       </div>
 
       {/* Container Hero */}
       <div className="flex flex-col items-center gap-4 mb-6">
-        <div className="w-20 h-20 rounded-[24px] flex items-center justify-center bg-accent-blue">
-          <Package size={40} className="text-white" strokeWidth={2} />
-        </div>
+        <IconBadge icon={Package} color="#3B82F6" size="lg" />
         <div className="text-center flex flex-col gap-1">
           <h1 className="font-display text-[28px] font-bold text-text-primary leading-tight">
             {container.name}
@@ -116,32 +109,30 @@ export function Container() {
       <div className="flex flex-col gap-4">
         <div className="flex justify-between items-center">
           <h2 className="font-display text-[20px] font-bold text-text-primary">Items</h2>
-          <button
+          <Button
+            variant="primary"
+            size="sm"
+            leftIcon={Plus}
             onClick={() => setIsCreateItemOpen(true)}
-            className="bg-accent-pink rounded-button px-[14px] py-2 flex items-center gap-1.5"
           >
-            <Plus size={16} className="text-white" strokeWidth={2} />
-            <span className="font-body text-[13px] font-semibold text-white">Add Item</span>
-          </button>
+            Add Item
+          </Button>
         </div>
 
         {containerItems.length === 0 ? (
-          <div className="bg-bg-surface rounded-card p-8 text-center">
-            <p className="font-body text-text-secondary mb-4">No items in this container yet</p>
-            <button
-              onClick={() => setIsCreateItemOpen(true)}
-              className="font-body text-[14px] font-semibold text-accent-pink"
-            >
-              Add your first item
-            </button>
-          </div>
+          <EmptyState
+            message="No items in this container yet"
+            actionLabel="Add your first item"
+            onAction={() => setIsCreateItemOpen(true)}
+          />
         ) : (
           <div className="flex flex-col gap-3">
             {containerItems.map((item) => (
-              <div
+              <Card
                 key={item.id}
+                variant="interactive"
+                padding="sm"
                 onClick={() => navigate(`/items/${item.id}`)}
-                className="bg-bg-surface rounded-card p-[14px] cursor-pointer active:opacity-90 transition"
               >
                 <div className="flex items-center gap-[14px]">
                   {item.photos[0] ? (
@@ -161,7 +152,7 @@ export function Container() {
                         {item.name}
                       </h3>
                       {item.voiceNoteUrl && (
-                        <Mic size={14} className="text-accent-pink flex-shrink-0" />
+                        <Mic size={14} className="text-accent-aqua flex-shrink-0" />
                       )}
                     </div>
                     {item.description && (
@@ -172,19 +163,16 @@ export function Container() {
                     {item.tags.length > 0 && (
                       <div className="flex gap-1">
                         {item.tags.slice(0, 2).map((tag) => (
-                          <span
-                            key={tag}
-                            className="bg-accent-teal/10 text-accent-teal px-2 py-0.5 rounded text-xs font-body font-medium"
-                          >
+                          <Badge key={tag} variant="success" size="sm">
                             {tag}
-                          </span>
+                          </Badge>
                         ))}
                       </div>
                     )}
                   </div>
                   <ChevronRight size={20} className="text-text-tertiary flex-shrink-0" strokeWidth={2} />
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         )}

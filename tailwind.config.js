@@ -20,7 +20,7 @@ export default {
         'text-on-accent': '#FFFFFF',
 
         // Accents
-        'accent-pink': '#FFC0CB', // Primary Action
+        'accent-aqua': '#22D3EE', // Primary Action
         'accent-teal': '#14B8A6', // Places
         'accent-blue': '#3B82F6', // Containers
         'accent-amber': '#F59E0B',

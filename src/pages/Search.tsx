@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useInventory } from '@/hooks'
 import { ArrowLeft, Search as SearchIcon, Package } from 'lucide-react'
 import { BottomTabBar } from '@/components'
+import { Card } from '@/components/ui'
 
 export function Search() {
   const navigate = useNavigate()
@@ -34,7 +35,7 @@ export function Search() {
           <button onClick={() => navigate('/dashboard')}>
             <ArrowLeft size={24} className="text-text-primary" />
           </button>
-          <div className="flex-1 bg-bg-card rounded-3xl h-12 px-4 flex items-center gap-3">
+          <div className="flex-1 bg-bg-surface rounded-input h-12 px-4 flex items-center gap-3">
             <SearchIcon size={20} className="text-text-tertiary" />
             <input
               type="text"
@@ -57,10 +58,12 @@ export function Search() {
         {/* Results List */}
         <div className="space-y-3">
           {searchResults.map((item) => (
-            <div
+            <Card
               key={item.id}
+              variant="interactive"
+              padding="sm"
               onClick={() => navigate(`/items/${item.id}`)}
-              className="bg-bg-card rounded-card p-[14px] flex items-center gap-[14px] cursor-pointer active:bg-bg-elevated transition"
+              className="flex items-center gap-[14px]"
             >
               {item.photos[0] ? (
                 <img
@@ -81,7 +84,7 @@ export function Search() {
                   {getItemLocation(item.id)}
                 </p>
               </div>
-            </div>
+            </Card>
           ))}
         </div>
 

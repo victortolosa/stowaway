@@ -32,10 +32,11 @@ function App() {
   return (
     <Router>
       <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center bg-page">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent"></div>
+        <div className="min-h-screen flex items-center justify-center bg-bg-page">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-aqua"></div>
         </div>
       }>
+        <div className="fixed inset-0 min-h-screen w-full bg-bg-page -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-100/20 via-bg-page to-bg-page pointer-events-none" />
         <Routes>
           {/* Public routes */}
           <Route path="/login" element={<Login />} />

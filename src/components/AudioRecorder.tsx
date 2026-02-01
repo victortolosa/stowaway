@@ -269,7 +269,7 @@ export function AudioRecorder({
                                     type="button"
                                     onClick={startRecording}
                                     disabled={isLoading}
-                                    className="flex-1 h-12 bg-accent-pink rounded-button flex items-center justify-center gap-2 text-white font-medium active:opacity-90 transition disabled:opacity-50"
+                                    className="flex-1 h-12 bg-accent-aqua rounded-button flex items-center justify-center gap-2 text-white font-medium active:opacity-90 transition disabled:opacity-50"
                                 >
                                     {isLoading ? (
                                         <>
@@ -308,7 +308,7 @@ export function AudioRecorder({
                         <button
                             type="button"
                             onClick={togglePlayPreview}
-                            className="w-10 h-10 bg-accent-pink rounded-full flex items-center justify-center text-white active:opacity-90 transition"
+                            className="w-10 h-10 bg-accent-aqua rounded-full flex items-center justify-center text-white active:opacity-90 transition"
                         >
                             {isPlaying ? <Pause size={16} fill="white" /> : <Play size={16} fill="white" className="ml-0.5" />}
                         </button>

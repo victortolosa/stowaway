@@ -117,15 +117,216 @@ We will utilize a **Progressive Web App (PWA)** architecture for cross-platform 
 - Integrate into `CreateItemModal`
 - Update Item detail page for playback
 
-### 3. QR Scanning ⏳ PENDING (Sprint 5)
+### 3. QR Code System ⏳ PENDING (Sprint 5)
 
-* **Library:** `html5-qrcode`. Used for instant container redirection.
+This feature enables QR code generation for container labels and printing to physical printers, plus scanning for quick container lookup.
 
-**Next Steps:**
-- Create `QRGenerator` component (with jspdf for labels)
-- Create `QRScanner` component
-- Add scan route and page
-- Wire up Dashboard "Scan QR" button
+#### 3.1 Dependencies
+
+| Package | Version | Purpose | Status |
+|---------|---------|---------|--------|
+| `jspdf` | ^4.0.0 | PDF generation for printable labels | ✅ Installed |
+| `html5-qrcode` | ^2.3.8 | QR code scanning | ✅ Installed |
+| `html2canvas` | ^1.4.1 | Render DOM to canvas for PDF embedding | ✅ Installed |
+| `qrcode` | latest | Pure QR code generation (data URLs/canvas) | ❌ Need to install |
+
+#### 3.2 QR Code ID Strategy
+
+- Use the container's Firestore document `id` as the `qrCodeId`
+- QR payload format: `stowaway://container/{containerId}`
+- Enables deep linking when scanned
+- The `Container` interface already has `qrCodeId?: string` field
+
+#### 3.3 Components to Create
+
+**A. `QRCodeGenerator.tsx`**
+
+Generate QR code as canvas/data URL for a given container, display preview, and include container name and place as human-readable text below QR.
+
+```typescript
+interface QRCodeGeneratorProps {
+  containerId: string
+  containerName: string
+  placeName: string
+  size?: number // default 200px
+  onGenerated?: (dataUrl: string) => void
+}
+```
+
+**B. `PrintableLabelSheet.tsx`**
+
+Render a printable sheet with QR labels. Support multiple formats:
+- **Single Label:** One large label per page (4" x 6")
+- **Sheet of Labels:** Multiple labels per page (e.g., Avery 5160 - 30 labels/sheet)
+
+```typescript
+interface PrintableLabelSheetProps {
+  containers: Array<{ id: string; name: string; placeName: string }>
+  format: 'single' | 'sheet-30' | 'sheet-10'
+}
+```
+
+**Label Layout:**
+```
+┌─────────────────────────┐
+│      [QR CODE]          │
+│                         │
+│   Container Name        │
+│   Place Name            │
+│   ─────────────────     │
+│   stowaway              │
+└─────────────────────────┘
+```
+
+**C. `QRLabelModal.tsx`**
+
+Modal for generating and printing QR labels:
+- Preview the QR label
+- Select label format (single/sheet)
+- "Print" button → sends to browser print dialog
+- "Download PDF" button → saves as PDF file
+
+**D. `QRScanner.tsx`**
+
+- Use `html5-qrcode` for camera-based scanning
+- Parse scanned URL and redirect to container page
+- Handle invalid/unknown QR codes gracefully
+
+#### 3.4 Printing Implementation
+
+**Method 1: Browser Print API (Primary)**
+
+```typescript
+// src/utils/printLabel.ts
+export async function printLabel(containerId: string): Promise<void> {
+  // 1. Generate QR code as data URL
+  const qrDataUrl = await generateQRCode(`stowaway://container/${containerId}`)
+
+  // 2. Create print-optimized HTML
+  const printWindow = window.open('', '_blank')
+  printWindow.document.write(`
+    <html>
+      <head>
+        <style>
+          @media print {
+            body { margin: 0; }
+            .label { page-break-after: always; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="label">
+          <img src="${qrDataUrl}" />
+          <p>${containerName}</p>
+        </div>
+      </body>
+    </html>
+  `)
+
+  // 3. Trigger print dialog
+  printWindow.print()
+  printWindow.close()
+}
+```
+
+**Pros:** Native OS printer selection, works with any connected printer, no additional setup.
+
+**Method 2: PDF Generation with jsPDF (Secondary)**
+
+```typescript
+// src/utils/generateLabelPDF.ts
+import { jsPDF } from 'jspdf'
+import QRCode from 'qrcode'
+
+export async function generateLabelPDF(
+  containers: Container[],
+  format: 'single' | 'sheet-30'
+): Promise<Blob> {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'in',
+    format: format === 'single' ? [4, 6] : 'letter'
+  })
+
+  for (const container of containers) {
+    const qrDataUrl = await QRCode.toDataURL(
+      `stowaway://container/${container.id}`,
+      { width: 200, margin: 1 }
+    )
+    doc.addImage(qrDataUrl, 'PNG', x, y, 1.5, 1.5)
+    doc.text(container.name, x, y + 1.7)
+  }
+
+  return doc.output('blob')
+}
+```
+
+**Pros:** User can save and print later, consistent output across devices, better for batch printing.
+
+#### 3.5 Print Label Specifications
+
+| Format | Dimensions | Use Case |
+|--------|------------|----------|
+| Single Large | 4" × 6" | Shipping labels, large bins |
+| Avery 5160 | 1" × 2.625" | Standard address labels |
+| Avery 5163 | 2" × 4" | Shipping labels |
+
+**QR Code Size Guidelines:**
+- Minimum: 1" × 1" for reliable scanning
+- Recommended: 1.5" × 1.5" for easy mobile scanning
+- Include 4-module quiet zone around QR
+
+#### 3.6 Integration Points
+
+1. **Container Detail Page** (`src/pages/Container.tsx`) - Add "Print QR Label" button
+2. **Place Detail Page** (`src/pages/PlaceDetail.tsx`) - Add "Print All Labels" for batch printing
+3. **Container Creation Flow** - Prompt "Would you like to print a QR label?"
+4. **Dashboard** - Wire up existing "Scan QR" button to `/scan` route
+
+#### 3.7 File Structure
+
+```
+src/
+├── components/
+│   ├── QRCodeGenerator.tsx      # QR code generation component
+│   ├── QRLabelModal.tsx         # Print/download modal
+│   ├── QRScanner.tsx            # Camera-based scanner
+│   └── PrintableLabelSheet.tsx  # Printable label layout
+├── utils/
+│   ├── qrCode.ts                # QR generation helpers
+│   └── printLabel.ts            # Print & PDF functions
+└── pages/
+    └── Scan.tsx                 # QR scanner page
+```
+
+#### 3.8 Implementation Tasks
+
+| # | Task | Size |
+|---|------|------|
+| 1 | Install `qrcode` package | - |
+| 2 | Create `src/utils/qrCode.ts` utility with generation function | S |
+| 3 | Create `QRCodeGenerator.tsx` component | S |
+| 4 | Create `src/utils/printLabel.ts` with browser print function | S |
+| 5 | Create `src/utils/generateLabelPDF.ts` for PDF export | M |
+| 6 | Create `QRLabelModal.tsx` with preview + actions | M |
+| 7 | Add print button to Container page | S |
+| 8 | Add batch print to PlaceDetail page | S |
+| 9 | Add print prompt after container creation | S |
+| 10 | Create `QRScanner.tsx` component | M |
+| 11 | Create `/scan` route and `Scan.tsx` page | S |
+| 12 | Wire up Dashboard "Scan QR" button | S |
+
+#### 3.9 Testing Checklist
+
+- [ ] QR code generates correctly for container ID
+- [ ] QR code scans correctly with phone camera
+- [ ] Browser print dialog opens with correct layout
+- [ ] PDF generates with correct dimensions
+- [ ] PDF downloads successfully
+- [ ] Labels print correctly on standard printer paper
+- [ ] QR code remains scannable after printing
+- [ ] Scanner redirects to correct container page
+- [ ] Scanner handles invalid QR codes gracefully
 
 ---
 
@@ -152,8 +353,6 @@ We will utilize a **Progressive Web App (PWA)** architecture for cross-platform 
 - CreateItemModal updated with native camera support
 - CreateContainerModal updated with native camera support
 
-**All tasks complete!**
-
 ---
 
 ### ⏳ Sprint 4: Audio Recording - PENDING
@@ -168,15 +367,22 @@ We will utilize a **Progressive Web App (PWA)** architecture for cross-platform 
 
 ---
 
-### ⏳ Sprint 5: QR System - PENDING  
+### ⏳ Sprint 5: QR System - PENDING
 
-**Next Steps:**
-- QR code generation with `jspdf` for printable labels
-- QR scanner using `html5-qrcode`
-- Add /scan route and page
-- Wire up Dashboard "Scan QR" button
+**Scope:** QR code generation, printable labels, and scanning for container lookup.
 
-**Libraries already installed:** `html5-qrcode`, `jspdf`
+**Key Deliverables:**
+- `QRCodeGenerator` - Generate QR codes with container ID payload
+- `QRLabelModal` - Preview, print, and download PDF labels
+- `PrintableLabelSheet` - Support single and batch label formats (Avery 5160/5163)
+- `QRScanner` - Camera-based scanning with `html5-qrcode`
+- `/scan` route and page
+- Print button on Container detail page
+- Batch print on Place detail page
+
+**Libraries:** `html5-qrcode` ✅, `jspdf` ✅, `html2canvas` ✅, `qrcode` ❌ (need to install)
+
+**See Section 4.3 for detailed implementation plan.**
 
 ---
 

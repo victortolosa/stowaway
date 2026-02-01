@@ -7,6 +7,7 @@ import { useInventory } from '@/hooks'
 import { deleteContainer, deletePlace } from '@/services/firebaseService'
 import { Container } from '@/types'
 import { ArrowLeft, MoreVertical, ChevronRight, Package, Plus } from 'lucide-react'
+import { Button, Card, IconBadge, EmptyState } from '@/components/ui'
 
 export function PlaceDetail() {
     const { id } = useParams<{ id: string }>()
@@ -15,16 +16,13 @@ export function PlaceDetail() {
     const { places, containers, items } = useInventoryStore()
     const navigate = useNavigate()
 
-    // Modal States
     const [isCreateContainerOpen, setIsCreateContainerOpen] = useState(false)
     const [showMenu, setShowMenu] = useState(false)
 
-    // Place Actions
     const [isEditingPlace, setIsEditingPlace] = useState(false)
     const [isDeletingPlace, setIsDeletingPlace] = useState(false)
     const [isDeletePlaceConfirmOpen, setIsDeletePlaceConfirmOpen] = useState(false)
 
-    // Container Actions
     const [editingContainer, setEditingContainer] = useState<Container | null>(null)
     const [deletingContainer, setDeletingContainer] = useState<Container | null>(null)
     const [isDeletingContainer, setIsDeletingContainer] = useState(false)
@@ -45,9 +43,6 @@ export function PlaceDetail() {
     ).length
 
     const getContainerColor = (index: number) => {
-        // We could also map these to our tailwind safe-list or just use style objects for dynamic colors
-        // For now, let's keep hex but maybe use the css vars if we wanted strictly tokens
-        // But dynamic colors are often exceptions.
         const colors = ['#3B82F6', '#3B82F6', '#3B82F6', '#18181B', '#F59E0B']
         return colors[index % colors.length]
     }
@@ -82,7 +77,7 @@ export function PlaceDetail() {
     }
 
     return (
-        <div className="p-4">
+        <div className="flex flex-col h-full">
             {/* Header */}
             <div className="flex justify-between items-center mb-6">
                 <button
@@ -93,12 +88,14 @@ export function PlaceDetail() {
                     <span className="font-body text-base text-text-primary">Back</span>
                 </button>
                 <div className="relative">
-                    <button
+                    <Button
+                        variant="icon"
+                        size="icon"
+                        className="w-11 h-11 bg-bg-surface rounded-full"
                         onClick={() => setShowMenu(!showMenu)}
-                        className="w-11 h-11 bg-bg-surface rounded-full flex items-center justify-center"
                     >
                         <MoreVertical size={20} className="text-text-primary" strokeWidth={2} />
-                    </button>
+                    </Button>
                     {showMenu && (
                         <div className="absolute right-0 mt-2 w-48 bg-bg-page rounded-card shadow-card py-2 z-10 border border-border-standard">
                             <button
@@ -126,9 +123,7 @@ export function PlaceDetail() {
 
             {/* Place Hero */}
             <div className="flex flex-col items-center gap-4 mb-6">
-                <div className="w-20 h-20 rounded-[24px] flex items-center justify-center bg-accent-teal">
-                    <Package size={40} className="text-white" strokeWidth={2} />
-                </div>
+                <IconBadge icon={Package} color="#14B8A6" size="lg" />
                 <div className="text-center flex flex-col gap-1">
                     <h1 className="font-display text-[28px] font-bold text-text-primary leading-tight">
                         {place.name}
@@ -143,39 +138,32 @@ export function PlaceDetail() {
             <div className="flex flex-col gap-4">
                 <div className="flex justify-between items-center">
                     <h2 className="font-display text-[20px] font-bold text-text-primary">Containers</h2>
-                    <button
+                    <Button
+                        variant="primary"
+                        size="sm"
+                        leftIcon={Plus}
                         onClick={() => setIsCreateContainerOpen(true)}
-                        className="bg-accent-pink rounded-card px-[14px] py-2 flex items-center gap-1.5"
                     >
-                        <Plus size={16} className="text-white" strokeWidth={2} />
-                        <span className="font-body text-[13px] font-semibold text-white">Add</span>
-                    </button>
+                        Add
+                    </Button>
                 </div>
 
                 {placeContainers.length === 0 ? (
-                    <div className="bg-bg-surface rounded-card p-8 text-center">
-                        <p className="font-body text-text-secondary mb-4">No containers in this place yet</p>
-                        <button
-                            onClick={() => setIsCreateContainerOpen(true)}
-                            className="font-body text-[14px] font-semibold text-accent-pink"
-                        >
-                            Add Your First Container
-                        </button>
-                    </div>
+                    <EmptyState
+                        message="No containers in this place yet"
+                        actionLabel="Add Your First Container"
+                        onAction={() => setIsCreateContainerOpen(true)}
+                    />
                 ) : (
                     <div className="flex flex-col gap-3">
                         {placeContainers.map((container, index) => (
-                            <div
+                            <Card
                                 key={container.id}
+                                variant="interactive"
                                 onClick={() => navigate(`/containers/${container.id}`)}
-                                className="bg-bg-surface rounded-card p-4 flex items-center gap-[14px] cursor-pointer active:opacity-90 transition"
+                                className="flex items-center gap-[14px]"
                             >
-                                <div
-                                    className="w-14 h-14 rounded-[14px] flex items-center justify-center flex-shrink-0"
-                                    style={{ backgroundColor: getContainerColor(index) }}
-                                >
-                                    <Package size={28} className="text-white" strokeWidth={2} />
-                                </div>
+                                <IconBadge icon={Package} color={getContainerColor(index)} />
                                 <div className="flex-1 min-w-0 flex flex-col gap-1">
                                     <h3 className="font-body text-[16px] font-semibold text-text-primary">
                                         {container.name}
@@ -194,7 +182,7 @@ export function PlaceDetail() {
                                     </p>
                                 </div>
                                 <ChevronRight size={20} className="text-text-tertiary" strokeWidth={2} />
-                            </div>
+                            </Card>
                         ))}
                     </div>
                 )}

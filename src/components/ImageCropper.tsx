@@ -169,7 +169,7 @@ export function ImageCropper({
                                 <div className="flex items-center gap-4">
                                     <button
                                         onClick={() => setZoom(Math.max(1, zoom - 0.1))}
-                                        className="text-text-tertiary hover:text-accent-pink transition"
+                                        className="text-text-tertiary hover:text-accent-aqua transition"
                                     >
                                         <span className="text-xl font-bold">−</span>
                                     </button>
@@ -180,11 +180,11 @@ export function ImageCropper({
                                         step={0.01}
                                         value={zoom}
                                         onChange={(e) => setZoom(Number(e.target.value))}
-                                        className="flex-1 h-1.5 bg-bg-surface rounded-full appearance-none cursor-pointer accent-accent-pink"
+                                        className="flex-1 h-1.5 bg-bg-surface rounded-full appearance-none cursor-pointer accent-accent-aqua"
                                     />
                                     <button
                                         onClick={() => setZoom(Math.min(3, zoom + 0.1))}
-                                        className="text-text-tertiary hover:text-accent-pink transition"
+                                        className="text-text-tertiary hover:text-accent-aqua transition"
                                     >
                                         <span className="text-xl font-bold">+</span>
                                     </button>
@@ -205,7 +205,7 @@ export function ImageCropper({
                                 <button
                                     onClick={createCroppedImage}
                                     disabled={isProcessing}
-                                    className="flex-1 h-12 bg-accent-pink rounded-xl flex items-center justify-center gap-2 text-text-primary font-bold shadow-lg shadow-accent-pink/20 active:scale-[0.98] transition-all disabled:opacity-50"
+                                    className="flex-1 h-12 bg-accent-aqua rounded-xl flex items-center justify-center gap-2 text-text-primary font-bold shadow-lg shadow-accent-aqua/20 active:scale-[0.98] transition-all disabled:opacity-50"
                                 >
                                     {isProcessing ? (
                                         <>
