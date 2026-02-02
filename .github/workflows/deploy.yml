@@ -4,9 +4,18 @@ name: Deploy to Firebase Hosting on merge
     branches:
       - main
 
+permissions:
+  contents: read
+  deployments: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build_and_deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
       VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
