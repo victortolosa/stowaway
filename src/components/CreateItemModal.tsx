@@ -96,7 +96,11 @@ export function CreateItemModal({
     }, [audioPreviewUrl])
 
     const onSubmit = async (data: ItemFormValues) => {
-        if (!user) return
+        console.log('onSubmit triggered', { user: user?.uid, data })
+        if (!user) {
+            console.error('onSubmit failed: No user logged in')
+            return
+        }
 
         setIsSubmitting(true)
         const uploadedPaths: string[] = []
