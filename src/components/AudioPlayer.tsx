@@ -220,6 +220,7 @@ export function AudioPlayer({ audioUrl, className = '' }: AudioPlayerProps) {
                     muted={false}
                     controls={false}
                     autoPlay={false}
+                    crossOrigin="anonymous" // Add anonymous access for CORS on iOS
                     style={{
                         display: 'none',
                         position: 'absolute',
