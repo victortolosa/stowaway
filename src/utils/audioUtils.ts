@@ -1,8 +1,13 @@
+// Extend Window interface to include webkitAudioContext
+interface WebkitWindow extends Window {
+    webkitAudioContext?: typeof AudioContext
+}
+
 export const trimSilence = async (
     audioBlob: Blob,
     threshold = 0.02 // ~ -34dB
 ): Promise<Blob> => {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const audioContext = new (window.AudioContext || (window as WebkitWindow).webkitAudioContext!)()
     const arrayBuffer = await audioBlob.arrayBuffer()
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
 

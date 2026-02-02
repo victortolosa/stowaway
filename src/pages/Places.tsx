@@ -86,7 +86,7 @@ export function Places() {
                       e.stopPropagation()
                       setDeletingPlace(place)
                     }}
-                    className="p-2 text-text-tertiary hover:text-accent-danger transition-colors z-10"
+                    className="p-3 text-text-tertiary hover:text-accent-danger transition-colors z-10"
                   >
                     <Trash2 size={20} strokeWidth={2} />
                   </button>

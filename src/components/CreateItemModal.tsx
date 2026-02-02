@@ -138,7 +138,7 @@ export function CreateItemModal({
             }
 
             if (editMode && initialData) {
-                const updatePayload: any = {
+                const updatePayload: Partial<Item> & { voiceNoteUrl?: ReturnType<typeof deleteField> } = {
                     ...itemData,
                     photos: photoUrl ? [photoUrl] : initialData.photos,
                 }
@@ -152,11 +152,13 @@ export function CreateItemModal({
                 await updateItem(initialData.id, updatePayload)
             } else {
                 await createItem({
-                    ...itemData,
+                    name: itemData.name,
+                    description: itemData.description,
                     containerId,
                     photos: photoUrl ? [photoUrl] : [],
                     tags: [],
-                } as any)
+                    voiceNoteUrl: audioUrl,
+                })
             }
 
             reset()

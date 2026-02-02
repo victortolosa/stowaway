@@ -32,7 +32,7 @@ export function Search() {
       <div className="max-w-mobile mx-auto p-4">
         {/* Search Header */}
         <div className="flex items-center gap-3 mb-5">
-          <button onClick={() => navigate('/dashboard')}>
+          <button onClick={() => navigate('/dashboard')} className="p-2">
             <ArrowLeft size={24} className="text-text-primary" />
           </button>
           <div className="flex-1 bg-bg-surface rounded-input h-12 px-4 flex items-center gap-3">

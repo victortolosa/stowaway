@@ -5,6 +5,15 @@ import { useInventoryStore } from '@/store/inventory'
 import { Search, ScanLine, Plus, Bell, ChevronRight, Home, Briefcase, Archive, MapPin, Package, Mic } from 'lucide-react'
 import { Button, Card, IconBadge, EmptyState } from '@/components/ui'
 import { QRScanner } from '@/components/QRScanner'
+import { Timestamp } from 'firebase/firestore'
+
+// Helper to convert Firestore Timestamp to Date
+const toDate = (timestamp: Date | Timestamp): Date => {
+  if (timestamp instanceof Timestamp) {
+    return timestamp.toDate()
+  }
+  return timestamp instanceof Date ? timestamp : new Date(timestamp)
+}
 
 export function Dashboard() {
   const { refresh } = useInventory()
@@ -33,8 +42,8 @@ export function Dashboard() {
 
   const recentItems = [...items]
     .sort((a, b) => {
-      const dateA = (a.createdAt as any)?.toDate?.() || new Date(a.createdAt as any)
-      const dateB = (b.createdAt as any)?.toDate?.() || new Date(b.createdAt as any)
+      const dateA = toDate(a.createdAt)
+      const dateB = toDate(b.createdAt)
       return dateB.getTime() - dateA.getTime()
     })
     .slice(0, 3)
@@ -111,7 +120,7 @@ export function Dashboard() {
             <h2 className="font-display text-[22px] md:text-2xl font-bold text-text-primary tracking-tight">My Places</h2>
             <button
               onClick={() => navigate('/places')}
-              className="font-body text-[14px] font-medium text-accent-aqua hover:text-accent-aqua-dark transition-colors"
+              className="font-body text-[14px] font-medium text-accent-aqua hover:text-accent-aqua-dark transition-colors px-3 py-2"
             >
               See all
             </button>
@@ -161,7 +170,7 @@ export function Dashboard() {
           <div className="flex flex-col gap-5">
             <div className="flex justify-between items-center px-1">
               <h2 className="font-display text-[22px] md:text-2xl font-bold text-text-primary tracking-tight">Recently Added</h2>
-              <button className="font-body text-[14px] font-medium text-accent-aqua hover:text-accent-aqua-dark transition-colors">
+              <button className="font-body text-[14px] font-medium text-accent-aqua hover:text-accent-aqua-dark transition-colors px-3 py-2">
                 See all
               </button>
             </div>
@@ -199,7 +208,7 @@ export function Dashboard() {
                     </div>
                     <span className="font-body text-[12px] text-text-tertiary whitespace-nowrap self-start mt-1">
                       {(() => {
-                        const date = (item.createdAt as any)?.toDate?.() || new Date(item.createdAt as any)
+                        const date = toDate(item.createdAt)
                         const now = new Date()
                         const diffMs = now.getTime() - date.getTime()
                         const diffHours = Math.floor(diffMs / (1000 * 60 * 60))

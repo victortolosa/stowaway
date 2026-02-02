@@ -56,7 +56,8 @@ export async function generateQRCodeToCanvas(
 export function parseQRCodeURL(url: string): string | null {
   try {
     const parsed = new URL(url)
-    const match = parsed.pathname.match(/\/containers\/([a-zA-Z0-9]+)/)
+    // Firestore IDs can contain letters, numbers, dashes, and underscores
+    const match = parsed.pathname.match(/\/containers\/([a-zA-Z0-9_-]+)/)
     return match ? match[1] : null
   } catch {
     return null

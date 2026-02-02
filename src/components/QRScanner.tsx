@@ -11,8 +11,15 @@ interface QRScannerProps {
 
 export function QRScanner({ onScan, onClose }: QRScannerProps) {
   const scannerRef = useRef<Html5Qrcode | null>(null)
+  const onScanRef = useRef(onScan)
   const [error, setError] = useState<string | null>(null)
   const [isStarting, setIsStarting] = useState(true)
+  const [scanMessage, setScanMessage] = useState<string | null>(null)
+
+  // Keep onScanRef up to date
+  useEffect(() => {
+    onScanRef.current = onScan
+  }, [onScan])
 
   useEffect(() => {
     const scannerId = 'qr-scanner-region'
@@ -29,12 +36,19 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
             aspectRatio: 1,
           },
           (decodedText) => {
+            console.log('QR Code scanned:', decodedText)
             const containerId = parseQRCodeURL(decodedText)
             if (containerId) {
+              console.log('Container ID extracted:', containerId)
               // Stop scanner before navigating
               scanner.stop().then(() => {
-                onScan(containerId)
+                onScanRef.current(containerId)
               })
+            } else {
+              // Show feedback for invalid QR codes
+              console.warn('Invalid Stowaway QR code:', decodedText)
+              setScanMessage('Not a valid Stowaway QR code. Keep scanning...')
+              setTimeout(() => setScanMessage(null), 2000)
             }
           },
           () => {
@@ -67,7 +81,7 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
         }
       }
     }
-  }, [onScan])
+  }, [])
 
   return (
     <div className="fixed inset-0 z-50 bg-black">
@@ -107,12 +121,18 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
         )}
       </div>
 
-      {/* Instructions */}
+      {/* Instructions and Scan Messages */}
       {!error && (
         <div className="absolute bottom-0 left-0 right-0 p-6 text-center bg-gradient-to-t from-black/80 to-transparent">
-          <p className="text-white/80 text-sm">
-            Point your camera at a Stowaway QR code
-          </p>
+          {scanMessage ? (
+            <p className="text-yellow-400 text-sm font-medium animate-pulse">
+              {scanMessage}
+            </p>
+          ) : (
+            <p className="text-white/80 text-sm">
+              Point your camera at a Stowaway QR code
+            </p>
+          )}
         </div>
       )}
     </div>

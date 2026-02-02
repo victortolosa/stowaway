@@ -16,8 +16,8 @@ export function Login() {
       const provider = new GoogleAuthProvider()
       await signInWithPopup(auth, provider)
       navigate('/dashboard')
-    } catch (err: any) {
-      setError(err.message || 'Failed to sign in with Google')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to sign in with Google')
     } finally {
       setLoading(false)
     }

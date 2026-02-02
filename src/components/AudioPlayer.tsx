@@ -10,7 +10,7 @@ interface AudioPlayerProps {
  * Custom audio player with play/pause controls and progress bar
  */
 export function AudioPlayer({ audioUrl, className = '' }: AudioPlayerProps) {
-    const audioRef = useRef<HTMLAudioElement>(null)
+    const audioRef = useRef<HTMLAudioElement | HTMLVideoElement>(null)
     const [isPlaying, setIsPlaying] = useState(false)
     const [currentTime, setCurrentTime] = useState(0)
     const [duration, setDuration] = useState(0)
@@ -212,7 +212,7 @@ export function AudioPlayer({ audioUrl, className = '' }: AudioPlayerProps) {
             {isIOS ? (
                 // Use video element on iOS for better speaker routing
                 <video
-                    ref={audioRef as any}
+                    ref={audioRef as React.RefObject<HTMLVideoElement>}
                     src={audioUrl}
                     preload="metadata"
                     playsInline

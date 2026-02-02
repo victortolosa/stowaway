@@ -1,8 +1,8 @@
-import { initializeApp } from 'firebase/app'
-import { getAnalytics, isSupported } from 'firebase/analytics'
-import { getAuth } from 'firebase/auth'
-import { getFirestore } from 'firebase/firestore'
-import { getStorage } from 'firebase/storage'
+import { initializeApp, type FirebaseApp } from 'firebase/app'
+import { getAnalytics, isSupported, type Analytics } from 'firebase/analytics'
+import { getAuth, type Auth } from 'firebase/auth'
+import { getFirestore, type Firestore } from 'firebase/firestore'
+import { getStorage, type FirebaseStorage } from 'firebase/storage'
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -47,16 +47,16 @@ if (missingKeys.length > 0) {
   const errorMsg = `CRITICAL: Missing Firebase configuration keys: ${missingKeys.join(', ')}. Check your .env file or GitHub Secrets.`;
   console.error(errorMsg);
   if (import.meta.env.PROD) {
-    (window as any).FIREBASE_INIT_ERROR = errorMsg;
+    window.FIREBASE_INIT_ERROR = errorMsg;
   }
 }
 
 // Safe initialization wrapper
-let app: any;
-let auth: any;
-let db: any;
-let storage: any;
-let analytics: any = null;
+let app: FirebaseApp | undefined;
+let auth: Auth | undefined;
+let db: Firestore | undefined;
+let storage: FirebaseStorage | undefined;
+let analytics: Analytics | null = null;
 
 try {
   app = initializeApp(firebaseConfig)
@@ -72,11 +72,11 @@ try {
       }
     });
   }
-} catch (e: any) {
-  const errorMsg = `FIREBASE_CRITICAL_ERROR: ${e.message || e}`;
+} catch (e) {
+  const errorMsg = `FIREBASE_CRITICAL_ERROR: ${e instanceof Error ? e.message : String(e)}`;
   console.error(errorMsg, e);
   if (typeof window !== 'undefined') {
-    (window as any).FIREBASE_INIT_ERROR = ((window as any).FIREBASE_INIT_ERROR || '') + '\n' + errorMsg;
+    window.FIREBASE_INIT_ERROR = (window.FIREBASE_INIT_ERROR || '') + '\n' + errorMsg;
   }
 }
 
@@ -86,16 +86,15 @@ if (!auth) {
   auth = {
     currentUser: null,
     // Dummy implementation to prevent crash on execution
-    // @ts-expect-error - Dummy implementation for initial render
-    onAuthStateChanged: (_cb) => {
+    onAuthStateChanged: (_cb: unknown) => {
       return () => { }; // Return dummy unsubscribe function
     },
     signOut: async () => { },
-  };
+  } as Auth;
 }
 
-if (!db) db = {} as any;
-if (!storage) storage = {} as any;
+if (!db) db = {} as Firestore;
+if (!storage) storage = {} as FirebaseStorage;
 
 export { auth, db, storage, analytics };
 

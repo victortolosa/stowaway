@@ -61,9 +61,10 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                 await updatePlace(initialData.id, data)
             } else {
                 await createPlace({
-                    ...data,
+                    name: data.name,
+                    type: data.type,
                     userId: user.uid,
-                } as any)
+                })
             }
 
             reset()

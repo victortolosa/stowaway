@@ -1,6 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { Mic, Square, Play, Pause, X, AlertCircle, Loader2 } from 'lucide-react'
 
+// Extend Navigator interface for iOS standalone mode
+interface IOSNavigator extends Navigator {
+    standalone?: boolean
+}
+
 interface AudioRecorderProps {
     onRecordingComplete: (blob: Blob) => void
     maxDuration?: number // in seconds
@@ -31,7 +36,7 @@ export function AudioRecorder({
     const [isStandalone] = useState(() => {
         if (typeof window === 'undefined') return false
         const standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches
-        return Boolean(standalone || (navigator as any).standalone)
+        return Boolean(standalone || (navigator as IOSNavigator).standalone)
     })
     const [isIOS] = useState(() => {
         if (typeof navigator === 'undefined') return false
@@ -171,9 +176,9 @@ export function AudioRecorder({
                 stopRecording()
             }, maxDuration * 1000)
 
-        } catch (err: any) {
+        } catch (err) {
             console.error('Failed to start recording:', err)
-            setError(err.name || 'permission_denied')
+            setError(err instanceof Error && 'name' in err ? (err as Error & { name: string }).name : 'permission_denied')
             setStatus('idle')
         }
     }
@@ -207,10 +212,12 @@ export function AudioRecorder({
                     console.log('Audio playback started successfully')
                     setIsPlaying(true)
                 })
-                .catch((err: any) => {
-                    console.error('Audio playback failed:', err.name, err.message, 'src:', audio.src)
+                .catch((err) => {
+                    const errorName = err instanceof Error && 'name' in err ? (err as Error & { name: string }).name : 'Unknown'
+                    const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+                    console.error('Audio playback failed:', errorName, errorMessage, 'src:', audio.src)
                     setIsPlaying(false)
-                    alert(`Preview playback failed: ${err.message || err.name || 'Unknown error'}. The recording was saved successfully.`)
+                    alert(`Preview playback failed: ${errorMessage}. The recording was saved successfully.`)
                 })
         }
     }

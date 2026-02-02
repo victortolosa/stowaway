@@ -8,6 +8,15 @@ import { deleteContainer, deletePlace } from '@/services/firebaseService'
 import { Container } from '@/types'
 import { ArrowLeft, MoreVertical, ChevronRight, Package, Plus, QrCode } from 'lucide-react'
 import { Button, Card, IconBadge, EmptyState } from '@/components/ui'
+import { Timestamp } from 'firebase/firestore'
+
+// Helper to convert Firestore Timestamp to Date
+const toDate = (timestamp: Date | Timestamp): Date => {
+  if (timestamp instanceof Timestamp) {
+    return timestamp.toDate()
+  }
+  return timestamp instanceof Date ? timestamp : new Date(timestamp)
+}
 
 export function PlaceDetail() {
     const { id } = useParams<{ id: string }>()
@@ -179,7 +188,7 @@ export function PlaceDetail() {
                                     <p className="font-body text-[13px] text-text-secondary">
                                         {getContainerItemCount(container.id)} items · Last updated{' '}
                                         {(() => {
-                                            const date = (container.lastAccessed as any)?.toDate?.() || new Date(container.lastAccessed as any)
+                                            const date = toDate(container.lastAccessed)
                                             const now = new Date()
                                             const diffMs = now.getTime() - date.getTime()
                                             const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))

@@ -1,5 +1,12 @@
 import { Component, ErrorInfo, ReactNode } from 'react';
 
+// Extend Window interface for Firebase init error tracking
+declare global {
+    interface Window {
+        FIREBASE_INIT_ERROR?: string;
+    }
+}
+
 interface Props {
     children: ReactNode;
 }
@@ -29,7 +36,7 @@ export class RootErrorBoundary extends Component<Props, State> {
 
     public render() {
         if (this.state.hasError) {
-            const initError = (window as any).FIREBASE_INIT_ERROR;
+            const initError = window.FIREBASE_INIT_ERROR;
 
             return (
                 <div className="min-h-screen flex items-center justify-center bg-[#F8F9FA] p-6 text-center">

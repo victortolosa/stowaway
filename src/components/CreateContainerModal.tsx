@@ -94,11 +94,11 @@ export function CreateContainerModal({
                             })
                         } else {
                             await createContainer({
-                                ...data,
+                                name: data.name,
                                 placeId,
                                 photoUrl: url,
                                 lastAccessed: new Date(),
-                            } as any)
+                            })
                         }
                     }
                 )
@@ -107,10 +107,10 @@ export function CreateContainerModal({
                     await updateContainer(initialData.id, data)
                 } else {
                     await createContainer({
-                        ...data,
+                        name: data.name,
                         placeId,
                         lastAccessed: new Date(),
-                    } as any)
+                    })
                 }
             }
 
