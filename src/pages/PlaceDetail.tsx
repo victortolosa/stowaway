@@ -6,7 +6,7 @@ import { CreateContainerModal, CreatePlaceModal, ConfirmDeleteModal } from '@/co
 import { useInventory } from '@/hooks'
 import { deleteContainer, deletePlace } from '@/services/firebaseService'
 import { Container } from '@/types'
-import { ArrowLeft, MoreVertical, ChevronRight, Package, Plus } from 'lucide-react'
+import { ArrowLeft, MoreVertical, ChevronRight, Package, Plus, QrCode } from 'lucide-react'
 import { Button, Card, IconBadge, EmptyState } from '@/components/ui'
 
 export function PlaceDetail() {
@@ -165,9 +165,17 @@ export function PlaceDetail() {
                             >
                                 <IconBadge icon={Package} color={getContainerColor(index)} />
                                 <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                    <h3 className="font-body text-[16px] font-semibold text-text-primary">
-                                        {container.name}
-                                    </h3>
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="font-body text-[16px] font-semibold text-text-primary">
+                                            {container.name}
+                                        </h3>
+                                        {container.qrCodeId && (
+                                            <div className="flex items-center gap-1 px-2 py-0.5 bg-accent-aqua/10 rounded-full">
+                                                <QrCode size={12} className="text-accent-aqua" strokeWidth={2} />
+                                                <span className="text-[10px] font-medium text-accent-aqua">QR</span>
+                                            </div>
+                                        )}
+                                    </div>
                                     <p className="font-body text-[13px] text-text-secondary">
                                         {getContainerItemCount(container.id)} items · Last updated{' '}
                                         {(() => {

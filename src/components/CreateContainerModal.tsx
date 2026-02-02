@@ -104,10 +104,7 @@ export function CreateContainerModal({
                 )
             } else {
                 if (editMode && initialData) {
-                    await updateContainer(initialData.id, {
-                        ...data,
-                        photoUrl: initialData.photoUrl,
-                    })
+                    await updateContainer(initialData.id, data)
                 } else {
                     await createContainer({
                         ...data,

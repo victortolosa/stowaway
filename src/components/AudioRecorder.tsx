@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react'
-import { useReactMediaRecorder } from 'react-media-recorder'
 import { Mic, Square, Play, Pause, X, AlertCircle, Loader2 } from 'lucide-react'
 
 interface AudioRecorderProps {
@@ -9,21 +8,26 @@ interface AudioRecorderProps {
 
 /**
  * Audio recording component with preview playback
- * Records audio/webm with opus codec for efficiency
+ * Uses native MediaRecorder with timeslice for iOS stability
  */
 export function AudioRecorder({
     onRecordingComplete,
     maxDuration = 60
 }: AudioRecorderProps) {
+    const [status, setStatus] = useState<'idle' | 'acquiring_media' | 'recording' | 'stopped'>('idle')
     const [isPlaying, setIsPlaying] = useState(false)
+    const [mediaBlobUrl, setMediaBlobUrl] = useState<string | null>(null)
+    const [error, setError] = useState<string | null>(null)
+
     const audioRef = useRef<HTMLAudioElement | null>(null)
     const timeoutRef = useRef<number | null>(null)
-    const stoppedRef = useRef(false)
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+    const chunksRef = useRef<Blob[]>([])
+    const streamRef = useRef<MediaStream | null>(null)
 
     // Check for secure context and media device support
     const [isSecureContext] = useState(() => typeof window !== 'undefined' ? window.isSecureContext : true)
     const [hasMediaDevices] = useState(() => typeof window !== 'undefined' ? !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) : true)
-    const [availableMics, setAvailableMics] = useState<MediaDeviceInfo[]>([])
     const [isStandalone] = useState(() => {
         if (typeof window === 'undefined') return false
         const standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches
@@ -34,98 +38,203 @@ export function AudioRecorder({
         return /iP(ad|hone|od)/.test(navigator.userAgent)
     })
 
-    useEffect(() => {
-        // Check for available devices
-        if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
-            navigator.mediaDevices.enumerateDevices()
-                .then((devices: MediaDeviceInfo[]) => {
-                    const mics = devices.filter(d => d.kind === 'audioinput')
-                    setAvailableMics(mics)
-                    console.log("Available microphones:", mics)
-                })
-                .catch((err: any) => console.error("Error enumerating devices:", err))
+    // Determine best audio format for cross-device compatibility
+    const getAudioMimeType = () => {
+        console.log('getAudioMimeType: Starting format detection...')
+
+        // Detect iOS/Safari
+        const isIOSorSafari = /iP(ad|hone|od)/.test(navigator.userAgent) ||
+                              /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent)
+
+        console.log('Device detection:', { isIOSorSafari, userAgent: navigator.userAgent })
+
+        if (!MediaRecorder || !MediaRecorder.isTypeSupported) {
+            console.log('MediaRecorder.isTypeSupported not available, using default')
+            return undefined
         }
-    }, [])
 
-    const {
-        status,
-        startRecording: baseStartRecording,
-        stopRecording: baseStopRecording,
-        mediaBlobUrl,
-        error: recorderError,
-        clearBlobUrl
-    } = useReactMediaRecorder({
-        audio: true, // Most basic constraint
-        onStop: (blobUrl, blob) => {
-            if (!blobUrl || !blob) return
-            if (stoppedRef.current) return
-            stoppedRef.current = true
+        // For iOS/Safari, explicitly try formats in order of preference
+        const types = isIOSorSafari ? [
+            'audio/mp4',                    // iOS prefers MP4
+            'audio/mp4;codecs=mp4a.40.2',  // MP4 with AAC-LC
+        ] : [
+            'audio/webm;codecs=opus',       // Chrome, Firefox prefer webm
+            'audio/webm',
+            'audio/mp4',
+            'audio/ogg;codecs=opus'
+        ]
 
-            // Create audio element for preview
-            const audio = new Audio(blobUrl)
-            audio.onended = () => setIsPlaying(false)
-            audioRef.current = audio
-            onRecordingComplete(blob)
-
-            // Clear timeout if it exists
-            if (timeoutRef.current) {
-                window.clearTimeout(timeoutRef.current)
-                timeoutRef.current = null
+        for (const type of types) {
+            const supported = MediaRecorder.isTypeSupported(type)
+            console.log(`Format "${type}" supported:`, supported)
+            if (supported) {
+                console.log('✓ Selected audio format:', type)
+                return type
             }
         }
-    })
+
+        console.log('⚠ No preferred format supported, using browser default')
+        return undefined
+    }
 
     const startRecording = async () => {
         try {
-            // Clear any existing state
-            if (audioRef.current) {
-                audioRef.current.pause()
-                audioRef.current.onended = null
-                audioRef.current.src = ''
-                audioRef.current = null
-            }
-            setIsPlaying(false)
-            clearBlobUrl()
-            stoppedRef.current = false
+            setStatus('acquiring_media')
+            setError(null)
+            chunksRef.current = []
 
-            // Preflight getUserMedia to ensure permission prompt appears in a predictable way
-            if (navigator.mediaDevices) {
-                try {
-                    // request and immediately stop to trigger permissions UI where needed
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                    const pre = (navigator.mediaDevices as any).getUserMedia({ audio: true })
-                    // Wait briefly for the promise to resolve/reject before proceeding
-                    await Promise.race([pre, new Promise(res => setTimeout(res, 250))])
-                    // if we got a stream, stop tracks (safe if it's not a stream)
-                    pre.then((s: MediaStream) => s.getTracks().forEach((t: MediaStreamTrack) => t.stop())).catch(() => { })
-                } catch (err) {
-                    console.debug('Microphone preflight failed or was denied, proceeding to recorder start:', err)
+            // Get user media
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+            streamRef.current = stream
+
+            // Determine mime type
+            const mimeType = getAudioMimeType()
+
+            // Create MediaRecorder with options
+            const options: MediaRecorderOptions = {}
+            if (mimeType) {
+                options.mimeType = mimeType
+            }
+
+            const mediaRecorder = new MediaRecorder(stream, options)
+            mediaRecorderRef.current = mediaRecorder
+
+            console.log('MediaRecorder created with mimeType:', mediaRecorder.mimeType)
+
+            // Handle data available - collect chunks
+            mediaRecorder.ondataavailable = (e) => {
+                if (e.data && e.data.size > 0) {
+                    chunksRef.current.push(e.data)
+                    console.log('Audio chunk received, size:', e.data.size)
                 }
             }
 
-            // Start recording
-            baseStartRecording()
+            // Handle stop - create blob and trigger callback
+            mediaRecorder.onstop = () => {
+                console.log('Recording stopped, total chunks:', chunksRef.current.length)
+
+                if (chunksRef.current.length === 0) {
+                    console.error('No audio data recorded')
+                    setError('no_data')
+                    setStatus('idle')
+                    return
+                }
+
+                // Create blob from chunks with the recorder's mimeType
+                const blob = new Blob(chunksRef.current, {
+                    type: mediaRecorder.mimeType || 'audio/mp4'
+                })
+
+                console.log('Recording complete - blob size:', blob.size, 'type:', blob.type)
+
+                // Create preview URL
+                const blobUrl = URL.createObjectURL(blob)
+                setMediaBlobUrl(blobUrl)
+
+                // Create audio element for preview
+                const audio = new Audio(blobUrl)
+                audio.onended = () => setIsPlaying(false)
+                audio.onerror = (e) => {
+                    console.error('Audio preview playback error:', e, 'blob type:', blob.type)
+                    setIsPlaying(false)
+                }
+                audioRef.current = audio
+
+                // Trigger callback with blob
+                onRecordingComplete(blob)
+
+                // Stop all tracks
+                if (streamRef.current) {
+                    streamRef.current.getTracks().forEach(track => track.stop())
+                    streamRef.current = null
+                }
+
+                setStatus('stopped')
+            }
+
+            // Handle errors
+            mediaRecorder.onerror = (e: Event) => {
+                console.error('MediaRecorder error:', e)
+                setError('recording_failed')
+                setStatus('idle')
+            }
+
+            // Start recording with TIMESLICE for iOS stability
+            // This is the key fix - chunking helps iOS handle recording better
+            mediaRecorder.start(1000) // 1000ms timeslice
+            setStatus('recording')
+            console.log('Recording started with 1000ms timeslice')
 
             // Setup auto-stop timeout
             if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
             timeoutRef.current = window.setTimeout(() => {
-                baseStopRecording()
+                stopRecording()
             }, maxDuration * 1000)
+
         } catch (err: any) {
-            console.error("Failed to start recording:", err)
+            console.error('Failed to start recording:', err)
+            setError(err.name || 'permission_denied')
+            setStatus('idle')
         }
     }
 
     const stopRecording = () => {
-        stoppedRef.current = true
-        baseStopRecording()
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+            mediaRecorderRef.current.stop()
+            console.log('Stopping recording...')
+        }
+
         if (timeoutRef.current) {
             window.clearTimeout(timeoutRef.current)
             timeoutRef.current = null
         }
     }
 
-    // Stop recording when the document becomes hidden (PWAs may background/suspend)
+    const togglePlayPreview = () => {
+        const audio = audioRef.current
+        if (!audio) {
+            console.warn('No audio element available for preview')
+            return
+        }
+
+        if (isPlaying) {
+            audio.pause()
+            setIsPlaying(false)
+        } else {
+            console.log('Attempting to play audio preview, src:', audio.src)
+            audio.play()
+                .then(() => {
+                    console.log('Audio playback started successfully')
+                    setIsPlaying(true)
+                })
+                .catch((err: any) => {
+                    console.error('Audio playback failed:', err.name, err.message, 'src:', audio.src)
+                    setIsPlaying(false)
+                    alert(`Preview playback failed: ${err.message || err.name || 'Unknown error'}. The recording was saved successfully.`)
+                })
+        }
+    }
+
+    const clearRecording = () => {
+        if (audioRef.current) {
+            audioRef.current.pause()
+            audioRef.current.onended = null
+            try {
+                if (mediaBlobUrl) {
+                    URL.revokeObjectURL(mediaBlobUrl)
+                }
+            } catch {
+                /* ignore */
+            }
+            audioRef.current.src = ''
+            audioRef.current = null
+        }
+        setIsPlaying(false)
+        setMediaBlobUrl(null)
+        setStatus('idle')
+    }
+
+    // Stop recording when the document becomes hidden
     useEffect(() => {
         const handleVisibility = () => {
             try {
@@ -141,37 +250,7 @@ export function AudioRecorder({
         return () => document.removeEventListener('visibilitychange', handleVisibility)
     }, [status])
 
-    const togglePlayPreview = () => {
-        const audio = audioRef.current
-        if (!audio) return
-
-        if (isPlaying) {
-            audio.pause()
-            setIsPlaying(false)
-        } else {
-            audio.play()
-                .then(() => setIsPlaying(true))
-                .catch((err: any) => {
-                    console.error('Playback failed:', err)
-                    setIsPlaying(false)
-                })
-        }
-    }
-
-    const clearRecording = () => {
-        if (audioRef.current) {
-            audioRef.current.pause()
-            audioRef.current.onended = null
-            try { if (mediaBlobUrl) URL.revokeObjectURL(mediaBlobUrl) } catch {
-                /* ignore */
-            }
-            audioRef.current.src = ''
-            audioRef.current = null
-        }
-        setIsPlaying(false)
-        clearBlobUrl()
-    }
-
+    // Cleanup on unmount
     useEffect(() => {
         return () => {
             if (timeoutRef.current) window.clearTimeout(timeoutRef.current)
@@ -181,23 +260,26 @@ export function AudioRecorder({
                 audioRef.current.src = ''
                 audioRef.current = null
             }
+            if (streamRef.current) {
+                streamRef.current.getTracks().forEach(track => track.stop())
+            }
+            if (mediaBlobUrl) {
+                try {
+                    URL.revokeObjectURL(mediaBlobUrl)
+                } catch {
+                    /* ignore */
+                }
+            }
         }
     }, [])
-
-    useEffect(() => {
-        if (recorderError) {
-            console.error("Media Recorder Error:", recorderError)
-        }
-    }, [recorderError])
 
     // Render helpers
     const isLoading = status === 'acquiring_media'
     const isRecording = status === 'recording'
-    const hasError = !!recorderError || !isSecureContext || !hasMediaDevices
+    const hasError = !!error || !isSecureContext || !hasMediaDevices
 
-    const getErrorMessage = (err: unknown) => {
+    const getErrorMessage = (err: string | null) => {
         if (!isSecureContext) return 'Microphone requires a secure connection (HTTPS).'
-        const code = typeof err === 'string' ? err : (err && (err as any).name) || String(err || 'unknown')
 
         if (!hasMediaDevices) return 'Recording is not supported in this browser or environment.'
 
@@ -206,20 +288,23 @@ export function AudioRecorder({
             ? ' Note: iOS PWAs may suspend when backgrounded; recording can stop when the app is backgrounded.'
             : ''
 
-        switch (code) {
+        switch (err) {
+            case 'NotAllowedError':
             case 'permission_denied':
                 return 'Microphone access denied. Please check site permissions.' + pwaHint
-            case 'no_constraints':
-                return availableMics.length === 0
-                    ? 'No microphone detected. Please connect one and try again.'
-                    : 'Could not connect to microphone. Ensure it is not being used by another app.'
+            case 'NotFoundError':
             case 'no_mic':
                 return 'No microphone detected.'
+            case 'NotSupportedError':
             case 'not_supported':
             case 'no_media_recorder':
                 return 'Recording not supported in this browser.'
+            case 'no_data':
+                return 'No audio data was recorded. Please try again.'
+            case 'recording_failed':
+                return 'Recording failed. Please try again.'
             default:
-                return `Recording error (${code}). Please try again.` + pwaHint
+                return err ? `Recording error (${err}). Please try again.` + pwaHint : ''
         }
     }
 
@@ -295,7 +380,7 @@ export function AudioRecorder({
                         <div className="flex items-center gap-2 p-2 bg-red-50 rounded-button text-red-600 border border-red-100">
                             <AlertCircle size={14} />
                             <span className="font-body text-[12px]">
-                                {getErrorMessage(recorderError)}
+                                {getErrorMessage(error)}
                             </span>
                         </div>
                     )}

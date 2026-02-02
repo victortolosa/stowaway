@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import viteCompression from 'vite-plugin-compression'
 import { visualizer } from 'rollup-plugin-visualizer'
+import fs from 'fs'
 import path from 'path'
 
 export default defineConfig({
@@ -86,7 +87,12 @@ export default defineConfig({
   },
   server: {
     port: 3000,
-    open: true
+    open: true,
+    host: true, // Allow access from network IP addresses
+    https: {
+      key: fs.readFileSync('./localhost-key.pem'),
+      cert: fs.readFileSync('./localhost.pem'),
+    },
   },
   build: {
     outDir: 'dist',
@@ -107,7 +113,7 @@ export default defineConfig({
           // Heavy feature libraries - split into separate chunks
           'pdf-tools': ['jspdf'],
           'image-tools': ['html2canvas', 'browser-image-compression', 'react-image-crop'],
-          'media-tools': ['html5-qrcode', 'react-media-recorder'],
+          'media-tools': ['html5-qrcode'],
           // UI libraries
           'ui-libs': ['framer-motion', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
           // Vendor chunk for other dependencies

@@ -16,3 +16,6 @@ coverage/
 .firebase/
 firebase-debug.log
 serviceAccountKey.json
+
+# Local SSL certificates
+*.pem

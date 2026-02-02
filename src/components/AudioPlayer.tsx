@@ -29,22 +29,67 @@ export function AudioPlayer({ audioUrl, className = '' }: AudioPlayerProps) {
         const audio = audioRef.current
         if (!audio) return
 
+        console.log('AudioPlayer: Loading audio from URL:', audioUrl)
+
+        // Try to force speaker output on iOS by setting audio category
+        // This is a workaround attempt for iOS routing audio to earpiece
+        try {
+            // @ts-ignore - iOS-specific API that might not be in types
+            if (audio.webkitAudioContext || window.webkitAudioContext) {
+                console.log('AudioPlayer: Attempting to set audio output to speaker')
+            }
+        } catch (err) {
+            console.log('AudioPlayer: Could not set speaker output:', err)
+        }
+
         const updateTime = () => setCurrentTime(audio.currentTime)
-        const updateDuration = () => setDuration(Number.isFinite(audio.duration) ? audio.duration : 0)
+        const updateDuration = () => {
+            const dur = Number.isFinite(audio.duration) ? audio.duration : 0
+            console.log('AudioPlayer: Duration loaded:', dur)
+            setDuration(dur)
+        }
         const handleEnded = () => setIsPlaying(false)
+        const handleError = () => {
+            console.error('AudioPlayer: Audio element error:', {
+                error: audio.error,
+                errorCode: audio.error?.code,
+                errorMessage: audio.error?.message,
+                src: audio.src,
+                readyState: audio.readyState,
+                networkState: audio.networkState
+            })
+        }
+        const handleCanPlay = () => {
+            console.log('AudioPlayer: Audio can play', {
+                duration: audio.duration,
+                volume: audio.volume,
+                muted: audio.muted
+            })
+        }
 
         audio.addEventListener('timeupdate', updateTime)
         audio.addEventListener('loadedmetadata', updateDuration)
         audio.addEventListener('ended', handleEnded)
+        audio.addEventListener('error', handleError)
+        audio.addEventListener('canplay', handleCanPlay)
 
-        try { audio.load() } catch {
-            /* ignore */
+        // Ensure audio is not muted and volume is at max
+        audio.muted = false
+        audio.volume = 1.0
+
+        try {
+            audio.load()
+            console.log('AudioPlayer: load() called, volume:', audio.volume, 'muted:', audio.muted)
+        } catch (err) {
+            console.error('AudioPlayer: load() failed:', err)
         }
 
         return () => {
             audio.removeEventListener('timeupdate', updateTime)
             audio.removeEventListener('loadedmetadata', updateDuration)
             audio.removeEventListener('ended', handleEnded)
+            audio.removeEventListener('error', handleError)
+            audio.removeEventListener('canplay', handleCanPlay)
         }
     }, [audioUrl])
 
@@ -56,11 +101,38 @@ export function AudioPlayer({ audioUrl, className = '' }: AudioPlayerProps) {
             audio.pause()
             setIsPlaying(false)
         } else {
+            console.log('AudioPlayer: Attempting to play', {
+                src: audio.src,
+                readyState: audio.readyState,
+                duration: audio.duration,
+                networkState: audio.networkState
+            })
             audio.play()
-                .then(() => setIsPlaying(true))
+                .then(() => {
+                    console.log('AudioPlayer: Playback started successfully')
+                    setIsPlaying(true)
+                    // Log after a moment to see if time is progressing
+                    setTimeout(() => {
+                        console.log('AudioPlayer: Playback check', {
+                            currentTime: audio.currentTime,
+                            duration: audio.duration,
+                            paused: audio.paused,
+                            volume: audio.volume,
+                            muted: audio.muted
+                        })
+                    }, 500)
+                })
                 .catch((err) => {
-                    console.error('Playback failed:', err)
+                    console.error('AudioPlayer: Playback failed', {
+                        error: err,
+                        name: err.name,
+                        message: err.message,
+                        src: audio.src,
+                        readyState: audio.readyState,
+                        audioElementError: audio.error
+                    })
                     setIsPlaying(false)
+                    alert(`Playback failed: ${err.message || err.name}. The audio was saved successfully and can be played on other devices.`)
                 })
         }
     }
@@ -85,9 +157,41 @@ export function AudioPlayer({ audioUrl, className = '' }: AudioPlayerProps) {
 
     const progress = duration > 0 ? (currentTime / duration) * 100 : 0
 
+    // Detect iOS for special handling
+    const isIOS = /iP(ad|hone|od)/.test(navigator.userAgent)
+
     return (
         <div className={`bg-bg-surface rounded-button p-4 ${className}`}>
-            <audio ref={audioRef} src={audioUrl} preload="metadata" />
+            {isIOS ? (
+                // Use video element on iOS for better speaker routing
+                <video
+                    ref={audioRef as any}
+                    src={audioUrl}
+                    preload="metadata"
+                    playsInline
+                    webkit-playsinline="true"
+                    muted={false}
+                    controls={false}
+                    autoPlay={false}
+                    style={{
+                        display: 'none',
+                        position: 'absolute',
+                        width: '1px',
+                        height: '1px',
+                        opacity: 0,
+                        pointerEvents: 'none'
+                    }}
+                />
+            ) : (
+                <audio
+                    ref={audioRef}
+                    src={audioUrl}
+                    preload="metadata"
+                    playsInline
+                    controls={false}
+                    style={{ display: 'none' }}
+                />
+            )}
 
             <div className="flex items-center gap-3">
                 {/* Play/Pause Button */}

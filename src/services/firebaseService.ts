@@ -130,6 +130,32 @@ export async function deleteContainer(containerId: string) {
   }
 }
 
+export async function generateQRCodeForContainer(containerId: string) {
+  try {
+    const containerRef = doc(db, 'containers', containerId)
+    await updateDoc(containerRef, {
+      qrCodeId: containerId,
+      updatedAt: Timestamp.now(),
+    })
+  } catch (error) {
+    console.error('Error generating QR code:', error)
+    throw error
+  }
+}
+
+export async function removeQRCodeFromContainer(containerId: string) {
+  try {
+    const containerRef = doc(db, 'containers', containerId)
+    await updateDoc(containerRef, {
+      qrCodeId: null,
+      updatedAt: Timestamp.now(),
+    })
+  } catch (error) {
+    console.error('Error removing QR code:', error)
+    throw error
+  }
+}
+
 /**
  * ITEMS OPERATIONS
  */

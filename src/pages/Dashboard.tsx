@@ -1,14 +1,16 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useInventory } from '@/hooks'
 import { useInventoryStore } from '@/store/inventory'
 import { Search, ScanLine, Plus, Bell, ChevronRight, Home, Briefcase, Archive, MapPin, Package, Mic } from 'lucide-react'
 import { Button, Card, IconBadge, EmptyState } from '@/components/ui'
+import { QRScanner } from '@/components/QRScanner'
 
 export function Dashboard() {
   const { refresh } = useInventory()
   const { places, containers, items } = useInventoryStore()
   const navigate = useNavigate()
+  const [showScanner, setShowScanner] = useState(false)
 
   useEffect(() => {
     console.log('Dashboard: Refreshing inventory...')
@@ -45,6 +47,11 @@ export function Dashboard() {
     return `${place?.name || ''} → ${container?.name || ''}`
   }
 
+  const handleQRScan = (containerId: string) => {
+    setShowScanner(false)
+    navigate(`/containers/${containerId}`)
+  }
+
   return (
     <div className="flex flex-col gap-10 pb-32 w-full max-w-full">
       {/* Top Section with Background Gradient/Header */}
@@ -78,7 +85,13 @@ export function Dashboard() {
       <div className="flex flex-col gap-10">
         {/* Quick Actions */}
         <div className="grid grid-cols-2 md:flex md:justify-start gap-4">
-          <Button variant="primary" size="lg" className="w-full md:w-auto shadow-xl shadow-accent-aqua/20" leftIcon={ScanLine}>
+          <Button
+            variant="primary"
+            size="lg"
+            className="w-full md:w-auto shadow-xl shadow-accent-aqua/20"
+            leftIcon={ScanLine}
+            onClick={() => setShowScanner(true)}
+          >
             Scan QR
           </Button>
           <Button
@@ -203,6 +216,14 @@ export function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* QR Scanner Modal */}
+      {showScanner && (
+        <QRScanner
+          onScan={handleQRScan}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
     </div>
   )
 }

@@ -1,136 +1,23 @@
-# Project Implementation Plan: "Stowaway"
+# Sprint 5 & 6 Implementation Plan
 
-**Personal Storage & Inventory Tracking Application**
+## Overview
 
-## 1. Executive Summary
-
-* **Goal:** Create a mobile-first application that solves the "Where did I put that?" problem for long-term storage (attics, basements, off-site units).
-* **Core Hierarchy:** `Place (Location)` → `Container (Box/Bin)` → `Item (Object)`.
-* **Key Differentiators:** Media-rich inventory (Voice, Photo) and offline capability.
+This document provides a detailed implementation plan for:
+- **Sprint 5:** QR System
+- **Sprint 6:** Enhanced Search, Voice-to-Text, PWA Finalization
 
 ---
 
-## 2. UX & Product Design
+## Sprint 5: QR System
 
-### 2.1. User Personas
-
-* **The Mover:** Recently moved, has 50+ boxes in a garage. Needs to find "Winter Coats" without opening every box.
-* **The Collector:** Has specific items (comics, coins, gear) and needs to know exactly which bin contains a specific issue.
-* **The Homeowner:** Uses the attic for seasonal decor. Needs to remember where the "Halloween Skeleton" was put last year.
-
-### 2.2. Core User Flows
-
-#### A. The "Stow" Flow (Input)
-
-*Crucial for adoption. Must be fast.*
-
-1. **Select Location:** User selects "Attic".
-2. **Select/Create Container:** User scans a QR code on a box OR selects "Green Bin 1".
-3. **Add Item:**
-* **Quick Snap:** Take a photo of the item inside the box.
-* **Voice Tag:** User holds a button and says, *"Grandma's vintage lamp, needs rewiring."* (App auto-transcribes this for search).
-
-
-4. **Save:** Item is logged with timestamp.
-
-#### B. The "Fetch" Flow (Retrieval)
-
-1. **Search:** User types "Lamp" or "Grandma".
-2. **Result:** App shows the item, the photo, and the breadcrumbs: **Attic > North Corner > Green Bin 1**.
-
-### 2.3. Wireframe Concepts
-
-* **Dashboard:** High-level view of "Places" with utilization stats (e.g., "Garage: 12 Containers"). Global Search bar at the top.
-* **Container View:** A visual grid. Show a "Master Photo" of the open box with individual item tags overlaying it.
-* **Item Detail:** Large Hero Image, Audio Player for the voice note, and a "Move Item" button.
-
----
-
-## 3. Technical Design
-
-### 3.1. Data Architecture (NoSQL Schema)
-
-Using **Cloud Firestore** for a document-based structure.
-
-| Collection | Key Fields |
-| --- | --- |
-| **places** | `id`, `name`, `type` (Home, Office, etc.) |
-| **containers** | `id`, `place_id`, `name`, `qr_code_id`, `photo_url`, `last_accessed` |
-| **items** | `id`, `container_id`, `name`, `description` (STT), `photos[]`, `voice_note_url`, `tags[]` |
-
-### 3.2. Detailed Technology Stack
-
-We will utilize a **Progressive Web App (PWA)** architecture for cross-platform compatibility and offline functionality.
-
-#### Frontend Core
-
-* **Framework:** React 18+ (via Vite)
-* **Language:** TypeScript (Strict typing for data models)
-* **Offline Engine:** `vite-plugin-pwa` (Workbox) using `StaleWhileRevalidate` strategy.
-* **State Management:** Zustand (Lightweight for ephemeral state).
-* **Routing:** React Router v6.
-
-#### UI & Interaction Layer
-
-* **Styling:** Tailwind CSS.
-* **Components:** Shadcn/UI (Radix UI primitives).
-* **Animations:** Framer Motion (Page transitions and "zoom" effects).
-* **Form Handling:** React Hook Form + Zod.
-
-#### Backend & Infrastructure
-
-* **Platform:** Google Firebase.
-* **Database:** Cloud Firestore with `enableIndexedDbPersistence()` enabled for the "Basement Problem."
-* **File Storage:** Firebase Storage (Images and `.webm` audio).
-* **Authentication:** Google Sign-In ONLY (SSO).
-* **Serverless Logic:** Cloud Functions (Triggering Speech-to-Text on upload).
-
----
-
-## 4. Specific Feature Implementation
-
-### 1. Image Capture & Optimization ✅ COMPLETED (Sprint 3)
-
-* ✅ **Capture:** Native `<input type="file" capture="environment" />` to use OS-native camera features.
-* ✅ **Cropping:** `react-easy-crop` - Full cropping UI with zoom/rotate controls.
-* ✅ **Compression:** `browser-image-compression` (Max size 1MB, 1920px width) to save bandwidth.
-* ✅ **Cache Control:** 1-year browser caching for uploaded images.
-* ✅ **Orphan Cleanup:** Automatic storage cleanup on failed database writes.
-
-**Implementation Files:**
-- `src/components/ImageCropper.tsx` - Cropping component
-- `src/hooks/useImageCompression.ts` - Compression hook
-- `src/services/firebaseService.ts` - Enhanced with cache control & cleanup
-- `src/components/CreateItemModal.tsx` - Updated with full image pipeline
-- `src/components/CreateContainerModal.tsx` - Updated with full image pipeline
-
-**Status:** ✅ COMPLETE - Both item and container photos implemented
-
-### 2. Audio Recording ✅ COMPLETED (Sprint 4)
-
-* **Library:** `react-media-recorder`.
-* **Codec:** `audio/webm;codecs=opus`. Highly efficient; 30 seconds ~ 100KB.
-* **Feature:** Client-side silence trimming using Web Audio API.
-
-**Implementation Details:**
-- `src/components/AudioRecorder.tsx` - Recording component with visualizer
-- `src/components/AudioPlayer.tsx` - Playback component
-- `src/utils/audioUtils.ts` - `trimSilence` utility (Web Audio API)
-- `src/components/CreateItemModal.tsx` - Integrated recording, playback, and "Trim Silence"
-- `src/pages/Item.tsx` - Playback in detail view
-
-**Status:** ✅ COMPLETE - Recording, playback, saving, and silence trimming functional.
-
-### 3. Sprint 5: QR System
-
-#### Goals
+### Goals
 1. Generate QR codes for containers
 2. Scan QR codes to navigate directly to containers
 3. Print QR labels (single and batch)
 
 ---
 
-#### Task 5.1: Install QR Generation Package
+### Task 5.1: Install QR Generation Package
 
 **File:** `package.json`
 
@@ -142,7 +29,7 @@ npm install qrcode @types/qrcode
 
 ---
 
-#### Task 5.2: Create QR Code Generation Utility
+### Task 5.2: Create QR Code Generation Utility
 
 **File:** `src/utils/qrCode.ts`
 
@@ -215,7 +102,7 @@ export function parseQRCodeURL(url: string): string | null {
 
 ---
 
-#### Task 5.3: Create QR Code Display Component
+### Task 5.3: Create QR Code Display Component
 
 **File:** `src/components/QRCodeDisplay.tsx`
 
@@ -277,7 +164,7 @@ export function QRCodeDisplay({
 
 ---
 
-#### Task 5.4: Create QR Scanner Component
+### Task 5.4: Create QR Scanner Component
 
 **File:** `src/components/QRScanner.tsx`
 
@@ -406,7 +293,7 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
 
 ---
 
-#### Task 5.5: Create QR Label Modal
+### Task 5.5: Create QR Label Modal
 
 **File:** `src/components/QRLabelModal.tsx`
 
@@ -537,7 +424,7 @@ export function QRLabelModal({
 
 ---
 
-#### Task 5.6: Add Batch Label Generation
+### Task 5.6: Add Batch Label Generation
 
 **File:** `src/utils/qrLabelPdf.ts`
 
@@ -627,7 +514,7 @@ function truncateText(text: string, maxLength: number): string {
 
 ---
 
-#### Task 5.7: Integrate QR Scanner into Dashboard
+### Task 5.7: Integrate QR Scanner into Dashboard
 
 **File:** `src/pages/Dashboard.tsx`
 
@@ -668,7 +555,7 @@ const handleQRScan = (containerId: string) => {
 
 ---
 
-#### Task 5.8: Add QR Button to Container Detail Page
+### Task 5.8: Add QR Button to Container Detail Page
 
 **File:** `src/pages/ContainerDetail.tsx`
 
@@ -701,7 +588,7 @@ const [showQRModal, setShowQRModal] = useState(false)
 
 ---
 
-#### Task 5.9: Update Firebase Service for QR Code ID
+### Task 5.9: Update Firebase Service for QR Code ID
 
 **File:** `src/services/firebaseService.ts`
 
@@ -731,7 +618,7 @@ export async function createContainer(
 
 ---
 
-#### Sprint 5 Testing Checklist
+### Sprint 5 Testing Checklist
 
 - [ ] QR code generates correctly with container URL
 - [ ] QR scanner opens camera and detects codes
@@ -745,16 +632,16 @@ export async function createContainer(
 
 ---
 
-### 4. Sprint 6: Enhanced Search
+## Sprint 6: Enhanced Search
 
-#### Goals
+### Goals
 1. Integrate fuzzy search with fuse.js
 2. Optional: Voice-to-Text transcription
 3. PWA finalization and offline testing
 
 ---
 
-#### Task 6.1: Integrate Fuzzy Search Hook
+### Task 6.1: Integrate Fuzzy Search Hook
 
 **File:** `src/pages/Search.tsx`
 
@@ -912,7 +799,7 @@ export default function Search() {
 
 ---
 
-#### Task 6.2: Enhance Search Hook with Loading State
+### Task 6.2: Enhance Search Hook with Loading State
 
 **File:** `src/hooks/useSearch.ts`
 
@@ -998,11 +885,11 @@ export function useSearch() {
 
 ---
 
-#### Task 6.3: Voice-to-Text (Optional)
+### Task 6.3: Voice-to-Text (Optional)
 
 This feature requires Firebase Cloud Functions for server-side speech recognition.
 
-##### 6.3.1: Create Cloud Function
+#### 6.3.1: Create Cloud Function
 
 **File:** `functions/src/index.ts`
 
@@ -1068,7 +955,7 @@ export const transcribeAudio = functions.https.onCall(
 )
 ```
 
-##### 6.3.2: Create Client Hook
+#### 6.3.2: Create Client Hook
 
 **File:** `src/hooks/useVoiceToText.ts`
 
@@ -1110,7 +997,7 @@ export function useVoiceToText() {
 }
 ```
 
-##### 6.3.3: Integration Point
+#### 6.3.3: Integration Point
 
 Add transcription button to item detail or search page that:
 1. Uploads voice recording
@@ -1119,9 +1006,9 @@ Add transcription button to item detail or search page that:
 
 ---
 
-#### Task 6.4: PWA Finalization
+### Task 6.4: PWA Finalization
 
-##### 6.4.1: Update Manifest for iOS
+#### 6.4.1: Update Manifest for iOS
 
 **File:** `vite.config.ts`
 
@@ -1171,7 +1058,7 @@ VitePWA({
 })
 ```
 
-##### 6.4.2: Add Apple Meta Tags
+#### 6.4.2: Add Apple Meta Tags
 
 **File:** `index.html`
 
@@ -1195,7 +1082,7 @@ VitePWA({
 </head>
 ```
 
-##### 6.4.3: Enhance Offline Data Caching
+#### 6.4.3: Enhance Offline Data Caching
 
 **File:** `vite.config.ts`
 
@@ -1258,7 +1145,7 @@ workbox: {
 }
 ```
 
-##### 6.4.4: Add Offline Indicator Component
+#### 6.4.4: Add Offline Indicator Component
 
 **File:** `src/components/OfflineIndicator.tsx`
 
@@ -1303,7 +1190,7 @@ import { OfflineIndicator } from '@/components/OfflineIndicator'
 
 ---
 
-#### Sprint 6 Testing Checklist
+### Sprint 6 Testing Checklist
 
 **Fuzzy Search:**
 - [ ] Search finds items with typos (e.g., "scrwdriver" → "Screwdriver")
@@ -1331,7 +1218,7 @@ import { OfflineIndicator } from '@/components/OfflineIndicator'
 
 ---
 
-## 5. File Summary
+## File Summary
 
 ### Sprint 5 New Files
 | File | Purpose |
@@ -1368,7 +1255,7 @@ import { OfflineIndicator } from '@/components/OfflineIndicator'
 
 ---
 
-## 6. Estimated Effort
+## Estimated Effort
 
 | Task | Complexity |
 |------|------------|
@@ -1392,7 +1279,7 @@ import { OfflineIndicator } from '@/components/OfflineIndicator'
 
 ---
 
-## 7. Dependencies
+## Dependencies
 
 **Sprint 5 requires:**
 ```bash
@@ -1406,65 +1293,3 @@ npm install @google-cloud/speech firebase-functions firebase-admin
 ```
 
 **Enable Google Cloud Speech API** in Firebase Console if using Voice-to-Text.
-
----
-
-## 8. Roadmap & Progress
-
-### ✅ Epic 1: Foundation (COMPLETE)
-
-* ✅ **Sprint 1:** Firebase setup, Google Auth, and "Places" dashboard. Enable offline persistence.
-* ✅ **Sprint 2:** Container creation and Item logging. Implement image compression and breadcrumb navigation.
-
-**Status:** All CRUD operations working. Dashboard, places, containers, and items fully functional.
-
----
-
-### 🔄 Epic 2: The Sensory Layer (IN PROGRESS)
-
-#### ✅ Sprint 3: Image Optimization - COMPLETE
-
-**Completed:**
-- ImageCropper component with zoom/rotate
-- useImageCompression hook with progress tracking  
-- Firebase cache control headers (1-year caching)
-- Orphan cleanup for failed uploads
-- CreateItemModal updated with native camera support
-- CreateContainerModal updated with native camera support
-
-#### ✅ Sprint 4: Audio Recording - COMPLETE
-
-**Completed:**
-- AudioRecorder component using `react-media-recorder`
-- AudioPlayer component
-- Integrated voice notes into CreateItemModal
-- Added playback to Item detail page
-- **Bonus:** Client-side silence trimming
-
-**Library installed:** `react-media-recorder`
-
----
-
-### ⏳ Epic 3: Search & Launch (PLANNED)
-
-#### Sprint 5: QR System
-
-* **QR Codes:** Generation and Scanning
-* **Printing:** Labels and Batch Printing
-
-#### Sprint 6: Enhanced Search
-
-* **Fuzzy search:** Implement `fuse.js` for typo-tolerant search
-* **Voice-to-Text:** (Optional) Cloud Functions for STT transcription
-* **PWA:** Final manifest configuration and offline testing
-
-**Library already installed:** `fuse.js`
-
----
-
-## 🔴 CURRENT POSITION
-
-**Last Completed:** Sprint 4 - Audio Recording (FULLY COMPLETE)
-**Next:** Sprint 5 (QR Codes) and Sprint 6 (Search) are planned and detailed above.
-
-**Detailed tasks available in:** `task.md`

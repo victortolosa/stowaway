@@ -9,6 +9,7 @@ import { deleteField } from 'firebase/firestore'
 import { useAuthStore } from '@/store/auth'
 import { useImageCompression } from '@/hooks'
 import { ImageCropper, AudioRecorder, AudioPlayer } from '@/components'
+import { trimSilence } from '@/utils/audioUtils'
 import { Item } from '@/types'
 import { Modal, Button, Input, Textarea, FormField, Label, ImageUploader, ProgressBar } from '@/components/ui'
 
@@ -47,6 +48,7 @@ export function CreateItemModal({
     const [existingAudioUrl, setExistingAudioUrl] = useState<string | null>(null)
     const [wasAudioDeleted, setWasAudioDeleted] = useState(false)
     const [showAudioRecorder, setShowAudioRecorder] = useState(false)
+    const [isTrimming, setIsTrimming] = useState(false)
 
     const { compress, isCompressing, progress } = useImageCompression()
 
@@ -96,23 +98,11 @@ export function CreateItemModal({
     }, [audioPreviewUrl])
 
     const onSubmit = async (data: ItemFormValues) => {
-        console.log('onSubmit triggered', { user: user?.uid, data })
-        if (!user) {
-            console.error('onSubmit failed: No user logged in')
-            return
-        }
+        if (!user) return
 
         setIsSubmitting(true)
         const uploadedPaths: string[] = []
         try {
-            console.log('Starting item creation/update submission')
-            console.log('Form data:', data)
-            console.log('Has audio blob:', !!audioBlob)
-            if (audioBlob) {
-                console.log('Audio blob size:', audioBlob.size)
-                console.log('Audio blob type:', audioBlob.type)
-            }
-
             let photoUrl = ''
             let audioUrl = ''
 
@@ -131,16 +121,13 @@ export function CreateItemModal({
             }
 
             if (audioBlob) {
-                console.log('Attempting to upload audio...')
                 const ext = (audioBlob.type && audioBlob.type.split('/')[1]) || 'webm'
                 const filename = `${Date.now()}_${(crypto && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2))}.${ext}`
                 const audioFile = new File([audioBlob], filename, {
                     type: audioBlob.type || 'audio/webm',
                 })
                 const audioPath = `items/${user.uid}/audio/${filename}`
-                console.log('Upload path:', audioPath)
                 audioUrl = await uploadAudio(audioFile, audioPath)
-                console.log('Audio uploaded successfully. URL:', audioUrl)
                 uploadedPaths.push(audioPath)
             }
 
@@ -149,14 +136,20 @@ export function CreateItemModal({
                 ...(photoUrl && { photos: [photoUrl] }),
                 ...(audioUrl && { voiceNoteUrl: audioUrl }),
             }
-            console.log('Final item data to save:', itemData)
 
             if (editMode && initialData) {
-                await updateItem(initialData.id, {
+                const updatePayload: any = {
                     ...itemData,
                     photos: photoUrl ? [photoUrl] : initialData.photos,
-                    voiceNoteUrl: wasAudioDeleted && !audioUrl ? deleteField() : (audioUrl || undefined)
-                } as any)
+                }
+
+                if (wasAudioDeleted && !audioUrl) {
+                    updatePayload.voiceNoteUrl = deleteField()
+                } else if (audioUrl) {
+                    updatePayload.voiceNoteUrl = audioUrl
+                }
+
+                await updateItem(initialData.id, updatePayload)
             } else {
                 await createItem({
                     ...itemData,
@@ -228,6 +221,32 @@ export function CreateItemModal({
         setPhotoPreview(null)
     }
 
+    const handleTrimAudio = async () => {
+        if (!audioBlob) return
+
+        try {
+            setIsTrimming(true)
+            // Small delay to let UI render the loading state
+            await new Promise(resolve => setTimeout(resolve, 100))
+
+            const trimmedBlob = await trimSilence(audioBlob)
+
+            // Check if size changed significantly to warn/inform? 
+            // For now just update it.
+            if (trimmedBlob.size !== audioBlob.size) {
+                if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
+                const newUrl = URL.createObjectURL(trimmedBlob)
+                setAudioBlob(trimmedBlob)
+                setAudioPreviewUrl(newUrl)
+            }
+        } catch (error) {
+            console.error('Failed to trim audio:', error)
+            alert('Could not trim audio. Please try again.')
+        } finally {
+            setIsTrimming(false)
+        }
+    }
+
     return (
         <>
             <Modal
@@ -297,8 +316,10 @@ export function CreateItemModal({
                         {showAudioRecorder && !audioBlob && (
                             <AudioRecorder
                                 onRecordingComplete={(blob) => {
+                                    console.log('CreateItemModal: onRecordingComplete', { size: blob.size, type: blob.type })
                                     setAudioBlob(blob)
                                     const url = URL.createObjectURL(blob)
+                                    console.log('CreateItemModal: Created preview URL', url)
                                     setAudioPreviewUrl(url)
                                     setShowAudioRecorder(false)
                                     setExistingAudioUrl(null) // Clear existing if new one recorded
@@ -308,28 +329,51 @@ export function CreateItemModal({
                         )}
 
                         {(audioBlob && audioPreviewUrl) || existingAudioUrl ? (
-                            <div className="relative">
-                                <AudioPlayer
-                                    audioUrl={(audioBlob && audioPreviewUrl) ? audioPreviewUrl : existingAudioUrl!}
-                                    className="border border-border-light"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        if (audioBlob) {
-                                            setAudioBlob(null)
-                                            if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
-                                            setAudioPreviewUrl(null)
-                                        } else {
-                                            setExistingAudioUrl(null)
-                                            setWasAudioDeleted(true)
-                                        }
-                                        setShowAudioRecorder(false)
-                                    }}
-                                    className="absolute -top-2 -right-2 w-7 h-7 bg-bg-elevated rounded-full shadow-sm flex items-center justify-center text-text-secondary hover:text-text-primary transition border border-border-light z-10"
-                                >
-                                    <X size={14} />
-                                </button>
+                            <div className="space-y-2">
+                                <div className="relative">
+                                    <AudioPlayer
+                                        audioUrl={(audioBlob && audioPreviewUrl) ? audioPreviewUrl : existingAudioUrl!}
+                                        className="border border-border-light"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (audioBlob) {
+                                                setAudioBlob(null)
+                                                if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
+                                                setAudioPreviewUrl(null)
+                                            } else {
+                                                setExistingAudioUrl(null)
+                                                setWasAudioDeleted(true)
+                                            }
+                                            setShowAudioRecorder(false)
+                                        }}
+                                        className="absolute -top-2 -right-2 w-7 h-7 bg-bg-elevated rounded-full shadow-sm flex items-center justify-center text-text-secondary hover:text-text-primary transition border border-border-light z-10"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+
+                                {audioBlob && !isTrimming && (
+                                    <div className="flex justify-end">
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={handleTrimAudio}
+                                            className="text-xs h-7 px-2 text-text-secondary hover:text-accent-blue"
+                                        >
+                                            ✨ Trim Silence
+                                        </Button>
+                                    </div>
+                                )}
+
+                                {isTrimming && (
+                                    <div className="flex items-center gap-2 text-xs text-text-secondary animate-pulse">
+                                        <div className="w-2 h-2 rounded-full bg-accent-blue animate-bounce" />
+                                        Processing audio (client-side)...
+                                    </div>
+                                )}
                             </div>
                         ) : null}
                     </div>
