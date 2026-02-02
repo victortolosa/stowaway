@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useInventory } from '@/hooks'
 import { useInventoryStore } from '@/store/inventory'
-import { Search, Plus, Home, Briefcase, Archive, MapPin, Package, Mic, ChevronRight, ChevronDown } from 'lucide-react'
+import { Plus, Home, Briefcase, Archive, MapPin, Package, Mic, ChevronRight, ChevronDown } from 'lucide-react'
 import { Button, Card, EmptyState } from '@/components/ui'
 import { Timestamp } from 'firebase/firestore'
 
@@ -122,19 +122,13 @@ export function Dashboard() {
 
   return (
     <div className="flex flex-col gap-10 pb-48 w-full max-w-full">
-      {/* Top Section with Search and Add Item */}
+      {/* Top Section with Logo and Add Item */}
       <div className="flex flex-col gap-6">
-        <div className="flex gap-3 items-center">
-          {/* Search Bar */}
-          <div
-            className="bg-white rounded-xl h-[44px] pl-5 pr-4 flex items-center gap-3 cursor-pointer shadow-sm border border-black/5 hover:border-black/10 hover:shadow-md transition-all duration-200 flex-1"
-            onClick={() => navigate('/search')}
-          >
-            <Search size={22} className="text-accent-aqua" strokeWidth={2.5} />
-            <span className="font-body text-[16px] text-text-tertiary">
-              Search everything...
-            </span>
-          </div>
+        <div className="flex justify-between items-center">
+          {/* Brand Logo */}
+          <h1 className="font-display text-2xl md:text-3xl font-bold text-text-primary tracking-tight">
+            Stowaway
+          </h1>
 
           <Button
             variant="primary"
