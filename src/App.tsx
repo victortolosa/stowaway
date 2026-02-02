@@ -9,6 +9,8 @@ import './styles/globals.css'
 // Lazy load pages for better code splitting
 const Dashboard = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.Dashboard })))
 const Places = lazy(() => import('@/pages/Places').then(m => ({ default: m.Places })))
+const ItemsList = lazy(() => import('@/pages/ItemsList').then(m => ({ default: m.ItemsList })))
+const ContainersList = lazy(() => import('@/pages/ContainersList').then(m => ({ default: m.ContainersList })))
 const Container = lazy(() => import('@/pages/Container').then(m => ({ default: m.Container })))
 const Item = lazy(() => import('@/pages/Item').then(m => ({ default: m.Item })))
 const Login = lazy(() => import('@/pages/Login').then(m => ({ default: m.Login })))
@@ -52,6 +54,8 @@ function App() {
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/places" element={<Places />} />
+            <Route path="/items" element={<ItemsList />} />
+            <Route path="/containers" element={<ContainersList />} />
             <Route path="/places/:id" element={<PlaceDetail />} />
             <Route path="/containers/:id" element={<Container />} />
             <Route path="/items/:id" element={<Item />} />

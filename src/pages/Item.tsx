@@ -44,7 +44,7 @@ export function Item() {
   }
 
   return (
-    <div className="pb-6">
+    <div className="pb-48">
       {/* Hero Image */}
       <div className="relative h-[280px] bg-bg-elevated">
         {item.photos[0] ? (

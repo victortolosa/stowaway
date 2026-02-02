@@ -52,17 +52,17 @@ if (missingKeys.length > 0) {
 }
 
 // Safe initialization wrapper
-let app: FirebaseApp | undefined;
-let auth: Auth | undefined;
-let db: Firestore | undefined;
-let storage: FirebaseStorage | undefined;
+let app!: FirebaseApp;
+let auth!: Auth;
+let db!: Firestore;
+let storage!: FirebaseStorage;
 let analytics: Analytics | null = null;
 
 try {
-  app = initializeApp(firebaseConfig)
-  auth = getAuth(app)
-  db = getFirestore(app)
-  storage = getStorage(app)
+  app = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db = getFirestore(app);
+  storage = getStorage(app);
 
   if (typeof window !== 'undefined') {
     isSupported().then(yes => {

@@ -86,7 +86,7 @@ export function PlaceDetail() {
     }
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="flex flex-col h-full pb-48">
             {/* Header */}
             <div className="flex justify-between items-center mb-6">
                 <button
@@ -153,7 +153,7 @@ export function PlaceDetail() {
                         leftIcon={Plus}
                         onClick={() => setIsCreateContainerOpen(true)}
                     >
-                        Add
+                        Add Container
                     </Button>
                 </div>
 

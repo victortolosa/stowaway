@@ -2,13 +2,15 @@ import { useNavigate } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/auth'
+import { useInventoryStore } from '@/store/inventory'
 import { BottomTabBar } from '@/components'
-import { User, LogOut } from 'lucide-react'
+import { User, LogOut, MapPin, Package, Box } from 'lucide-react'
 import { Card } from '@/components/ui'
 
 export function Profile() {
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
+  const { places, containers, items } = useInventoryStore()
 
   const handleLogout = async () => {
     try {
@@ -37,6 +39,40 @@ export function Profile() {
               {user?.displayName || 'User'}
             </h2>
             <p className="font-body text-sm text-text-secondary">{user?.email}</p>
+          </div>
+        </Card>
+
+        {/* Storage Stats */}
+        <Card padding="lg" className="mb-6">
+          <h3 className="font-display text-base font-semibold text-text-primary mb-4">My Storage</h3>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-12 h-12 bg-accent-aqua/10 rounded-full flex items-center justify-center">
+                <MapPin size={24} className="text-accent-aqua" strokeWidth={2} />
+              </div>
+              <div className="text-center">
+                <p className="font-display text-xl font-bold text-text-primary">{places.length}</p>
+                <p className="font-body text-[12px] text-text-secondary">Places</p>
+              </div>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-12 h-12 bg-accent-aqua/10 rounded-full flex items-center justify-center">
+                <Package size={24} className="text-accent-aqua" strokeWidth={2} />
+              </div>
+              <div className="text-center">
+                <p className="font-display text-xl font-bold text-text-primary">{containers.length}</p>
+                <p className="font-body text-[12px] text-text-secondary">Containers</p>
+              </div>
+            </div>
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-12 h-12 bg-accent-aqua/10 rounded-full flex items-center justify-center">
+                <Box size={24} className="text-accent-aqua" strokeWidth={2} />
+              </div>
+              <div className="text-center">
+                <p className="font-display text-xl font-bold text-text-primary">{items.length}</p>
+                <p className="font-body text-[12px] text-text-secondary">Items</p>
+              </div>
+            </div>
           </div>
         </Card>
 

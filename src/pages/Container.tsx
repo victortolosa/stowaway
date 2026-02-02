@@ -4,10 +4,10 @@ import { useAuthStore } from '@/store/auth'
 import { useInventory } from '@/hooks'
 import { CreateItemModal, CreateContainerModal, ConfirmDeleteModal } from '@/components'
 import { QRLabelModal } from '@/components/QRLabelModal'
-import { QRCodeDisplay } from '@/components/QRCodeDisplay'
-import { deleteContainer, deleteItem, generateQRCodeForContainer, removeQRCodeFromContainer } from '@/services/firebaseService'
+import { QRManageModal } from '@/components/QRManageModal'
+import { deleteContainer, deleteItem } from '@/services/firebaseService'
 import { Item } from '@/types'
-import { ArrowLeft, Pencil, Trash2, ChevronRight, Package, Plus, Mic, QrCode, Sparkles } from 'lucide-react'
+import { ArrowLeft, Pencil, Trash2, ChevronRight, Package, Plus, Mic, QrCode } from 'lucide-react'
 import { Button, Card, IconBadge, EmptyState, Badge } from '@/components/ui'
 
 export function Container() {
@@ -17,9 +17,8 @@ export function Container() {
   const navigate = useNavigate()
 
   const [isCreateItemOpen, setIsCreateItemOpen] = useState(false)
-  const [showQRModal, setShowQRModal] = useState(false)
-  const [isGeneratingQR, setIsGeneratingQR] = useState(false)
-  const [isRemovingQR, setIsRemovingQR] = useState(false)
+  const [showQRManageModal, setShowQRManageModal] = useState(false)
+  const [showQRLabelModal, setShowQRLabelModal] = useState(false)
 
   const [isEditingContainer, setIsEditingContainer] = useState(false)
   const [isDeleteContainerConfirmOpen, setIsDeleteContainerConfirmOpen] = useState(false)
@@ -66,32 +65,12 @@ export function Container() {
     }
   }
 
-  const handleGenerateQR = async () => {
-    setIsGeneratingQR(true)
-    try {
-      await generateQRCodeForContainer(container.id)
-      await refresh()
-    } catch (error) {
-      console.error('Failed to generate QR code:', error)
-    } finally {
-      setIsGeneratingQR(false)
-    }
-  }
-
-  const handleRemoveQR = async () => {
-    setIsRemovingQR(true)
-    try {
-      await removeQRCodeFromContainer(container.id)
-      await refresh()
-    } catch (error) {
-      console.error('Failed to remove QR code:', error)
-    } finally {
-      setIsRemovingQR(false)
-    }
+  const handleViewLabel = () => {
+    setShowQRLabelModal(true)
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full pb-48">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <button
@@ -102,6 +81,14 @@ export function Container() {
           <span className="font-body text-base text-text-primary">{place?.name}</span>
         </button>
         <div className="flex items-center gap-3">
+          <Button
+            variant="icon"
+            size="icon"
+            className="w-11 h-11 bg-bg-surface rounded-full"
+            onClick={() => setShowQRManageModal(true)}
+          >
+            <QrCode size={18} className="text-text-primary" strokeWidth={2} />
+          </Button>
           <Button
             variant="icon"
             size="icon"
@@ -132,81 +119,6 @@ export function Container() {
             {containerItems.length} items · {place?.name}
           </p>
         </div>
-      </div>
-
-      {/* QR Code Section */}
-      <div className="mb-8">
-        {container.qrCodeId ? (
-          <Card className="bg-gradient-to-br from-accent-aqua/5 to-accent-aqua/10 border-accent-aqua/20">
-            <div className="flex items-center gap-4">
-              {/* QR Code Preview */}
-              <div className="flex-shrink-0 bg-white p-3 rounded-xl shadow-sm">
-                <QRCodeDisplay containerId={container.id} size={80} />
-              </div>
-
-              {/* QR Info & Actions */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <QrCode size={18} className="text-accent-aqua" strokeWidth={2} />
-                  <h3 className="font-display text-[16px] font-semibold text-text-primary">
-                    QR Code Active
-                  </h3>
-                </div>
-                <p className="font-body text-[13px] text-text-secondary mb-3">
-                  Scan to quickly access this container
-                </p>
-                <div className="flex gap-2">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => setShowQRModal(true)}
-                  >
-                    View Label
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleRemoveQR}
-                    disabled={isRemovingQR}
-                  >
-                    {isRemovingQR ? 'Removing...' : 'Remove'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </Card>
-        ) : (
-          <Card className="bg-gradient-to-br from-zinc-50 to-zinc-100/50 border-zinc-200">
-            <div className="flex items-center gap-4">
-              {/* Icon */}
-              <div className="flex-shrink-0 w-20 h-20 bg-white rounded-xl flex items-center justify-center shadow-sm">
-                <QrCode size={32} className="text-zinc-400" strokeWidth={2} />
-              </div>
-
-              {/* Info & Action */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <Sparkles size={16} className="text-zinc-500" strokeWidth={2} />
-                  <h3 className="font-display text-[16px] font-semibold text-text-primary">
-                    Enable QR Code
-                  </h3>
-                </div>
-                <p className="font-body text-[13px] text-text-secondary mb-3">
-                  Generate a QR code for quick scanning and labeling
-                </p>
-                <Button
-                  variant="primary"
-                  size="sm"
-                  onClick={handleGenerateQR}
-                  disabled={isGeneratingQR}
-                  leftIcon={QrCode}
-                >
-                  {isGeneratingQR ? 'Generating...' : 'Generate QR Code'}
-                </Button>
-              </div>
-            </div>
-          </Card>
-        )}
       </div>
 
       {/* Items Section */}
@@ -345,11 +257,20 @@ export function Container() {
         />
       )}
 
+      {/* QR Manage Modal */}
+      <QRManageModal
+        isOpen={showQRManageModal}
+        onClose={() => setShowQRManageModal(false)}
+        container={container}
+        onRefresh={refresh}
+        onViewLabel={handleViewLabel}
+      />
+
       {/* QR Label Modal */}
       {place && (
         <QRLabelModal
-          isOpen={showQRModal}
-          onClose={() => setShowQRModal(false)}
+          isOpen={showQRLabelModal}
+          onClose={() => setShowQRLabelModal(false)}
           container={container}
           place={place}
         />

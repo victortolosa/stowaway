@@ -5,13 +5,14 @@ import { CreatePlaceModal, ConfirmDeleteModal } from '@/components'
 import { useNavigate } from 'react-router-dom'
 import { deletePlace } from '@/services/firebaseService'
 import { Place } from '@/types'
-import { Trash2, Home, Briefcase, Archive, MapPin } from 'lucide-react'
+import { Trash2, Home, Briefcase, Archive, MapPin, Search } from 'lucide-react'
 import { PageHeader, ListItem, EmptyState, IconBadge } from '@/components/ui'
 
 export function Places() {
   const user = useAuthStore((state) => state.user)
   const { places, containers, refresh } = useInventory()
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const [editingPlace, setEditingPlace] = useState<Place | null>(null)
 
@@ -52,23 +53,48 @@ export function Places() {
     return colors[index % colors.length]
   }
 
+  const filteredPlaces = places.filter((place) => {
+    if (!searchQuery) return true
+    const query = searchQuery.toLowerCase()
+    const placeContainers = containers.filter((c) => c.placeId === place.id)
+    return (
+      place.name.toLowerCase().includes(query) ||
+      place.type.toLowerCase().includes(query) ||
+      placeContainers.some(c => c.name.toLowerCase().includes(query))
+    )
+  })
+
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full pb-48">
       <PageHeader
         title="Places"
-        actionLabel="Add"
+        actionLabel="Add Place"
         onAction={() => setIsCreateModalOpen(true)}
       />
 
-      {places.length === 0 ? (
+      {/* Search Bar */}
+      <div className="mb-6">
+        <div className="bg-white rounded-xl h-[52px] px-4 flex items-center gap-3 shadow-sm border border-black/5 focus-within:border-accent-aqua focus-within:shadow-md transition-all duration-200">
+          <Search size={22} className="text-accent-aqua" strokeWidth={2.5} />
+          <input
+            type="text"
+            placeholder="Search places..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="flex-1 font-body text-[16px] text-text-primary placeholder:text-text-tertiary outline-none bg-transparent"
+          />
+        </div>
+      </div>
+
+      {filteredPlaces.length === 0 ? (
         <EmptyState
-          message="No places yet"
-          actionLabel="Create Your First Place"
-          onAction={() => setIsCreateModalOpen(true)}
+          message={searchQuery ? 'No places found' : 'No places yet'}
+          actionLabel={searchQuery ? undefined : 'Create Your First Place'}
+          onAction={searchQuery ? undefined : () => setIsCreateModalOpen(true)}
         />
       ) : (
         <div className="flex flex-col gap-3">
-          {places.map((place, index) => {
+          {filteredPlaces.map((place, index) => {
             const placeContainers = containers.filter((c) => c.placeId === place.id)
             const PlaceIcon = getPlaceIcon(place.type)
 

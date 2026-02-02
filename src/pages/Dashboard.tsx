@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useInventory } from '@/hooks'
 import { useInventoryStore } from '@/store/inventory'
-import { Search, ScanLine, Plus, Bell, ChevronRight, Home, Briefcase, Archive, MapPin, Package, Mic } from 'lucide-react'
-import { Button, Card, IconBadge, EmptyState } from '@/components/ui'
-import { QRScanner } from '@/components/QRScanner'
+import { Search, Plus, Home, Briefcase, Archive, MapPin, Package, Mic, ChevronRight, ChevronDown } from 'lucide-react'
+import { Button, Card, EmptyState } from '@/components/ui'
 import { Timestamp } from 'firebase/firestore'
+
+type SortOption = 'recently-added' | 'oldest-first' | 'a-z' | 'z-a' | 'recently-modified'
 
 // Helper to convert Firestore Timestamp to Date
 const toDate = (timestamp: Date | Timestamp): Date => {
@@ -19,12 +20,34 @@ export function Dashboard() {
   const { refresh } = useInventory()
   const { places, containers, items } = useInventoryStore()
   const navigate = useNavigate()
-  const [showScanner, setShowScanner] = useState(false)
+  const [visibleItemsCount, setVisibleItemsCount] = useState(8)
+
+  const [itemsSortBy, setItemsSortBy] = useState<SortOption>('recently-added')
+  const [containersSortBy, setContainersSortBy] = useState<SortOption>('recently-modified')
+  const [placesSortBy, setPlacesSortBy] = useState<SortOption>('recently-modified')
+
+  const [showItemsSortMenu, setShowItemsSortMenu] = useState(false)
+  const [showContainersSortMenu, setShowContainersSortMenu] = useState(false)
+  const [showPlacesSortMenu, setShowPlacesSortMenu] = useState(false)
 
   useEffect(() => {
     console.log('Dashboard: Refreshing inventory...')
     refresh()
   }, [refresh])
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (!target.closest('.sort-dropdown')) {
+        setShowItemsSortMenu(false)
+        setShowContainersSortMenu(false)
+        setShowPlacesSortMenu(false)
+      }
+    }
+
+    document.addEventListener('click', handleClickOutside)
+    return () => document.removeEventListener('click', handleClickOutside)
+  }, [])
 
   const getPlaceIcon = (type: string) => {
     switch (type) {
@@ -40,13 +63,54 @@ export function Dashboard() {
     return colors[index % colors.length]
   }
 
-  const recentItems = [...items]
-    .sort((a, b) => {
-      const dateA = toDate(a.createdAt)
-      const dateB = toDate(b.createdAt)
-      return dateB.getTime() - dateA.getTime()
-    })
-    .slice(0, 3)
+  const getSortLabel = (sortOption: SortOption): string => {
+    switch (sortOption) {
+      case 'recently-added': return 'Recently Added'
+      case 'recently-modified': return 'Recently Modified'
+      case 'oldest-first': return 'Oldest First'
+      case 'a-z': return 'A-Z'
+      case 'z-a': return 'Z-A'
+    }
+  }
+
+  const sortItems = <T extends { name: string; createdAt: Date | Timestamp; lastAccessed?: Date | Timestamp }>(
+    items: T[],
+    sortBy: SortOption
+  ): T[] => {
+    const sorted = [...items]
+    switch (sortBy) {
+      case 'recently-added':
+        return sorted.sort((a, b) => {
+          const dateA = toDate(a.createdAt)
+          const dateB = toDate(b.createdAt)
+          return dateB.getTime() - dateA.getTime()
+        })
+      case 'recently-modified':
+        return sorted.sort((a, b) => {
+          const dateA = toDate(a.lastAccessed || a.createdAt)
+          const dateB = toDate(b.lastAccessed || b.createdAt)
+          return dateB.getTime() - dateA.getTime()
+        })
+      case 'oldest-first':
+        return sorted.sort((a, b) => {
+          const dateA = toDate(a.createdAt)
+          const dateB = toDate(b.createdAt)
+          return dateA.getTime() - dateB.getTime()
+        })
+      case 'a-z':
+        return sorted.sort((a, b) => a.name.localeCompare(b.name))
+      case 'z-a':
+        return sorted.sort((a, b) => b.name.localeCompare(a.name))
+    }
+  }
+
+  const allRecentItems = sortItems([...items], itemsSortBy)
+  const recentItems = allRecentItems.slice(0, visibleItemsCount)
+  const hasMoreItems = allRecentItems.length > visibleItemsCount
+
+  const loadMoreItems = () => {
+    setVisibleItemsCount(prev => prev + 8)
+  }
 
   const getItemLocation = (itemId: string) => {
     const item = items.find(i => i.id === itemId)
@@ -56,74 +120,281 @@ export function Dashboard() {
     return `${place?.name || ''} → ${container?.name || ''}`
   }
 
-  const handleQRScan = (containerId: string) => {
-    setShowScanner(false)
-    navigate(`/containers/${containerId}`)
-  }
-
   return (
-    <div className="flex flex-col gap-10 pb-32 w-full max-w-full">
-      {/* Top Section with Background Gradient/Header */}
+    <div className="flex flex-col gap-10 pb-48 w-full max-w-full">
+      {/* Top Section with Search and Add Item */}
       <div className="flex flex-col gap-6">
-        <div className="flex justify-between items-center">
-          <div className="flex flex-col gap-1">
-            <h1 className="font-display text-3xl md:text-4xl font-bold text-text-primary leading-tight tracking-tight">
-              My Storage
-            </h1>
-            <p className="font-body text-[15px] md:text-base text-text-secondary">
-              {places.length} places · {containers.length} containers
-            </p>
+        <div className="flex gap-3 items-center">
+          {/* Search Bar */}
+          <div
+            className="bg-white rounded-xl h-[44px] pl-5 pr-4 flex items-center gap-3 cursor-pointer shadow-sm border border-black/5 hover:border-black/10 hover:shadow-md transition-all duration-200 flex-1"
+            onClick={() => navigate('/search')}
+          >
+            <Search size={22} className="text-accent-aqua" strokeWidth={2.5} />
+            <span className="font-body text-[16px] text-text-tertiary">
+              Search everything...
+            </span>
           </div>
-          <Button variant="icon" size="icon" className="w-12 h-12 bg-white rounded-full shadow-sm hover:shadow-md border border-gray-100 transition-all">
-            <Bell size={22} className="text-text-primary" strokeWidth={2} />
-          </Button>
-        </div>
 
-        {/* Search Bar */}
-        <div
-          className="bg-white rounded-xl h-[52px] px-4 flex items-center gap-3 cursor-pointer shadow-sm border border-black/5 hover:border-black/10 hover:shadow-md transition-all duration-200 w-full"
-          onClick={() => navigate('/search')}
-        >
-          <Search size={22} className="text-accent-aqua" strokeWidth={2.5} />
-          <span className="font-body text-[16px] text-text-tertiary">
-            Search items...
-          </span>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-10">
-        {/* Quick Actions */}
-        <div className="grid grid-cols-2 md:flex md:justify-start gap-4">
           <Button
             variant="primary"
-            size="lg"
-            className="w-full md:w-auto shadow-xl shadow-accent-aqua/20"
-            leftIcon={ScanLine}
-            onClick={() => setShowScanner(true)}
-          >
-            Scan QR
-          </Button>
-          <Button
-            variant="secondary"
-            size="lg"
-            className="w-full md:w-auto"
+            size="md"
             leftIcon={Plus}
             onClick={() => navigate('/places')}
+            className="!px-6 !h-[44px] !py-0"
           >
             Add Item
           </Button>
         </div>
+      </div>
+
+      <div className="flex flex-col gap-10">
+        {/* Items Section */}
+        {recentItems.length > 0 && (
+          <div className="flex flex-col gap-5">
+            <div className="flex items-baseline justify-between">
+              <button
+                onClick={() => navigate('/items')}
+                className="flex items-center gap-2 group"
+              >
+                <h2 className="font-display text-[22px] md:text-2xl font-bold text-text-primary tracking-tight">Items</h2>
+                <ChevronRight size={20} className="text-text-tertiary" strokeWidth={2} />
+              </button>
+              <div className="relative sort-dropdown">
+                <button
+                  onClick={() => setShowItemsSortMenu(!showItemsSortMenu)}
+                  className="flex items-center gap-1.5 font-body text-[12px] font-medium text-text-tertiary tracking-wide uppercase hover:text-text-secondary transition-colors"
+                >
+                  {getSortLabel(itemsSortBy)}
+                  <ChevronDown size={14} className="text-text-tertiary" strokeWidth={2} />
+                </button>
+                {showItemsSortMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-bg-page rounded-card shadow-card py-2 z-10 border border-border-standard">
+                    {(['recently-added', 'oldest-first', 'a-z', 'z-a'] as SortOption[]).map((option) => (
+                      <button
+                        key={option}
+                        onClick={() => {
+                          setItemsSortBy(option)
+                          setShowItemsSortMenu(false)
+                        }}
+                        className={`w-full px-4 py-2 text-left font-body text-sm transition-colors ${
+                          itemsSortBy === option
+                            ? 'text-accent-aqua bg-accent-aqua/10'
+                            : 'text-text-primary hover:bg-bg-surface'
+                        }`}
+                      >
+                        {getSortLabel(option)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Horizontal Scroll Container */}
+            <div className="flex flex-col gap-4">
+              <div className="overflow-x-auto -mx-4 px-4 pb-2">
+                <div className="flex gap-4 min-w-max">
+                  {recentItems.map((item) => (
+                    <Card
+                      key={item.id}
+                      padding="none"
+                      variant="interactive"
+                      className="overflow-hidden w-[280px] flex-shrink-0"
+                      onClick={() => navigate(`/items/${item.id}`)}
+                    >
+                      <div className="flex flex-col h-full">
+                        {/* Image */}
+                        {item.photos[0] ? (
+                          <img
+                            src={item.photos[0]}
+                            alt={item.name}
+                            className="w-full h-[140px] object-cover bg-gray-100"
+                          />
+                        ) : (
+                          <div className="w-full h-[140px] bg-bg-elevated flex items-center justify-center">
+                            <Package size={32} className="text-text-tertiary" strokeWidth={2} />
+                          </div>
+                        )}
+
+                        {/* Content */}
+                        <div className="p-4 flex flex-col gap-2">
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-body text-[15px] font-semibold text-text-primary truncate flex-1">
+                              {item.name}
+                            </h3>
+                            {item.voiceNoteUrl && (
+                              <Mic size={14} className="text-accent-aqua flex-shrink-0" />
+                            )}
+                          </div>
+                          <p className="font-body text-[13px] text-text-secondary truncate">
+                            {getItemLocation(item.id)}
+                          </p>
+                          <span className="font-body text-[12px] text-text-tertiary">
+                            {(() => {
+                              const date = toDate(item.createdAt)
+                              const now = new Date()
+                              const diffMs = now.getTime() - date.getTime()
+                              const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+                              if (diffHours < 1) return 'Just now'
+                              if (diffHours < 24) return `${diffHours}h`
+                              const diffDays = Math.floor(diffHours / 24)
+                              return `${diffDays}d`
+                            })()}
+                          </span>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+
+                  {/* Show More Button */}
+                  {hasMoreItems && (
+                    <button
+                      onClick={loadMoreItems}
+                      className="w-[280px] flex-shrink-0 bg-bg-surface border-2 border-dashed border-border-standard rounded-card flex flex-col items-center justify-center gap-3 hover:border-accent-aqua hover:bg-accent-aqua/5 transition-all cursor-pointer min-h-[220px]"
+                    >
+                      <Plus size={32} className="text-accent-aqua" strokeWidth={2} />
+                      <div className="text-center">
+                        <p className="font-display text-[15px] font-semibold text-text-primary">
+                          Show More
+                        </p>
+                        <p className="font-body text-[13px] text-text-secondary">
+                          {allRecentItems.length - visibleItemsCount} more items
+                        </p>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Containers Section */}
+        {containers.length > 0 && (
+          <div className="flex flex-col gap-5">
+            <div className="flex items-baseline justify-between">
+              <button
+                onClick={() => navigate('/containers')}
+                className="flex items-center gap-2 group"
+              >
+                <h2 className="font-display text-[22px] md:text-2xl font-bold text-text-primary tracking-tight">Containers</h2>
+                <ChevronRight size={20} className="text-text-tertiary" strokeWidth={2} />
+              </button>
+              <div className="relative sort-dropdown">
+                <button
+                  onClick={() => setShowContainersSortMenu(!showContainersSortMenu)}
+                  className="flex items-center gap-1.5 font-body text-[12px] font-medium text-text-tertiary tracking-wide uppercase hover:text-text-secondary transition-colors"
+                >
+                  {getSortLabel(containersSortBy)}
+                  <ChevronDown size={14} className="text-text-tertiary" strokeWidth={2} />
+                </button>
+                {showContainersSortMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-bg-page rounded-card shadow-card py-2 z-10 border border-border-standard">
+                    {(['recently-modified', 'recently-added', 'oldest-first', 'a-z', 'z-a'] as SortOption[]).map((option) => (
+                      <button
+                        key={option}
+                        onClick={() => {
+                          setContainersSortBy(option)
+                          setShowContainersSortMenu(false)
+                        }}
+                        className={`w-full px-4 py-2 text-left font-body text-sm transition-colors ${
+                          containersSortBy === option
+                            ? 'text-accent-aqua bg-accent-aqua/10'
+                            : 'text-text-primary hover:bg-bg-surface'
+                        }`}
+                      >
+                        {getSortLabel(option)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="overflow-x-auto -mx-4 px-4 pb-2">
+              <div className="flex gap-4 min-w-max">
+                {sortItems([...containers], containersSortBy)
+                  .slice(0, 8)
+                  .map((container, index) => {
+                    const place = places.find(p => p.id === container.placeId)
+                    const containerItems = items.filter(item => item.containerId === container.id)
+                    const containerColor = getPlaceColor(index)
+
+                    return (
+                      <Card
+                        key={container.id}
+                        variant="interactive"
+                        onClick={() => navigate(`/containers/${container.id}`)}
+                        padding="none"
+                        className="w-[280px] flex-shrink-0"
+                      >
+                        <div className="flex items-center gap-4 p-5 h-full">
+                          {/* Icon Badge */}
+                          <div
+                            className="w-[84px] h-[84px] rounded-lg flex items-center justify-center flex-shrink-0"
+                            style={{ backgroundColor: containerColor + '15' }}
+                          >
+                            <Package size={42} style={{ color: containerColor }} strokeWidth={2} />
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex flex-col gap-1 flex-1 min-w-0">
+                            <h3 className="font-display text-[16px] font-semibold text-text-primary leading-snug">
+                              {container.name}
+                            </h3>
+                            <p className="font-body text-[13px] text-text-secondary truncate">
+                              {place?.name} · {containerItems.length} items
+                            </p>
+                          </div>
+                        </div>
+                      </Card>
+                    )
+                  })}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Places Section */}
         <div className="flex flex-col gap-5">
-          <div className="flex justify-between items-center px-1">
-            <h2 className="font-display text-[22px] md:text-2xl font-bold text-text-primary tracking-tight">My Places</h2>
+          <div className="flex items-baseline justify-between">
             <button
               onClick={() => navigate('/places')}
-              className="font-body text-[14px] font-medium text-accent-aqua hover:text-accent-aqua-dark transition-colors px-3 py-2"
+              className="flex items-center gap-2 group"
             >
-              See all
+              <h2 className="font-display text-[22px] md:text-2xl font-bold text-text-primary tracking-tight">Places</h2>
+              <ChevronRight size={20} className="text-text-tertiary" strokeWidth={2} />
             </button>
+            <div className="relative sort-dropdown">
+              <button
+                onClick={() => setShowPlacesSortMenu(!showPlacesSortMenu)}
+                className="flex items-center gap-1.5 font-body text-[12px] font-medium text-text-tertiary tracking-wide uppercase hover:text-text-secondary transition-colors"
+              >
+                {getSortLabel(placesSortBy)}
+                <ChevronDown size={14} className="text-text-tertiary" strokeWidth={2} />
+              </button>
+              {showPlacesSortMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-bg-page rounded-card shadow-card py-2 z-10 border border-border-standard">
+                  {(['recently-modified', 'recently-added', 'oldest-first', 'a-z', 'z-a'] as SortOption[]).map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => {
+                        setPlacesSortBy(option)
+                        setShowPlacesSortMenu(false)
+                      }}
+                      className={`w-full px-4 py-2 text-left font-body text-sm transition-colors ${
+                        placesSortBy === option
+                          ? 'text-accent-aqua bg-accent-aqua/10'
+                          : 'text-text-primary hover:bg-bg-surface'
+                      }`}
+                    >
+                      {getSortLabel(option)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           {places.length === 0 ? (
@@ -133,106 +404,50 @@ export function Dashboard() {
               onAction={() => navigate('/places')}
             />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {places.slice(0, 3).map((place, index) => {
-                const placeContainers = containers.filter((c) => c.placeId === place.id)
-                const totalItems = items.filter((item) =>
-                  placeContainers.some((c) => c.id === item.containerId)
-                ).length
-                const PlaceIcon = getPlaceIcon(place.type)
+            <div className="overflow-x-auto -mx-4 px-4 pb-2">
+              <div className="flex gap-4 min-w-max">
+                {sortItems([...places], placesSortBy).map((place, index) => {
+                  const placeContainers = containers.filter((c) => c.placeId === place.id)
+                  const totalItems = items.filter((item) =>
+                    placeContainers.some((c) => c.id === item.containerId)
+                  ).length
+                  const PlaceIcon = getPlaceIcon(place.type)
 
-                return (
-                  <Card
-                    key={place.id}
-                    variant="interactive"
-                    onClick={() => navigate(`/places/${place.id}`)}
-                    className="flex items-center gap-4 h-full"
-                  >
-                    <IconBadge icon={PlaceIcon} color={getPlaceColor(index)} size="sm" />
-                    <div className="flex-1 flex flex-col gap-1">
-                      <h3 className="font-display text-[16px] font-semibold text-text-primary">
-                        {place.name}
-                      </h3>
-                      <p className="font-body text-[13px] text-text-secondary">
-                        {placeContainers.length} containers · {totalItems} items
-                      </p>
-                    </div>
-                    <ChevronRight size={20} className="text-text-tertiary" strokeWidth={2} />
-                  </Card>
-                )
-              })}
+                  return (
+                    <Card
+                      key={place.id}
+                      variant="interactive"
+                      onClick={() => navigate(`/places/${place.id}`)}
+                      padding="none"
+                      className="w-[350px] flex-shrink-0"
+                    >
+                      <div className="flex items-center gap-3 p-5">
+                        {/* Icon Badge */}
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: getPlaceColor(index) + '15' }}
+                        >
+                          <PlaceIcon size={16} style={{ color: getPlaceColor(index) }} strokeWidth={2} />
+                        </div>
+
+                        {/* Content */}
+                        <div className="flex flex-col gap-1 flex-1 min-w-0">
+                          <h3 className="font-display text-[16px] font-semibold text-text-primary truncate">
+                            {place.name}
+                          </h3>
+                          <p className="font-body text-[13px] text-text-secondary truncate">
+                            {placeContainers.length} containers · {totalItems} items
+                          </p>
+                        </div>
+                      </div>
+                    </Card>
+                  )
+                })}
+              </div>
             </div>
           )}
         </div>
-
-        {/* Recently Added */}
-        {recentItems.length > 0 && (
-          <div className="flex flex-col gap-5">
-            <div className="flex justify-between items-center px-1">
-              <h2 className="font-display text-[22px] md:text-2xl font-bold text-text-primary tracking-tight">Recently Added</h2>
-              <button className="font-body text-[14px] font-medium text-accent-aqua hover:text-accent-aqua-dark transition-colors px-3 py-2">
-                See all
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {recentItems.map((item) => (
-                <Card key={item.id} padding="none" variant="interactive" className="overflow-hidden">
-                  <div
-                    onClick={() => navigate(`/items/${item.id}`)}
-                    className="py-[14px] px-4 flex items-center gap-[14px] cursor-pointer h-full"
-                  >
-                    {item.photos[0] ? (
-                      <img
-                        src={item.photos[0]}
-                        alt={item.name}
-                        className="w-12 h-12 rounded-xl object-cover flex-shrink-0 bg-gray-100"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 bg-bg-elevated rounded-xl flex items-center justify-center flex-shrink-0">
-                        <Package size={24} className="text-text-tertiary" strokeWidth={2} />
-                      </div>
-                    )}
-                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <h3 className="font-body text-[15px] font-semibold text-text-primary truncate">
-                          {item.name}
-                        </h3>
-                        {item.voiceNoteUrl && (
-                          <Mic size={12} className="text-accent-aqua flex-shrink-0" />
-                        )}
-                      </div>
-                      <p className="font-body text-[13px] text-text-secondary truncate">
-                        {getItemLocation(item.id)}
-                      </p>
-                    </div>
-                    <span className="font-body text-[12px] text-text-tertiary whitespace-nowrap self-start mt-1">
-                      {(() => {
-                        const date = toDate(item.createdAt)
-                        const now = new Date()
-                        const diffMs = now.getTime() - date.getTime()
-                        const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-                        if (diffHours < 1) return 'Just now'
-                        if (diffHours < 24) return `${diffHours}h`
-                        const diffDays = Math.floor(diffHours / 24)
-                        return `${diffDays}d`
-                      })()}
-                    </span>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
-
-      {/* QR Scanner Modal */}
-      {showScanner && (
-        <QRScanner
-          onScan={handleQRScan}
-          onClose={() => setShowScanner(false)}
-        />
-      )}
     </div>
   )
 }

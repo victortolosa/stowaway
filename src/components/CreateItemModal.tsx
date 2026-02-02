@@ -138,7 +138,8 @@ export function CreateItemModal({
             }
 
             if (editMode && initialData) {
-                const updatePayload: Partial<Item> & { voiceNoteUrl?: ReturnType<typeof deleteField> } = {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const updatePayload: any = {
                     ...itemData,
                     photos: photoUrl ? [photoUrl] : initialData.photos,
                 }
