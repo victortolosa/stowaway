@@ -34,7 +34,7 @@ export function AudioPlayer({ audioUrl, className = '' }: AudioPlayerProps) {
         // Try to force speaker output on iOS by setting audio category
         // This is a workaround attempt for iOS routing audio to earpiece
         try {
-            // @ts-ignore - iOS-specific API that might not be in types
+            // @ts-expect-error - iOS-specific API that might not be in types
             if (audio.webkitAudioContext || window.webkitAudioContext) {
                 console.log('AudioPlayer: Attempting to set audio output to speaker')
             }

@@ -101,8 +101,8 @@ export function ImageCropper({
                 'image/jpeg',
                 0.95
             )
-        } catch (error) {
-            console.error('Error creating cropped image:', error)
+        } catch {
+            console.error('Failed to load image')
             setIsProcessing(false)
         }
     }
@@ -247,7 +247,7 @@ async function getExifOrientation(url: string): Promise<number> {
         const res = await fetch(url)
         const buffer = await res.arrayBuffer()
         return parseExifOrientation(buffer)
-    } catch (err) {
+    } catch {
         return 1 // default - no rotation
     }
 }

@@ -44,7 +44,7 @@ export function AudioRecorder({
 
         // Detect iOS/Safari
         const isIOSorSafari = /iP(ad|hone|od)/.test(navigator.userAgent) ||
-                              /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent)
+            /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent)
 
         console.log('Device detection:', { isIOSorSafari, userAgent: navigator.userAgent })
 
@@ -271,7 +271,7 @@ export function AudioRecorder({
                 }
             }
         }
-    }, [])
+    }, [mediaBlobUrl])
 
     // Render helpers
     const isLoading = status === 'acquiring_media'

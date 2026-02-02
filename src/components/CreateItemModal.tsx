@@ -89,13 +89,13 @@ export function CreateItemModal({
             setAudioPreviewUrl(null)
             setShowAudioRecorder(false)
         }
-    }, [isOpen, editMode, initialData, reset])
+    }, [isOpen, editMode, initialData, reset, audioPreviewUrl])
 
     useEffect(() => {
         return () => {
             if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
         }
-    }, [audioPreviewUrl])
+    }, [isOpen, editMode, initialData, reset, audioPreviewUrl])
 
     const onSubmit = async (data: ItemFormValues) => {
         if (!user) return

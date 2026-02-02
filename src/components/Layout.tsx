@@ -6,7 +6,7 @@ export function Layout() {
     const location = useLocation()
 
     // Hide tab bar on specific routes
-    const showTabBar = !['/login', '/signup'].includes(location.pathname)
+    const showTabBar = !['/login', '/signup', '/scan'].includes(location.pathname)
 
     return (
         <div className="min-h-screen flex justify-center">

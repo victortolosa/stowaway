@@ -16,6 +16,7 @@ const SignUp = lazy(() => import('@/pages/SignUp').then(m => ({ default: m.SignU
 const PlaceDetail = lazy(() => import('@/pages/PlaceDetail').then(m => ({ default: m.PlaceDetail })))
 const Search = lazy(() => import('@/pages/Search').then(m => ({ default: m.Search })))
 const Profile = lazy(() => import('@/pages/Profile').then(m => ({ default: m.Profile })))
+const Scan = lazy(() => import('@/pages/Scan').then(m => ({ default: m.Scan })))
 
 function App() {
   const { setUser, setLoading } = useAuthStore()
@@ -55,6 +56,7 @@ function App() {
             <Route path="/containers/:id" element={<Container />} />
             <Route path="/items/:id" element={<Item />} />
             <Route path="/search" element={<Search />} />
+            <Route path="/scan" element={<Scan />} />
             <Route path="/profile" element={<Profile />} />
           </Route>
         </Routes>

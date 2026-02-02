@@ -20,6 +20,7 @@ const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'appId'] as const;
 const missingKeys = requiredKeys.filter(key => !firebaseConfig[key]);
 
 // Safely log configuration state for debugging
+// eslint-disable-next-line no-constant-condition
 if (import.meta.env.PROD || true) {
   console.group('Firebase Configuration Diagnostics');
   console.log('Status:', missingKeys.length === 0 ? 'VALID' : 'INVALID');
@@ -85,8 +86,8 @@ if (!auth) {
   auth = {
     currentUser: null,
     // Dummy implementation to prevent crash on execution
-    // @ts-ignore
-    onAuthStateChanged: (cb) => {
+    // @ts-expect-error - Dummy implementation for initial render
+    onAuthStateChanged: (_cb) => {
       return () => { }; // Return dummy unsubscribe function
     },
     signOut: async () => { },
