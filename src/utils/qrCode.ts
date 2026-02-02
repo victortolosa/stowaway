@@ -16,7 +16,7 @@ export async function generateQRCodeDataURL(
   containerId: string,
   options: QRCodeOptions = {}
 ): Promise<string> {
-  const url = `${window.location.origin}/container/${containerId}`
+  const url = `${window.location.origin}/containers/${containerId}`
 
   return QRCode.toDataURL(url, {
     width: options.width ?? 200,
@@ -37,7 +37,7 @@ export async function generateQRCodeToCanvas(
   containerId: string,
   options: QRCodeOptions = {}
 ): Promise<void> {
-  const url = `${window.location.origin}/container/${containerId}`
+  const url = `${window.location.origin}/containers/${containerId}`
 
   await QRCode.toCanvas(canvas, url, {
     width: options.width ?? 200,
@@ -56,7 +56,7 @@ export async function generateQRCodeToCanvas(
 export function parseQRCodeURL(url: string): string | null {
   try {
     const parsed = new URL(url)
-    const match = parsed.pathname.match(/\/container\/([a-zA-Z0-9]+)/)
+    const match = parsed.pathname.match(/\/containers\/([a-zA-Z0-9]+)/)
     return match ? match[1] : null
   } catch {
     return null
