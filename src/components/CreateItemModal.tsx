@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { AnimatePresence } from 'framer-motion'
 import { Mic, X } from 'lucide-react'
 import { createItem, updateItem, uploadImage, uploadAudio, deleteStorageFile } from '@/services/firebaseService'
+import { deleteField } from 'firebase/firestore'
 import { useAuthStore } from '@/store/auth'
 import { useImageCompression } from '@/hooks'
 import { ImageCropper, AudioRecorder, AudioPlayer } from '@/components'
@@ -43,6 +44,8 @@ export function CreateItemModal({
     const [imageToCrop, setImageToCrop] = useState<string | null>(null)
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
     const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null)
+    const [existingAudioUrl, setExistingAudioUrl] = useState<string | null>(null)
+    const [wasAudioDeleted, setWasAudioDeleted] = useState(false)
     const [showAudioRecorder, setShowAudioRecorder] = useState(false)
 
     const { compress, isCompressing, progress } = useImageCompression()
@@ -65,6 +68,8 @@ export function CreateItemModal({
             setPhotoFile(null)
             setPhotoPreview(initialData.photos[0] || null)
             setAudioBlob(null)
+            setExistingAudioUrl(initialData.voiceNoteUrl || null)
+            setWasAudioDeleted(false)
             if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
             setAudioPreviewUrl(null)
             setShowAudioRecorder(false)
@@ -76,6 +81,8 @@ export function CreateItemModal({
             setPhotoFile(null)
             setPhotoPreview(null)
             setAudioBlob(null)
+            setExistingAudioUrl(null)
+            setWasAudioDeleted(false)
             if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
             setAudioPreviewUrl(null)
             setShowAudioRecorder(false)
@@ -94,6 +101,14 @@ export function CreateItemModal({
         setIsSubmitting(true)
         const uploadedPaths: string[] = []
         try {
+            console.log('Starting item creation/update submission')
+            console.log('Form data:', data)
+            console.log('Has audio blob:', !!audioBlob)
+            if (audioBlob) {
+                console.log('Audio blob size:', audioBlob.size)
+                console.log('Audio blob type:', audioBlob.type)
+            }
+
             let photoUrl = ''
             let audioUrl = ''
 
@@ -112,13 +127,16 @@ export function CreateItemModal({
             }
 
             if (audioBlob) {
+                console.log('Attempting to upload audio...')
                 const ext = (audioBlob.type && audioBlob.type.split('/')[1]) || 'webm'
                 const filename = `${Date.now()}_${(crypto && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2))}.${ext}`
                 const audioFile = new File([audioBlob], filename, {
                     type: audioBlob.type || 'audio/webm',
                 })
                 const audioPath = `items/${user.uid}/audio/${filename}`
+                console.log('Upload path:', audioPath)
                 audioUrl = await uploadAudio(audioFile, audioPath)
+                console.log('Audio uploaded successfully. URL:', audioUrl)
                 uploadedPaths.push(audioPath)
             }
 
@@ -127,12 +145,14 @@ export function CreateItemModal({
                 ...(photoUrl && { photos: [photoUrl] }),
                 ...(audioUrl && { voiceNoteUrl: audioUrl }),
             }
+            console.log('Final item data to save:', itemData)
 
             if (editMode && initialData) {
                 await updateItem(initialData.id, {
                     ...itemData,
                     photos: photoUrl ? [photoUrl] : initialData.photos,
-                })
+                    voiceNoteUrl: wasAudioDeleted && !audioUrl ? deleteField() : (audioUrl || undefined)
+                } as any)
             } else {
                 await createItem({
                     ...itemData,
@@ -257,7 +277,7 @@ export function CreateItemModal({
                     <div>
                         <div className="flex items-center justify-between mb-2">
                             <Label className="mb-0">Voice Note (Optional)</Label>
-                            {!showAudioRecorder && !audioBlob && (
+                            {!showAudioRecorder && !audioBlob && !existingAudioUrl && (
                                 <Button
                                     type="button"
                                     variant="ghost"
@@ -277,23 +297,29 @@ export function CreateItemModal({
                                     const url = URL.createObjectURL(blob)
                                     setAudioPreviewUrl(url)
                                     setShowAudioRecorder(false)
+                                    setExistingAudioUrl(null) // Clear existing if new one recorded
                                 }}
                                 maxDuration={60}
                             />
                         )}
 
-                        {audioBlob && audioPreviewUrl && (
+                        {(audioBlob && audioPreviewUrl) || existingAudioUrl ? (
                             <div className="relative">
                                 <AudioPlayer
-                                    audioUrl={audioPreviewUrl}
+                                    audioUrl={(audioBlob && audioPreviewUrl) ? audioPreviewUrl : existingAudioUrl!}
                                     className="border border-border-light"
                                 />
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        setAudioBlob(null)
-                                        if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
-                                        setAudioPreviewUrl(null)
+                                        if (audioBlob) {
+                                            setAudioBlob(null)
+                                            if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
+                                            setAudioPreviewUrl(null)
+                                        } else {
+                                            setExistingAudioUrl(null)
+                                            setWasAudioDeleted(true)
+                                        }
                                         setShowAudioRecorder(false)
                                     }}
                                     className="absolute -top-2 -right-2 w-7 h-7 bg-bg-elevated rounded-full shadow-sm flex items-center justify-center text-text-secondary hover:text-text-primary transition border border-border-light z-10"
@@ -301,7 +327,7 @@ export function CreateItemModal({
                                     <X size={14} />
                                 </button>
                             </div>
-                        )}
+                        ) : null}
                     </div>
 
                     <div className="flex justify-end gap-3 pt-2">
