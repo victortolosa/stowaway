@@ -4,7 +4,7 @@ This suite focuses on reducing the manual overhead of inventory management throu
 
 ---
 
-## 1. The "Rapid Fire" Batch Add
+## 1. Batch Item Creation - Camera Mode
 
 *Designed for the initial "Deep Clean" or when unpacking a new shipment.*
 
@@ -12,13 +12,13 @@ This suite focuses on reducing the manual overhead of inventory management throu
 * **"Ghost" Mode**: For maximum speed, users can just take photos. The app creates "Unnamed Items" that appear in a "Needs Review" inbox on the dashboard, allowing the user to name/tag them later from the comfort of their couch.
 * **Auto-Incrementing**: If adding containers, the tool can automatically name them (e.g., *Holiday Bin 01*, *Holiday Bin 02*) so the user only has to worry about the physical labels.
 
-## 2. The "Moving Day" Wizard
 
-*Designed for high-volume setup of new storage supplies.*
+## 2. Batch Container Creation
 
-* **Template-Based Creation**: Select a **Place** (e.g., Garage) and a container type. Enter a quantity, and the app generates the digital records instantly.
-* **Integrated Label Queue**: As containers are batch-created, they are automatically added to a "Print Queue."
-* **Batch PDF Generation**: Exports a single PDF optimized for standard label sheets (like Avery 5160) so you can label an entire shelf in one go.
+*Designed for high-volume setup of new containers*
+
+* **Template-Based Creation**: Select a **Place** (e.g., Garage) and quickly create containers through a simple sequence of taking all the container photos consecutively. User can add name after every photo(optional can do later). Once all photos are taken user can preview all the containers, seeing the photo with placeholder names and rename them manually, or replace photos if the photo is not good.
+* **Integrated Label Queue**: Before the batch photos are started the user is asked if they want to print QR codes for the containers or not. If yes, as containers are batch-created, QR code are generated for each container. User can print the QR codes individually or in bulk (similar to Batch QR creation functionality). If no, users can manually create QR codes for each container later during the review process.
 
 ## 3. The "Stale Item" Auditor
 
@@ -27,17 +27,6 @@ This suite focuses on reducing the manual overhead of inventory management throu
 * **Interaction Tracking**: The app tracks the "Last Seen" date (the last time an item’s QR was scanned or its record was updated).
 * **The "Dust" Filter**: A specialized tool that surfaces items not touched in 12+ months.
 * **Action Shortcuts**: From the auditor list, users can quickly mark items as **Donate**, **Sell**, or **Toss**, triggering a "Removal" workflow that clears them from the active inventory.
-
----
-
-### Implementation Priority Matrix
-
-| Tool | Dev Effort | Impact on UX | Key Tech |
-| --- | --- | --- | --- |
-| **Rapid Fire** | Medium | High | Camera API / Local State Management |
-| **Moving Day** | Low | Medium | PDF Kit / Batch DB Writes |
-| **Smart Mover** | Medium | High | QR Scanner Integration |
-| **Stale Auditor** | Low | Medium | Firestore Timestamps |
 
 ---
 

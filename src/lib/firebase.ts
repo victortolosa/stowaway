@@ -1,7 +1,7 @@
 import { initializeApp, type FirebaseApp } from 'firebase/app'
 import { getAnalytics, isSupported, type Analytics } from 'firebase/analytics'
 import { getAuth, type Auth } from 'firebase/auth'
-import { getFirestore, type Firestore } from 'firebase/firestore'
+import { getFirestore, type Firestore, enableIndexedDbPersistence } from 'firebase/firestore'
 import { getStorage, type FirebaseStorage } from 'firebase/storage'
 
 const firebaseConfig = {
@@ -98,13 +98,18 @@ if (!storage) storage = {} as FirebaseStorage;
 
 export { auth, db, storage, analytics };
 
-// Disable persistence temporarily to debug hangs
-/*
-enableIndexedDbPersistence(db).catch((err) => {
-  if (err.code === 'failed-precondition') {
-    console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.')
-  } else if (err.code === 'unimplemented') {
-    console.warn('The current browser does not support all of the features required to enable persistence')
-  }
-})
-*/
+// Enable offline persistence
+try {
+  // Use multi-tab persistence if available (newer SDK features)
+  // For now, we use standard persistence which is robust for single-tab PWA usage
+  // We wrap this in a try/catch/promise to ensure it doesn't block app load
+  enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code === 'failed-precondition') {
+      console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
+    } else if (err.code === 'unimplemented') {
+      console.warn('The current browser does not support all of the features required to enable persistence');
+    }
+  });
+} catch (e) {
+  console.warn('Error enabling offline persistence:', e);
+}

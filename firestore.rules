@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions for cleaner rules
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Helper to validate URLs (allows standard https URLs OR our offline placeholders)
+    function isValidUrlOrPlaceholder(url) {
+      return url.matches('^https://.*') || url.matches('^urn:stowaway:pending:.*');
+    }
+
+    // 1. Rules for the new Groups collection
+    match /groups/{groupId} {
+      allow create: if isOwner(request.resource.data.userId);
+      allow read, update, delete: if isOwner(resource.data.userId);
+    }
+
+    // 2. Rules for Places
+    match /places/{placeId} {
+      allow create: if isOwner(request.resource.data.userId);
+      allow read, update, delete: if isOwner(resource.data.userId);
+    }
+    
+    // 3. Rules for Containers
+    match /containers/{containerId} {
+      allow create: if isOwner(request.resource.data.userId);
+      allow read, update, delete: if isOwner(resource.data.userId);
+    }
+
+    // 4. Rules for Items
+    match /items/{itemId} {
+      allow create: if isOwner(request.resource.data.userId) 
+        // Optional: Add specific validation for photos/voiceNoteUrl here if needed
+        // && (
+        //   !('photos' in request.resource.data) || 
+        //   request.resource.data.photos.size() == 0 ||
+        //   isValidUrlOrPlaceholder(request.resource.data.photos[0])
+        // )
+        ;
+      allow read, update, delete: if isOwner(resource.data.userId);
+    }
+
+    // 5. Catch-all rule (Maintaining your existing "Getting Started" rules)
+    // This is useful for development but should be locked down eventually.
+    match /{document=**} {
+      allow read, write: if request.time < timestamp.date(2026, 3, 1);
+    }
+  }
+}

@@ -3,7 +3,7 @@ import { signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/auth'
 import { useInventoryStore } from '@/store/inventory'
-import { User, LogOut, MapPin, Package, Box } from 'lucide-react'
+import { User, LogOut, MapPin, Package, Box, WifiOff } from 'lucide-react'
 import { Card } from '@/components/ui'
 
 export function Profile() {
@@ -73,6 +73,17 @@ export function Profile() {
               </div>
             </div>
           </div>
+        </Card>
+
+        {/* Offline Info */}
+        <Card padding="lg" className="mb-6">
+          <div className="flex items-center gap-3 mb-2">
+            <WifiOff size={20} className="text-slate-400" />
+            <h3 className="font-display text-base font-semibold text-text-primary">Offline Mode</h3>
+          </div>
+          <p className="font-body text-sm text-text-secondary leading-relaxed">
+            Stowaway works offline! You can browse your inventory and add new items even without an internet connection. Changes will sync automatically when you&apos;re back online.
+          </p>
         </Card>
 
         <div className="space-y-3">

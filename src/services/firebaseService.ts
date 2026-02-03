@@ -17,6 +17,7 @@ import {
 } from 'firebase/storage'
 import { db, storage } from '@/lib/firebase'
 import { Place, Container, Item, Group } from '@/types'
+import { offlineStorage } from '@/lib/offlineStorage'
 
 /**
  * PLACES OPERATIONS
@@ -181,6 +182,40 @@ export async function createItem(item: Omit<Item, 'id' | 'createdAt' | 'updatedA
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     })
+
+    // Link pending uploads to this new document
+    // Check photos
+    if (item.photos && item.photos.length > 0) {
+      for (const photoUrl of item.photos) {
+        if (typeof photoUrl === 'string' && photoUrl.startsWith('urn:stowaway:pending:')) {
+          const pendingId = photoUrl.split(':').pop();
+          if (pendingId) {
+            await offlineStorage.updatePendingUpload(pendingId, {
+              metadata: {
+                collection: 'items',
+                docId: docRef.id,
+                field: 'photos'
+              }
+            });
+          }
+        }
+      }
+    }
+
+    // Check voice note
+    if (item.voiceNoteUrl && item.voiceNoteUrl.startsWith('urn:stowaway:pending:')) {
+      const pendingId = item.voiceNoteUrl.split(':').pop();
+      if (pendingId) {
+        await offlineStorage.updatePendingUpload(pendingId, {
+          metadata: {
+            collection: 'items',
+            docId: docRef.id,
+            field: 'voiceNoteUrl'
+          }
+        });
+      }
+    }
+
     return docRef.id
   } catch (error) {
     console.error('Error creating item:', error)
@@ -308,6 +343,22 @@ export async function deleteGroup(groupId: string, type: 'place' | 'container' |
  * STORAGE OPERATIONS
  */
 export async function uploadImage(file: File, path: string): Promise<string> {
+  // Offline handling
+  if (!navigator.onLine) {
+    const tempId = `pending_img_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    console.log('[Offline] Queueing image upload:', tempId);
+
+    await offlineStorage.addPendingUpload({
+      id: tempId,
+      file,
+      storagePath: path,
+      createdAt: Date.now()
+    });
+
+    // Return the temp ID as a placeholder URL
+    return `urn:stowaway:pending:${tempId}`;
+  }
+
   try {
     // Validate file size (max 10MB before compression)
     const maxSizeBytes = 10 * 1024 * 1024 // 10MB
@@ -332,6 +383,21 @@ export async function uploadImage(file: File, path: string): Promise<string> {
 }
 
 export async function uploadAudio(file: File, path: string): Promise<string> {
+  // Offline handling
+  if (!navigator.onLine) {
+    const tempId = `pending_audio_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    console.log('[Offline] Queueing audio upload:', tempId);
+
+    await offlineStorage.addPendingUpload({
+      id: tempId,
+      file,
+      storagePath: path,
+      createdAt: Date.now()
+    });
+
+    return `urn:stowaway:pending:${tempId}`;
+  }
+
   try {
     const storageRef = ref(storage, path)
 
