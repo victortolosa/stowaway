@@ -144,7 +144,7 @@ export function CreateItemModal({
                 ...data,
                 ...(photoUrl && { photos: [photoUrl] }),
                 ...(audioUrl && { voiceNoteUrl: audioUrl }),
-                groupId: data.groupId || undefined,
+                groupId: data.groupId || null,
             }
 
             if (editMode && initialData) {

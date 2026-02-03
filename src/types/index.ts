@@ -5,7 +5,7 @@ export interface Place {
   type: 'home' | 'office' | 'storage' | 'other'
   createdAt: Date
   updatedAt: Date
-  groupId?: string
+  groupId?: string | null
 }
 
 export interface Group {
@@ -27,7 +27,7 @@ export interface Container {
   lastAccessed: Date
   createdAt: Date
   updatedAt: Date
-  groupId?: string
+  groupId?: string | null
 }
 
 export interface Item {
@@ -40,7 +40,7 @@ export interface Item {
   tags: string[]
   createdAt: Date
   updatedAt: Date
-  groupId?: string
+  groupId?: string | null
 }
 
 export interface SearchResult {

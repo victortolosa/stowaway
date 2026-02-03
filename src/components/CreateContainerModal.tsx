@@ -100,7 +100,7 @@ export function CreateContainerModal({
                             await updateContainer(initialData.id, {
                                 ...data,
                                 photoUrl: url,
-                                groupId: data.groupId || undefined,
+                                groupId: data.groupId || null,
                             })
                         } else {
                             await createContainer({
@@ -108,7 +108,7 @@ export function CreateContainerModal({
                                 placeId,
                                 photoUrl: url,
                                 lastAccessed: new Date(),
-                                groupId: data.groupId || undefined,
+                                groupId: data.groupId || null,
                             })
                         }
                     }
@@ -117,14 +117,14 @@ export function CreateContainerModal({
                 if (editMode && initialData) {
                     await updateContainer(initialData.id, {
                         ...data,
-                        groupId: data.groupId || undefined,
+                        groupId: data.groupId || null,
                     })
                 } else {
                     await createContainer({
                         name: data.name,
                         placeId,
                         lastAccessed: new Date(),
-                        groupId: data.groupId || undefined,
+                        groupId: data.groupId || null,
                     })
                 }
             }

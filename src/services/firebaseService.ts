@@ -25,8 +25,11 @@ export async function createPlace(place: Omit<Place, 'id' | 'createdAt' | 'updat
   console.log('FirebaseService: Attempting to create place in project:', db.app.options.projectId)
   console.log('Place Data:', place)
   try {
+    const sanitizedPlace = Object.fromEntries(
+      Object.entries(place).filter(([_, v]) => v !== undefined)
+    )
     const docRef = await addDoc(collection(db, 'places'), {
-      ...place,
+      ...sanitizedPlace,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     })
@@ -55,8 +58,11 @@ export async function getUserPlaces(userId: string) {
 export async function updatePlace(placeId: string, updates: Partial<Place>) {
   try {
     const placeRef = doc(db, 'places', placeId)
+    const sanitizedUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, v]) => v !== undefined)
+    )
     await updateDoc(placeRef, {
-      ...updates,
+      ...sanitizedUpdates,
       updatedAt: Timestamp.now(),
     })
   } catch (error) {
@@ -167,8 +173,11 @@ export async function removeQRCodeFromContainer(containerId: string) {
  */
 export async function createItem(item: Omit<Item, 'id' | 'createdAt' | 'updatedAt'>) {
   try {
+    const sanitizedItem = Object.fromEntries(
+      Object.entries(item).filter(([_, v]) => v !== undefined)
+    )
     const docRef = await addDoc(collection(db, 'items'), {
-      ...item,
+      ...sanitizedItem,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     })
@@ -199,8 +208,11 @@ export async function getContainerItems(containerId: string) {
 export async function updateItem(itemId: string, updates: Partial<Item>) {
   try {
     const itemRef = doc(db, 'items', itemId)
+    const sanitizedUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, v]) => v !== undefined)
+    )
     await updateDoc(itemRef, {
-      ...updates,
+      ...sanitizedUpdates,
       updatedAt: Timestamp.now(),
     })
   } catch (error) {
@@ -223,8 +235,11 @@ export async function deleteItem(itemId: string) {
  */
 export async function createGroup(group: Omit<Group, 'id' | 'createdAt' | 'updatedAt'>) {
   try {
+    const sanitizedGroup = Object.fromEntries(
+      Object.entries(group).filter(([_, v]) => v !== undefined)
+    )
     const docRef = await addDoc(collection(db, 'groups'), {
-      ...group,
+      ...sanitizedGroup,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     })
@@ -252,8 +267,11 @@ export async function getUserGroups(userId: string) {
 export async function updateGroup(groupId: string, updates: Partial<Group>) {
   try {
     const groupRef = doc(db, 'groups', groupId)
+    const sanitizedUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, v]) => v !== undefined)
+    )
     await updateDoc(groupRef, {
-      ...updates,
+      ...sanitizedUpdates,
       updatedAt: Timestamp.now(),
     })
   } catch (error) {

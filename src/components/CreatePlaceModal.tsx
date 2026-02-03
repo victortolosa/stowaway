@@ -68,14 +68,14 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
             if (editMode && initialData) {
                 await updatePlace(initialData.id, {
                     ...data,
-                    groupId: data.groupId || undefined,
+                    groupId: data.groupId || null,
                 })
             } else {
                 await createPlace({
                     name: data.name,
                     type: data.type,
                     userId: user.uid,
-                    groupId: data.groupId || undefined,
+                    groupId: data.groupId || null,
                 })
             }
 
