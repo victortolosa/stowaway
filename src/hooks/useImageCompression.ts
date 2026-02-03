@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import imageCompression from 'browser-image-compression'
+import { fixImageOrientation } from '@/lib/imageUtils'
 
 interface CompressionOptions {
     maxSizeMB?: number
@@ -35,7 +36,10 @@ export function useImageCompression(): UseImageCompressionReturn {
         setProgress(0)
 
         try {
-            const compressedFile = await imageCompression(file, {
+            // Fix orientation first (in case compression skips it or fails to handle it)
+            const orientedFile = await fixImageOrientation(file)
+
+            const compressedFile = await imageCompression(orientedFile, {
                 maxSizeMB,
                 maxWidthOrHeight,
                 useWebWorker,

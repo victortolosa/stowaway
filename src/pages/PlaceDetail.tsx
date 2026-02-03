@@ -6,7 +6,7 @@ import { useInventory } from '@/hooks'
 import { deleteContainer, deletePlace, deleteGroup } from '@/services/firebaseService'
 import { Container, Group } from '@/types'
 import { MoreVertical, ChevronRight, Package, Plus, QrCode, Search, Mic, FolderPlus, Pencil } from 'lucide-react'
-import { Button, Card, IconBadge, EmptyState, LoadingState, Badge, NavigationHeader } from '@/components/ui'
+import { Button, Card, IconBadge, EmptyState, LoadingState, Badge, NavigationHeader, ImageCarousel, ImageGrid, Modal } from '@/components/ui'
 import { Timestamp } from 'firebase/firestore'
 
 // Helper to convert Firestore Timestamp to Date
@@ -39,6 +39,7 @@ export function PlaceDetail() {
     const [editingGroup, setEditingGroup] = useState<Group | null>(null)
     const [deletingGroup, setDeletingGroup] = useState<Group | null>(null)
     const [isDeletingGroup, setIsDeletingGroup] = useState(false)
+    const [showGallery, setShowGallery] = useState(false)
 
     if (!user || !id) {
         return <LoadingState />
@@ -177,20 +178,45 @@ export function PlaceDetail() {
             </div>
 
             {/* Place Hero */}
-            <div className="flex items-center gap-4 mb-6 px-1">
-                <IconBadge icon={Package} color="#14B8A6" size="md" />
-                <div className="flex flex-col gap-0.5">
-                    <span className="text-[10px] font-bold tracking-wider text-text-tertiary uppercase">
-                        Place
-                    </span>
-                    <h1 className="font-display text-[24px] font-bold text-text-primary leading-tight">
-                        {place.name}
-                    </h1>
-                    <p className="font-body text-[13px] text-text-secondary">
-                        {placeContainers.length} containers · {totalItems} items
-                    </p>
+            {place.photos && place.photos.length > 0 ? (
+                <div className="mb-6 px-1">
+                    <div className="rounded-2xl overflow-hidden aspect-[21/9] mb-4 shadow-sm border border-border-light bg-bg-surface">
+                        <ImageCarousel
+                            images={place.photos}
+                            alt={place.name}
+                            onImageClick={() => setShowGallery(true)}
+                        />
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] font-bold tracking-wider text-text-tertiary uppercase">
+                                Place
+                            </span>
+                            <h1 className="font-display text-[24px] font-bold text-text-primary leading-tight">
+                                {place.name}
+                            </h1>
+                            <p className="font-body text-[13px] text-text-secondary">
+                                {placeContainers.length} containers · {totalItems} items
+                            </p>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            ) : (
+                <div className="flex items-center gap-4 mb-6 px-1">
+                    <IconBadge icon={Package} color="#14B8A6" size="md" />
+                    <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] font-bold tracking-wider text-text-tertiary uppercase">
+                            Place
+                        </span>
+                        <h1 className="font-display text-[24px] font-bold text-text-primary leading-tight">
+                            {place.name}
+                        </h1>
+                        <p className="font-body text-[13px] text-text-secondary">
+                            {placeContainers.length} containers · {totalItems} items
+                        </p>
+                    </div>
+                </div>
+            )}
 
             {/* Search Bar */}
             {(placeContainers.length > 0 || totalItems > 0) && (
@@ -534,6 +560,30 @@ export function PlaceDetail() {
                     isDeleting={isDeletingContainer}
                 />
             )}
+
+            {/* Gallery Modal */}
+            <Modal
+                isOpen={showGallery}
+                onClose={() => setShowGallery(false)}
+                title="Photo Gallery"
+                description={`${place.photos?.length || 0} photos`}
+            >
+                <div className="max-h-[60vh] overflow-y-auto p-1">
+                    <ImageGrid
+                        images={place.photos || []}
+                        alt={place.name}
+                        onImageClick={(index) => {
+                            // Optional: Could open a full screen lightbox here
+                            console.log('Clicked image index:', index)
+                        }}
+                    />
+                </div>
+                <div className="flex justify-end mt-4">
+                    <Button variant="secondary" onClick={() => setShowGallery(false)}>
+                        Close
+                    </Button>
+                </div>
+            </Modal>
         </div>
     )
 }

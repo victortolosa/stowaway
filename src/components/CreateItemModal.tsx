@@ -2,16 +2,15 @@ import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AnimatePresence } from 'framer-motion'
 import { Mic, X } from 'lucide-react'
 import { createItem, updateItem, uploadImage, uploadAudio, deleteStorageFile } from '@/services/firebaseService'
 import { deleteField } from 'firebase/firestore'
 import { useAuthStore } from '@/store/auth'
 import { useImageCompression, useInventory } from '@/hooks'
-import { ImageCropper, AudioRecorder, AudioPlayer } from '@/components'
+import { AudioRecorder, AudioPlayer } from '@/components'
 import { trimSilence } from '@/utils/audioUtils'
 import { Item } from '@/types'
-import { Modal, Button, Input, Textarea, FormField, Label, ImageUploader, ProgressBar, Select } from '@/components/ui'
+import { Modal, Button, Input, Textarea, FormField, Label, MultiImageUploader, ProgressBar, Select } from '@/components/ui'
 
 const itemSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -41,10 +40,9 @@ export function CreateItemModal({
     const user = useAuthStore((state) => state.user)
     const { groups } = useInventory()
     const [isSubmitting, setIsSubmitting] = useState(false)
-    const [photoFile, setPhotoFile] = useState<File | null>(null)
-    const [photoPreview, setPhotoPreview] = useState<string | null>(null)
-    const [showCropper, setShowCropper] = useState(false)
-    const [imageToCrop, setImageToCrop] = useState<string | null>(null)
+    const [images, setImages] = useState<(File | string)[]>([])
+
+    // Audio state
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
     const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null)
     const [existingAudioUrl, setExistingAudioUrl] = useState<string | null>(null)
@@ -75,8 +73,7 @@ export function CreateItemModal({
                 description: initialData.description || '',
                 groupId: initialData.groupId || '',
             })
-            setPhotoFile(null)
-            setPhotoPreview(initialData.photos[0] || null)
+            setImages(initialData.photos || [])
             setAudioBlob(null)
             setExistingAudioUrl(initialData.voiceNoteUrl || null)
             setWasAudioDeleted(false)
@@ -89,8 +86,7 @@ export function CreateItemModal({
                 description: '',
                 groupId: '',
             })
-            setPhotoFile(null)
-            setPhotoPreview(null)
+            setImages([])
             setAudioBlob(null)
             setExistingAudioUrl(null)
             setWasAudioDeleted(false)
@@ -112,11 +108,21 @@ export function CreateItemModal({
         setIsSubmitting(true)
         const uploadedPaths: string[] = []
         try {
-            let photoUrl = ''
-            let audioUrl = ''
+            const newPhotos: string[] = []
+            const existingPhotos: string[] = []
 
-            if (photoFile) {
-                const compressedPhoto = await compress(photoFile, {
+            // Separate existing URLs from new Files
+            for (const img of images) {
+                if (typeof img === 'string') {
+                    existingPhotos.push(img)
+                }
+            }
+
+            // Upload new files
+            const filesToUpload = images.filter(img => img instanceof File) as File[]
+
+            for (const file of filesToUpload) {
+                const compressedPhoto = await compress(file, {
                     maxSizeMB: 1,
                     maxWidthOrHeight: 1920,
                     useWebWorker: true,
@@ -125,10 +131,14 @@ export function CreateItemModal({
                 const ext = compressedPhoto.type.split('/')[1] || 'jpg'
                 const filename = `${Date.now()}_${(crypto && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2))}.${ext}`
                 const photoPath = `items/${user.uid}/${filename}`
-                photoUrl = await uploadImage(compressedPhoto, photoPath)
+                const url = await uploadImage(compressedPhoto, photoPath)
+                newPhotos.push(url)
                 uploadedPaths.push(photoPath)
             }
 
+            const finalPhotos = [...existingPhotos, ...newPhotos]
+
+            let audioUrl = ''
             if (audioBlob) {
                 const ext = (audioBlob.type && audioBlob.type.split('/')[1]) || 'webm'
                 const filename = `${Date.now()}_${(crypto && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2))}.${ext}`
@@ -142,8 +152,9 @@ export function CreateItemModal({
 
             const itemData = {
                 ...data,
-                ...(photoUrl && { photos: [photoUrl] }),
-                ...(audioUrl && { voiceNoteUrl: audioUrl }),
+                photos: finalPhotos,
+                // Only include voiceNoteUrl if it's new, otherwise logic handles plain updates
+                // But actually logic should be robust.
                 groupId: data.groupId || null,
             }
 
@@ -151,14 +162,18 @@ export function CreateItemModal({
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const updatePayload: any = {
                     ...itemData,
-                    photos: photoUrl ? [photoUrl] : initialData.photos,
                 }
 
-                if (wasAudioDeleted && !audioUrl) {
-                    updatePayload.voiceNoteUrl = deleteField()
-                } else if (audioUrl) {
+                // If we have a new audio URL, set it
+                if (audioUrl) {
                     updatePayload.voiceNoteUrl = audioUrl
                 }
+                // If we don't have a new one, but we expressly deleted the old one
+                else if (wasAudioDeleted) {
+                    updatePayload.voiceNoteUrl = deleteField()
+                }
+                // If we don't have a new one and didn't delete, preserve implicit (don't send field) or explicit
+                // existingAudioUrl check is not needed if we just don't include it in payload
 
                 await updateItem(initialData.id, updatePayload)
             } else {
@@ -166,16 +181,15 @@ export function CreateItemModal({
                     name: itemData.name,
                     description: itemData.description,
                     containerId,
-                    photos: photoUrl ? [photoUrl] : [],
+                    photos: finalPhotos,
                     tags: [],
-                    voiceNoteUrl: audioUrl,
+                    voiceNoteUrl: audioUrl || undefined,
                     groupId: itemData.groupId,
                 })
             }
 
             reset()
-            setPhotoFile(null)
-            setPhotoPreview(null)
+            setImages([])
             setAudioBlob(null)
             if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
             setAudioPreviewUrl(null)
@@ -195,44 +209,6 @@ export function CreateItemModal({
         } finally {
             setIsSubmitting(false)
         }
-    }
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0]
-            const reader = new FileReader()
-
-            reader.onload = () => {
-                setImageToCrop(reader.result as string)
-                setShowCropper(true)
-            }
-
-            reader.readAsDataURL(file)
-        }
-    }
-
-    const handleCropComplete = async (croppedBlob: Blob) => {
-        const file = new File([croppedBlob], `cropped_${Date.now()}.jpg`, {
-            type: 'image/jpeg',
-        })
-
-        setPhotoFile(file)
-
-        const previewUrl = URL.createObjectURL(croppedBlob)
-        setPhotoPreview(previewUrl)
-
-        setShowCropper(false)
-        setImageToCrop(null)
-    }
-
-    const handleCropCancel = () => {
-        setShowCropper(false)
-        setImageToCrop(null)
-    }
-
-    const removePhoto = () => {
-        setPhotoFile(null)
-        setPhotoPreview(null)
     }
 
     const handleTrimAudio = async () => {
@@ -258,178 +234,164 @@ export function CreateItemModal({
     }
 
     return (
-        <>
-            <Modal
-                isOpen={isOpen}
-                onClose={onClose}
-                title={editMode ? 'Edit Item' : 'Add New Item'}
-                description={`Form to ${editMode ? 'edit' : 'create'} an item`}
-            >
-                <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-                    <FormField
-                        label="Item Name"
-                        htmlFor="name"
-                        error={errors.name?.message}
-                    >
-                        <Input
-                            id="name"
-                            type="text"
-                            placeholder="e.g., Vintage Lamp"
-                            error={!!errors.name}
-                            {...register('name')}
-                        />
-                    </FormField>
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={editMode ? 'Edit Item' : 'Add New Item'}
+            description={`Form to ${editMode ? 'edit' : 'create'} an item`}
+        >
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                <FormField
+                    label="Item Name"
+                    htmlFor="name"
+                    error={errors.name?.message}
+                >
+                    <Input
+                        id="name"
+                        type="text"
+                        placeholder="e.g., Vintage Lamp"
+                        error={!!errors.name}
+                        {...register('name')}
+                    />
+                </FormField>
 
-                    <FormField
-                        label="Description (Optional)"
-                        htmlFor="description"
-                    >
-                        <Textarea
-                            id="description"
-                            rows={3}
-                            placeholder="Details about the item..."
-                            {...register('description')}
-                        />
-                    </FormField>
+                <FormField
+                    label="Description (Optional)"
+                    htmlFor="description"
+                >
+                    <Textarea
+                        id="description"
+                        rows={3}
+                        placeholder="Details about the item..."
+                        {...register('description')}
+                    />
+                </FormField>
 
-                    <FormField
-                        label="Item Group (Optional)"
-                        htmlFor="groupId"
-                        error={errors.groupId?.message}
+                <FormField
+                    label="Item Group (Optional)"
+                    htmlFor="groupId"
+                    error={errors.groupId?.message}
+                >
+                    <Select
+                        id="groupId"
+                        error={!!errors.groupId}
+                        {...register('groupId')}
                     >
-                        <Select
-                            id="groupId"
-                            error={!!errors.groupId}
-                            {...register('groupId')}
-                        >
-                            <option value="">None (Top Level)</option>
-                            {itemGroups.map(group => (
-                                <option key={group.id} value={group.id}>
-                                    {group.name}
-                                </option>
-                            ))}
-                        </Select>
-                    </FormField>
+                        <option value="">None (Top Level)</option>
+                        {itemGroups.map(group => (
+                            <option key={group.id} value={group.id}>
+                                {group.name}
+                            </option>
+                        ))}
+                    </Select>
+                </FormField>
 
-                    <FormField label="Photo">
-                        <ImageUploader
-                            preview={photoPreview}
-                            onFileSelect={handleFileChange}
-                            onRemove={removePhoto}
-                            label="Photo"
+                <FormField label="Photos">
+                    <MultiImageUploader
+                        value={images}
+                        onChange={setImages}
+                        label="Photos"
+                    />
+                    {isCompressing && (
+                        <ProgressBar
+                            progress={progress}
+                            label="Compressing images..."
+                            className="mt-3"
                         />
-                        {isCompressing && (
-                            <ProgressBar
-                                progress={progress}
-                                label="Compressing image..."
-                                className="mt-3"
-                            />
+                    )}
+                </FormField>
+
+                <div>
+                    <div className="flex items-center justify-between mb-2">
+                        <Label className="mb-0">Voice Note (Optional)</Label>
+                        {!showAudioRecorder && !audioBlob && !existingAudioUrl && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                leftIcon={Mic}
+                                onClick={() => setShowAudioRecorder(true)}
+                            >
+                                Add Voice Note
+                            </Button>
                         )}
-                    </FormField>
+                    </div>
 
-                    <div>
-                        <div className="flex items-center justify-between mb-2">
-                            <Label className="mb-0">Voice Note (Optional)</Label>
-                            {!showAudioRecorder && !audioBlob && !existingAudioUrl && (
-                                <Button
+                    {showAudioRecorder && !audioBlob && (
+                        <AudioRecorder
+                            onRecordingComplete={(blob) => {
+                                setAudioBlob(blob)
+                                const url = URL.createObjectURL(blob)
+                                setAudioPreviewUrl(url)
+                                setShowAudioRecorder(false)
+                                setExistingAudioUrl(null)
+                            }}
+                            maxDuration={60}
+                        />
+                    )}
+
+                    {(audioBlob && audioPreviewUrl) || existingAudioUrl ? (
+                        <div className="space-y-2">
+                            <div className="relative">
+                                <AudioPlayer
+                                    audioUrl={(audioBlob && audioPreviewUrl) ? audioPreviewUrl : existingAudioUrl!}
+                                    className="border border-border-light"
+                                />
+                                <button
                                     type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    leftIcon={Mic}
-                                    onClick={() => setShowAudioRecorder(true)}
+                                    onClick={() => {
+                                        if (audioBlob) {
+                                            setAudioBlob(null)
+                                            if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
+                                            setAudioPreviewUrl(null)
+                                        } else {
+                                            setExistingAudioUrl(null)
+                                            setWasAudioDeleted(true)
+                                        }
+                                        setShowAudioRecorder(false)
+                                    }}
+                                    className="absolute -top-2 -right-2 w-7 h-7 bg-bg-elevated rounded-full shadow-sm flex items-center justify-center text-text-secondary hover:text-text-primary transition border border-border-light z-10"
                                 >
-                                    Add Voice Note
-                                </Button>
+                                    <X size={14} />
+                                </button>
+                            </div>
+
+                            {audioBlob && !isTrimming && (
+                                <div className="flex justify-end">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={handleTrimAudio}
+                                        className="text-xs h-7 px-2 text-text-secondary hover:text-accent-blue"
+                                    >
+                                        ✨ Trim Silence
+                                    </Button>
+                                </div>
+                            )}
+
+                            {isTrimming && (
+                                <div className="flex items-center gap-2 text-xs text-text-secondary animate-pulse">
+                                    <div className="w-2 h-2 rounded-full bg-accent-blue animate-bounce" />
+                                    Processing audio (client-side)...
+                                </div>
                             )}
                         </div>
+                    ) : null}
+                </div>
 
-                        {showAudioRecorder && !audioBlob && (
-                            <AudioRecorder
-                                onRecordingComplete={(blob) => {
-                                    setAudioBlob(blob)
-                                    const url = URL.createObjectURL(blob)
-                                    setAudioPreviewUrl(url)
-                                    setShowAudioRecorder(false)
-                                    setExistingAudioUrl(null)
-                                }}
-                                maxDuration={60}
-                            />
-                        )}
-
-                        {(audioBlob && audioPreviewUrl) || existingAudioUrl ? (
-                            <div className="space-y-2">
-                                <div className="relative">
-                                    <AudioPlayer
-                                        audioUrl={(audioBlob && audioPreviewUrl) ? audioPreviewUrl : existingAudioUrl!}
-                                        className="border border-border-light"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            if (audioBlob) {
-                                                setAudioBlob(null)
-                                                if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
-                                                setAudioPreviewUrl(null)
-                                            } else {
-                                                setExistingAudioUrl(null)
-                                                setWasAudioDeleted(true)
-                                            }
-                                            setShowAudioRecorder(false)
-                                        }}
-                                        className="absolute -top-2 -right-2 w-7 h-7 bg-bg-elevated rounded-full shadow-sm flex items-center justify-center text-text-secondary hover:text-text-primary transition border border-border-light z-10"
-                                    >
-                                        <X size={14} />
-                                    </button>
-                                </div>
-
-                                {audioBlob && !isTrimming && (
-                                    <div className="flex justify-end">
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={handleTrimAudio}
-                                            className="text-xs h-7 px-2 text-text-secondary hover:text-accent-blue"
-                                        >
-                                            ✨ Trim Silence
-                                        </Button>
-                                    </div>
-                                )}
-
-                                {isTrimming && (
-                                    <div className="flex items-center gap-2 text-xs text-text-secondary animate-pulse">
-                                        <div className="w-2 h-2 rounded-full bg-accent-blue animate-bounce" />
-                                        Processing audio (client-side)...
-                                    </div>
-                                )}
-                            </div>
-                        ) : null}
-                    </div>
-
-                    <div className="flex justify-end gap-3 pt-2">
-                        <Button type="button" variant="secondary" onClick={onClose}>
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            isLoading={isSubmitting || isCompressing}
-                        >
-                            {isSubmitting ? 'Saving...' : (editMode ? 'Save Changes' : 'Create Item')}
-                        </Button>
-                    </div>
-                </form>
-            </Modal>
-
-            <AnimatePresence>
-                {showCropper && imageToCrop && (
-                    <ImageCropper
-                        imageSrc={imageToCrop}
-                        onComplete={handleCropComplete}
-                        onCancel={handleCropCancel}
-                        aspectRatio={4 / 3}
-                    />
-                )}
-            </AnimatePresence>
-        </>
+                <div className="flex justify-end gap-3 pt-2">
+                    <Button type="button" variant="secondary" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    <Button
+                        type="submit"
+                        isLoading={isSubmitting || isCompressing}
+                    >
+                        {isSubmitting ? 'Saving...' : (editMode ? 'Save Changes' : 'Create Item')}
+                    </Button>
+                </div>
+            </form>
+        </Modal>
     )
 }

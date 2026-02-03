@@ -120,7 +120,7 @@ export function ImageCropper({
                         className="flex flex-col h-full"
                     >
                         {/* Header */}
-                        <div className="flex items-center justify-between p-4 bg-black/50 backdrop-blur-md border-b border-white/10">
+                        <div className="flex items-center justify-between p-4 pt-safe-area-top bg-black/50 backdrop-blur-md border-b border-white/10">
                             <h2 className="text-white font-medium">Crop Photo</h2>
                             <button
                                 onClick={onCancel}

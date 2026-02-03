@@ -8,7 +8,7 @@ import { QRManageModal } from '@/components/QRManageModal'
 import { deleteContainer, deleteItem, deleteGroup } from '@/services/firebaseService'
 import { Item, Group } from '@/types'
 import { Pencil, Trash2, Package, Plus, QrCode, Search, FolderPlus } from 'lucide-react'
-import { IconBadge, EmptyState, LoadingState, Button, NavigationHeader } from '@/components/ui'
+import { IconBadge, EmptyState, LoadingState, Button, NavigationHeader, ImageCarousel, ImageGrid, Modal } from '@/components/ui'
 import { ItemCard } from '@/components/ItemCard'
 
 export function Container() {
@@ -21,6 +21,7 @@ export function Container() {
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
   const [showQRManageModal, setShowQRManageModal] = useState(false)
   const [showQRLabelModal, setShowQRLabelModal] = useState(false)
+  const [showGallery, setShowGallery] = useState(false)
 
   const [isEditingContainer, setIsEditingContainer] = useState(false)
   const [isDeleteContainerConfirmOpen, setIsDeleteContainerConfirmOpen] = useState(false)
@@ -152,20 +153,45 @@ export function Container() {
       </div>
 
       {/* Container Hero */}
-      <div className="flex items-center gap-4 mb-6 px-1">
-        <IconBadge icon={Package} color="#3B82F6" size="md" />
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[10px] font-bold tracking-wider text-text-tertiary uppercase">
-            Container
-          </span>
-          <h1 className="font-display text-[24px] font-bold text-text-primary leading-tight">
-            {container.name}
-          </h1>
-          <p className="font-body text-[13px] text-text-secondary">
-            {containerItems.length} items · {place?.name}
-          </p>
+      {container.photos && container.photos.length > 0 ? (
+        <div className="mb-6 px-1">
+          <div className="rounded-2xl overflow-hidden aspect-[21/9] mb-4 shadow-sm border border-border-light bg-bg-surface">
+            <ImageCarousel
+              images={container.photos}
+              alt={container.name}
+              onImageClick={() => setShowGallery(true)}
+            />
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex flex-col gap-0.5">
+              <span className="text-[10px] font-bold tracking-wider text-text-tertiary uppercase">
+                Container
+              </span>
+              <h1 className="font-display text-[24px] font-bold text-text-primary leading-tight">
+                {container.name}
+              </h1>
+              <p className="font-body text-[13px] text-text-secondary">
+                {containerItems.length} items · {place?.name}
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center gap-4 mb-6 px-1">
+          <IconBadge icon={Package} color="#3B82F6" size="md" />
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[10px] font-bold tracking-wider text-text-tertiary uppercase">
+              Container
+            </span>
+            <h1 className="font-display text-[24px] font-bold text-text-primary leading-tight">
+              {container.name}
+            </h1>
+            <p className="font-body text-[13px] text-text-secondary">
+              {containerItems.length} items · {place?.name}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Search Bar */}
       <div className="mb-4">
@@ -397,6 +423,26 @@ export function Container() {
           place={place}
         />
       )}
+
+      {/* Gallery Modal */}
+      <Modal
+        isOpen={showGallery}
+        onClose={() => setShowGallery(false)}
+        title="Photo Gallery"
+        description={`${container.photos?.length || 0} photos`}
+      >
+        <div className="max-h-[60vh] overflow-y-auto p-1">
+          <ImageGrid
+            images={container.photos || []}
+            alt={container.name}
+          />
+        </div>
+        <div className="flex justify-end mt-4">
+          <Button variant="secondary" onClick={() => setShowGallery(false)}>
+            Close
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }

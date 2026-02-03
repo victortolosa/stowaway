@@ -3,6 +3,7 @@ import { BottomTabBar } from './BottomTabBar'
 import { ReloadPrompt } from './ReloadPrompt'
 import { OfflineIndicator } from './OfflineIndicator'
 import { SyncStatus } from './SyncStatus'
+import { Toast } from './ui'
 
 export function Layout() {
     const location = useLocation()
@@ -28,6 +29,7 @@ export function Layout() {
                 <ReloadPrompt />
                 <OfflineIndicator />
                 <SyncStatus />
+                <Toast />
             </div>
         </div>
     )

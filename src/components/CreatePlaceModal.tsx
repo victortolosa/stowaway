@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { createPlace, updatePlace } from '@/services/firebaseService'
+import { createPlace, updatePlace, uploadImageWithCleanup, deleteStorageFile } from '@/services/firebaseService'
 import { useAuthStore } from '@/store/auth'
 import { Place } from '@/types'
-import { Modal, Button, Input, Select, FormField } from '@/components/ui'
-import { useInventory } from '@/hooks'
+import { Modal, Button, Input, Select, FormField, MultiImageUploader, ProgressBar } from '@/components/ui'
+import { useInventory, useImageCompression } from '@/hooks'
 
 const placeSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -28,6 +28,10 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
     const user = useAuthStore((state) => state.user)
     const { groups } = useInventory()
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [images, setImages] = useState<(File | string)[]>([])
+
+    // Derived state for compression progress (simple average for now if multiple)
+    const { compress, isCompressing, progress } = useImageCompression()
 
     const placeGroups = groups.filter(g => g.type === 'place' && g.parentId === null)
 
@@ -51,12 +55,14 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                 type: initialData.type,
                 groupId: initialData.groupId || '',
             })
+            setImages(initialData.photos || [])
         } else if (isOpen && !editMode) {
             reset({
                 type: 'home',
                 name: '',
                 groupId: '',
             })
+            setImages([])
         }
     }, [isOpen, editMode, initialData, reset])
 
@@ -64,11 +70,48 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
         if (!user) return
 
         setIsSubmitting(true)
+        const uploadedPaths: string[] = []
+
         try {
+            const newPhotos: string[] = []
+            const existingPhotos: string[] = []
+
+            // Separate existing URLs from new Files
+            for (const img of images) {
+                if (typeof img === 'string') {
+                    existingPhotos.push(img)
+                }
+            }
+
+            // Upload new files
+            const filesToUpload = images.filter(img => img instanceof File) as File[]
+
+            // Process uploads sequentially to avoid flooding or race conditions
+            for (const file of filesToUpload) {
+                const compressedPhoto = await compress(file, {
+                    maxSizeMB: 1,
+                    maxWidthOrHeight: 1920,
+                    useWebWorker: true,
+                })
+
+                const ext = compressedPhoto.type.split('/')[1] || 'jpg'
+                const filename = `${Date.now()}_${(crypto && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2))}.${ext}`
+                const path = `places/${user.uid}/${filename}`
+
+                // We use uploadImageWithCleanup logic manually here effectively
+                // But since we are doing multiple, we will catch errors at the top level and clean up all
+                const url = await uploadImageWithCleanup(compressedPhoto, path, async () => { })
+                newPhotos.push(url)
+                uploadedPaths.push(path)
+            }
+
+            const finalPhotos = [...existingPhotos, ...newPhotos]
+
             if (editMode && initialData) {
                 await updatePlace(initialData.id, {
                     ...data,
                     groupId: data.groupId || null,
+                    photos: finalPhotos
                 })
             } else {
                 await createPlace({
@@ -76,14 +119,25 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                     type: data.type,
                     userId: user.uid,
                     groupId: data.groupId || null,
+                    photos: finalPhotos
                 })
             }
 
             reset()
+            setImages([])
             onPlaceCreated()
             onClose()
         } catch (error) {
             console.error('Failed to save place:', error)
+            // Cleanup uploaded files if save failed
+            try {
+                if (uploadedPaths.length > 0) {
+                    await Promise.all(uploadedPaths.map(path => deleteStorageFile(path)))
+                }
+            } catch (cleanupErr) {
+                console.error('Failed to cleanup uploaded files:', cleanupErr)
+            }
+            alert('Failed to save place. Please try again.')
         } finally {
             setIsSubmitting(false)
         }
@@ -147,11 +201,26 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                     </Select>
                 </FormField>
 
+                <FormField label="Photos (Optional)">
+                    <MultiImageUploader
+                        value={images}
+                        onChange={setImages}
+                        label="Place Photo"
+                    />
+                    {isCompressing && (
+                        <ProgressBar
+                            progress={progress}
+                            label="Compressing images..."
+                            className="mt-3"
+                        />
+                    )}
+                </FormField>
+
                 <div className="flex justify-end gap-3 pt-2">
                     <Button type="button" variant="secondary" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button type="submit" isLoading={isSubmitting}>
+                    <Button type="submit" isLoading={isSubmitting || isCompressing}>
                         {isSubmitting ? 'Saving...' : (editMode ? 'Save Changes' : 'Create Place')}
                     </Button>
                 </div>

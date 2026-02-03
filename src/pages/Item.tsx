@@ -5,7 +5,7 @@ import { CreateItemModal, ConfirmDeleteModal, AudioPlayer, Breadcrumbs } from '@
 import { useInventory } from '@/hooks'
 import { deleteItem } from '@/services/firebaseService'
 import { Trash2, Pencil, Plus } from 'lucide-react'
-import { Button, Badge, LoadingState, NavigationHeader } from '@/components/ui'
+import { Button, Badge, LoadingState, NavigationHeader, ImageCarousel, ImageGrid, Modal } from '@/components/ui'
 
 export function Item() {
   const { id } = useParams<{ id: string }>()
@@ -16,6 +16,7 @@ export function Item() {
   const [isEditing, setIsEditing] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
+  const [showGallery, setShowGallery] = useState(false)
 
   if (!user || !id) {
     return <LoadingState />
@@ -84,12 +85,13 @@ export function Item() {
       </div>
 
       {/* Hero Image */}
-      <div className="relative h-[280px] bg-bg-elevated rounded-2xl overflow-hidden mx-4">
-        {item.photos[0] ? (
-          <img
-            src={item.photos[0]}
+      <div className="relative h-[280px] bg-bg-elevated rounded-2xl overflow-hidden mx-4 shadow-sm border border-border-light">
+        {item.photos && item.photos.length > 0 ? (
+          <ImageCarousel
+            images={item.photos}
             alt={item.name}
-            className="w-full h-full object-cover"
+            className="h-full"
+            onImageClick={() => setShowGallery(true)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
@@ -177,6 +179,26 @@ export function Item() {
         message={`Are you sure you want to delete "${item.name}"?`}
         isDeleting={isDeleting}
       />
+
+      {/* Gallery Modal */}
+      <Modal
+        isOpen={showGallery}
+        onClose={() => setShowGallery(false)}
+        title="Photo Gallery"
+        description={`${item.photos?.length || 0} photos`}
+      >
+        <div className="max-h-[60vh] overflow-y-auto p-1">
+          <ImageGrid
+            images={item.photos || []}
+            alt={item.name}
+          />
+        </div>
+        <div className="flex justify-end mt-4">
+          <Button variant="secondary" onClick={() => setShowGallery(false)}>
+            Close
+          </Button>
+        </div>
+      </Modal>
     </div>
   )
 }

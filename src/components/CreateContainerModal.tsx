@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AnimatePresence } from 'framer-motion'
-import { createContainer, updateContainer, uploadImageWithCleanup } from '@/services/firebaseService'
+
+import { createContainer, updateContainer, uploadImageWithCleanup, deleteStorageFile } from '@/services/firebaseService'
 import { useAuthStore } from '@/store/auth'
 import { useImageCompression, useInventory } from '@/hooks'
-import { ImageCropper } from '@/components'
+// ImageCropper removed
+// import { ImageCropper } from '@/components'
 import { Container } from '@/types'
-import { Modal, Button, Input, FormField, ImageUploader, ProgressBar, Select } from '@/components/ui'
+import { Modal, Button, Input, FormField, MultiImageUploader, ProgressBar, Select } from '@/components/ui'
 
 const containerSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -37,10 +38,10 @@ export function CreateContainerModal({
     const user = useAuthStore((state) => state.user)
     const { groups } = useInventory()
     const [isSubmitting, setIsSubmitting] = useState(false)
-    const [photoFile, setPhotoFile] = useState<File | null>(null)
-    const [photoPreview, setPhotoPreview] = useState<string | null>(null)
-    const [showCropper, setShowCropper] = useState(false)
-    const [imageToCrop, setImageToCrop] = useState<string | null>(null)
+    const [images, setImages] = useState<(File | string)[]>([])
+    // Cropper removed for multi-image flow simplicity
+    // const [showCropper, setShowCropper] = useState(false)
+    // const [imageToCrop, setImageToCrop] = useState<string | null>(null)
 
     const containerGroups = groups.filter(g => g.type === 'container' && g.parentId === placeId)
 
@@ -64,15 +65,14 @@ export function CreateContainerModal({
                 name: initialData.name,
                 groupId: initialData.groupId || '',
             })
-            setPhotoFile(null)
-            setPhotoPreview(initialData.photoUrl || null)
+            // Load existing photos, fall back to single photoUrl if no photos array
+            setImages(initialData.photos || (initialData.photoUrl ? [initialData.photoUrl] : []))
         } else if (isOpen && !editMode) {
             reset({
                 name: '',
                 groupId: '',
             })
-            setPhotoFile(null)
-            setPhotoPreview(null)
+            setImages([])
         }
     }, [isOpen, editMode, initialData, reset])
 
@@ -80,9 +80,24 @@ export function CreateContainerModal({
         if (!user) return
 
         setIsSubmitting(true)
+        const uploadedPaths: string[] = []
+
         try {
-            if (photoFile) {
-                const compressedPhoto = await compress(photoFile, {
+            const newPhotos: string[] = []
+            const existingPhotos: string[] = []
+
+            // Separate existing URLs from new Files
+            for (const img of images) {
+                if (typeof img === 'string') {
+                    existingPhotos.push(img)
+                }
+            }
+
+            // Upload new files
+            const filesToUpload = images.filter(img => img instanceof File) as File[]
+
+            for (const file of filesToUpload) {
+                const compressedPhoto = await compress(file, {
                     maxSizeMB: 1,
                     maxWidthOrHeight: 1920,
                     useWebWorker: true,
@@ -92,93 +107,51 @@ export function CreateContainerModal({
                 const filename = `${Date.now()}_${(crypto && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2))}.${ext}`
                 const path = `containers/${user.uid}/${filename}`
 
-                await uploadImageWithCleanup(
-                    compressedPhoto,
-                    path,
-                    async (url) => {
-                        if (editMode && initialData) {
-                            await updateContainer(initialData.id, {
-                                ...data,
-                                photoUrl: url,
-                                groupId: data.groupId || null,
-                            })
-                        } else {
-                            await createContainer({
-                                name: data.name,
-                                placeId,
-                                photoUrl: url,
-                                lastAccessed: new Date(),
-                                groupId: data.groupId || null,
-                            })
-                        }
-                    }
-                )
+                const url = await uploadImageWithCleanup(compressedPhoto, path, async () => { })
+                newPhotos.push(url)
+                uploadedPaths.push(path)
+            }
+
+            const finalPhotos = [...existingPhotos, ...newPhotos]
+
+            if (editMode && initialData) {
+                await updateContainer(initialData.id, {
+                    ...data,
+                    photos: finalPhotos,
+                    // Legacy support is handled in service, but we pass photos array
+                    groupId: data.groupId || null,
+                })
             } else {
-                if (editMode && initialData) {
-                    await updateContainer(initialData.id, {
-                        ...data,
-                        groupId: data.groupId || null,
-                    })
-                } else {
-                    await createContainer({
-                        name: data.name,
-                        placeId,
-                        lastAccessed: new Date(),
-                        groupId: data.groupId || null,
-                    })
-                }
+                await createContainer({
+                    name: data.name,
+                    placeId,
+                    photos: finalPhotos,
+                    lastAccessed: new Date(),
+                    groupId: data.groupId || null,
+                })
             }
 
             reset()
-            setPhotoFile(null)
-            setPhotoPreview(null)
+            setImages([])
             onContainerCreated()
             onClose()
         } catch (error) {
             console.error('Failed to save container:', error)
+            // Cleanup uploaded files if save failed
+            try {
+                if (uploadedPaths.length > 0) {
+                    await Promise.all(uploadedPaths.map(path => deleteStorageFile(path)))
+                }
+            } catch (cleanupErr) {
+                console.error('Failed to cleanup uploaded files:', cleanupErr)
+            }
             alert('Failed to save container. Please try again.')
         } finally {
             setIsSubmitting(false)
         }
     }
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0]
-            const reader = new FileReader()
-
-            reader.onload = () => {
-                setImageToCrop(reader.result as string)
-                setShowCropper(true)
-            }
-
-            reader.readAsDataURL(file)
-        }
-    }
-
-    const handleCropComplete = async (croppedBlob: Blob) => {
-        const file = new File([croppedBlob], `cropped_${Date.now()}.jpg`, {
-            type: 'image/jpeg',
-        })
-
-        setPhotoFile(file)
-
-        const previewUrl = URL.createObjectURL(croppedBlob)
-        setPhotoPreview(previewUrl)
-
-        setShowCropper(false)
-        setImageToCrop(null)
-    }
-
-    const handleCropCancel = () => {
-        setShowCropper(false)
-        setImageToCrop(null)
-    }
-
-    const removePhoto = () => {
-        setPhotoFile(null)
-        setPhotoPreview(null)
-    }
+    // Cropper functions removed
 
     return (
         <>
@@ -221,17 +194,16 @@ export function CreateContainerModal({
                         </Select>
                     </FormField>
 
-                    <FormField label="Container Photo (Optional)">
-                        <ImageUploader
-                            preview={photoPreview}
-                            onFileSelect={handleFileChange}
-                            onRemove={removePhoto}
-                            label="Photo"
+                    <FormField label="Photos (Optional)">
+                        <MultiImageUploader
+                            value={images}
+                            onChange={setImages}
+                            label="Container Photo"
                         />
                         {isCompressing && (
                             <ProgressBar
                                 progress={progress}
-                                label="Compressing image..."
+                                label="Compressing images..."
                                 className="mt-3"
                             />
                         )}
@@ -251,16 +223,7 @@ export function CreateContainerModal({
                 </form>
             </Modal>
 
-            <AnimatePresence>
-                {showCropper && imageToCrop && (
-                    <ImageCropper
-                        imageSrc={imageToCrop}
-                        onComplete={handleCropComplete}
-                        onCancel={handleCropCancel}
-                        aspectRatio={4 / 3}
-                    />
-                )}
-            </AnimatePresence>
+            {/* Cropper removed */}
         </>
     )
 }
