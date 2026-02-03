@@ -1,4 +1,4 @@
-import { LayoutGrid, Search, ScanLine, User } from 'lucide-react'
+import { LayoutGrid, Search, ScanLine, Wrench } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 
 export function BottomTabBar() {
@@ -9,7 +9,7 @@ export function BottomTabBar() {
     { id: 'home', label: 'Home', icon: LayoutGrid, path: '/dashboard' },
     { id: 'search', label: 'Search', icon: Search, path: '/search' },
     { id: 'scan', label: 'Scan', icon: ScanLine, path: '/scan' },
-    { id: 'profile', label: 'Profile', icon: User, path: '/profile' },
+    { id: 'tools', label: 'Tools', icon: Wrench, path: '/tools' },
   ]
 
   const isActive = (path: string) => location.pathname === path

@@ -19,6 +19,7 @@ const PlaceDetail = lazy(() => import('@/pages/PlaceDetail').then(m => ({ defaul
 const Search = lazy(() => import('@/pages/Search').then(m => ({ default: m.Search })))
 const Profile = lazy(() => import('@/pages/Profile').then(m => ({ default: m.Profile })))
 const Scan = lazy(() => import('@/pages/Scan').then(m => ({ default: m.Scan })))
+const Tools = lazy(() => import('@/pages/Tools').then(m => ({ default: m.Tools })))
 
 function App() {
   const { setUser, setLoading } = useAuthStore()
@@ -62,6 +63,7 @@ function App() {
             <Route path="/search" element={<Search />} />
             <Route path="/scan" element={<Scan />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/tools" element={<Tools />} />
           </Route>
         </Routes>
       </Suspense>

@@ -26,8 +26,30 @@ export function QRLabelModal({
     setIsGenerating(true)
     try {
       const dataUrl = await generateQRCodeDataURL(container.id, { width: 400 })
+      const fileName = `${container.name.replace(/\s+/g, '_')}_qr.png`
+
+      // Convert data URL to blob
+      const response = await fetch(dataUrl)
+      const blob = await response.blob()
+
+      // Check if Web Share API is available (iOS Safari supports this)
+      if (navigator.share && navigator.canShare) {
+        const file = new File([blob], fileName, { type: 'image/png' })
+
+        // Check if files can be shared
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: 'QR Code',
+            text: `QR code for ${container.name}`
+          })
+          return
+        }
+      }
+
+      // Fallback for desktop browsers
       const link = document.createElement('a')
-      link.download = `${container.name.replace(/\s+/g, '_')}_qr.png`
+      link.download = fileName
       link.href = dataUrl
       link.click()
     } catch (error) {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useInventory } from '@/hooks'
-import { Plus, Home, Briefcase, Archive, MapPin, Package, ChevronRight, ChevronDown } from 'lucide-react'
+import { Plus, Home, Briefcase, Archive, MapPin, Package, ChevronRight, ChevronDown, User } from 'lucide-react'
 import { Button, Card, EmptyState, LoadingState } from '@/components/ui'
 import { ItemCard } from '@/components/ItemCard'
 import { Timestamp } from 'firebase/firestore'
@@ -133,15 +133,24 @@ export function Dashboard() {
             Stowaway
           </h1>
 
-          <Button
-            variant="primary"
-            size="md"
-            leftIcon={Plus}
-            onClick={() => navigate('/places')}
-            className="!px-6 !h-[44px] !py-0"
-          >
-            Add Item
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="primary"
+              size="md"
+              leftIcon={Plus}
+              onClick={() => navigate('/places')}
+              className="!px-6 !h-[44px] !py-0"
+            >
+              Add Item
+            </Button>
+
+            <button
+              onClick={() => navigate('/profile')}
+              className="w-[44px] h-[44px] rounded-full bg-bg-surface border border-border-standard flex items-center justify-center hover:border-accent-aqua hover:bg-accent-aqua/10 transition-all"
+            >
+              <User size={20} className="text-text-secondary" strokeWidth={2} />
+            </button>
+          </div>
         </div>
       </div>
 

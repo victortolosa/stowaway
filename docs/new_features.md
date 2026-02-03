@@ -20,14 +20,7 @@ This suite focuses on reducing the manual overhead of inventory management throu
 * **Integrated Label Queue**: As containers are batch-created, they are automatically added to a "Print Queue."
 * **Batch PDF Generation**: Exports a single PDF optimized for standard label sheets (like Avery 5160) so you can label an entire shelf in one go.
 
-## 3. The "Smart Mover" (Bulk Transfer)
-
-*Designed for reorganizing spaces or seasonal rotations.*
-
-* **Scan-to-Move**: Scan a "Source" QR code to open that container, multi-select items, then scan a "Destination" QR code to "beam" them to the new location.
-* **Drag-and-Drop Hierarchy**: A specialized view for tablets/desktop that allows users to move entire containers between **Places** (e.g., moving "Box A" from "Garage" to "Attic") with a single gesture.
-
-## 4. The "Stale Item" Auditor
+## 3. The "Stale Item" Auditor
 
 *Designed to keep storage from becoming "Permaclutter."*
 
