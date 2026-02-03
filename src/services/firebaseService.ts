@@ -16,7 +16,7 @@ import {
   deleteObject,
 } from 'firebase/storage'
 import { db, storage } from '@/lib/firebase'
-import { Place, Container, Item } from '@/types'
+import { Place, Container, Item, Group } from '@/types'
 
 /**
  * PLACES OPERATIONS
@@ -208,6 +208,74 @@ export async function deleteItem(itemId: string) {
     await deleteDoc(doc(db, 'items', itemId))
   } catch (error) {
     console.error('Error deleting item:', error)
+    throw error
+  }
+}
+
+/**
+ * GROUPS OPERATIONS
+ */
+export async function createGroup(group: Omit<Group, 'id' | 'createdAt' | 'updatedAt'>) {
+  try {
+    const docRef = await addDoc(collection(db, 'groups'), {
+      ...group,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    })
+    return docRef.id
+  } catch (error) {
+    console.error('Error creating group:', error)
+    throw error
+  }
+}
+
+export async function getUserGroups(userId: string) {
+  try {
+    const q = query(collection(db, 'groups'), where('userId', '==', userId))
+    const snapshot = await getDocs(q)
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Group[]
+  } catch (error) {
+    console.error('Error fetching user groups:', error)
+    throw error
+  }
+}
+
+export async function updateGroup(groupId: string, updates: Partial<Group>) {
+  try {
+    const groupRef = doc(db, 'groups', groupId)
+    await updateDoc(groupRef, {
+      ...updates,
+      updatedAt: Timestamp.now(),
+    })
+  } catch (error) {
+    console.error('Error updating group:', error)
+    throw error
+  }
+}
+
+export async function deleteGroup(groupId: string, type: 'place' | 'container' | 'item') {
+  try {
+    // 1. Find all objects in this group and clear their groupId
+    const collectionName = type === 'place' ? 'places' : type === 'container' ? 'containers' : 'items'
+    const q = query(collection(db, collectionName), where('groupId', '==', groupId))
+    const snapshot = await getDocs(q)
+
+    // Batch updates would be better but simple loops for now as per project style
+    const updatePromises = snapshot.docs.map(d =>
+      updateDoc(doc(db, collectionName, d.id), {
+        groupId: null,
+        updatedAt: Timestamp.now()
+      })
+    )
+    await Promise.all(updatePromises)
+
+    // 2. Delete the group itself
+    await deleteDoc(doc(db, 'groups', groupId))
+  } catch (error) {
+    console.error('Error deleting group:', error)
     throw error
   }
 }

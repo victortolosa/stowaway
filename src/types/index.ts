@@ -5,6 +5,17 @@ export interface Place {
   type: 'home' | 'office' | 'storage' | 'other'
   createdAt: Date
   updatedAt: Date
+  groupId?: string
+}
+
+export interface Group {
+  id: string
+  userId: string
+  parentId: string | null // placeId, containerId, or null (for Place groups)
+  name: string
+  type: 'place' | 'container' | 'item'
+  createdAt: Date
+  updatedAt: Date
 }
 
 export interface Container {
@@ -16,6 +27,7 @@ export interface Container {
   lastAccessed: Date
   createdAt: Date
   updatedAt: Date
+  groupId?: string
 }
 
 export interface Item {
@@ -28,6 +40,7 @@ export interface Item {
   tags: string[]
   createdAt: Date
   updatedAt: Date
+  groupId?: string
 }
 
 export interface SearchResult {

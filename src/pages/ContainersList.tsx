@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store/auth'
 import { useInventory } from '@/hooks'
 import { useNavigate } from 'react-router-dom'
 import { Search, Package, QrCode } from 'lucide-react'
-import { PageHeader, Card, EmptyState, IconBadge } from '@/components/ui'
+import { PageHeader, Card, EmptyState, IconBadge, LoadingState } from '@/components/ui'
 import { Timestamp } from 'firebase/firestore'
 
 // Helper to convert Firestore Timestamp to Date
@@ -16,12 +16,16 @@ const toDate = (timestamp: Date | Timestamp): Date => {
 
 export function ContainersList() {
   const user = useAuthStore((state) => state.user)
-  const { containers, items, places } = useInventory()
+  const { containers, items, places, isLoading } = useInventory()
   const [searchQuery, setSearchQuery] = useState('')
   const navigate = useNavigate()
 
   if (!user) {
     return <div>Please log in</div>
+  }
+
+  if (isLoading) {
+    return <LoadingState message="Loading containers..." />
   }
 
   const getContainerColor = (index: number) => {

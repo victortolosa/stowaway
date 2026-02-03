@@ -1,28 +1,36 @@
 import { useState } from 'react'
 import { useAuthStore } from '@/store/auth'
 import { useInventory } from '@/hooks'
-import { CreatePlaceModal, ConfirmDeleteModal } from '@/components'
+import { CreatePlaceModal, ConfirmDeleteModal, CreateGroupModal } from '@/components'
 import { useNavigate } from 'react-router-dom'
-import { deletePlace } from '@/services/firebaseService'
-import { Place } from '@/types'
-import { Trash2, Home, Briefcase, Archive, MapPin, Search } from 'lucide-react'
-import { PageHeader, ListItem, EmptyState, IconBadge } from '@/components/ui'
+import { deletePlace, deleteGroup } from '@/services/firebaseService'
+import { Place, Group } from '@/types'
+import { Trash2, Home, Briefcase, Archive, MapPin, Search, FolderPlus, Plus, Pencil } from 'lucide-react'
+import { PageHeader, ListItem, EmptyState, IconBadge, LoadingState, Button } from '@/components/ui'
 
 export function Places() {
   const user = useAuthStore((state) => state.user)
-  const { places, containers, refresh } = useInventory()
+  const { places, containers, groups, isLoading, refresh } = useInventory()
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
   const [editingPlace, setEditingPlace] = useState<Place | null>(null)
-
   const [deletingPlace, setDeletingPlace] = useState<Place | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+
+  const [editingGroup, setEditingGroup] = useState<Group | null>(null)
+  const [deletingGroup, setDeletingGroup] = useState<Group | null>(null)
+  const [isDeletingGroup, setIsDeletingGroup] = useState(false)
 
   const navigate = useNavigate()
 
   if (!user) {
     return <div>Please log in</div>
+  }
+
+  if (isLoading) {
+    return <LoadingState message="Loading places..." />
   }
 
   const handleDelete = async () => {
@@ -36,6 +44,20 @@ export function Places() {
       console.error('Failed to delete place:', error)
     } finally {
       setIsDeleting(false)
+    }
+  }
+
+  const handleDeleteGroup = async () => {
+    if (!deletingGroup) return
+    setIsDeletingGroup(true)
+    try {
+      await deleteGroup(deletingGroup.id, 'place')
+      await refresh()
+      setDeletingGroup(null)
+    } catch (error) {
+      console.error('Failed to delete group:', error)
+    } finally {
+      setIsDeletingGroup(false)
     }
   }
 
@@ -63,6 +85,8 @@ export function Places() {
       placeContainers.some(c => c.name.toLowerCase().includes(query))
     )
   })
+
+  const placeGroups = (groups || []).filter((g) => g && g.type === 'place' && g.parentId === null)
 
   return (
     <div className="flex flex-col h-full pb-48">
@@ -93,34 +117,148 @@ export function Places() {
           onAction={searchQuery ? undefined : () => setIsCreateModalOpen(true)}
         />
       ) : (
-        <div className="flex flex-col gap-3">
-          {filteredPlaces.map((place, index) => {
-            const placeContainers = containers.filter((c) => c.placeId === place.id)
-            const PlaceIcon = getPlaceIcon(place.type)
+        <div className="flex flex-col gap-6">
+          {/* Quick Actions */}
+          {!searchQuery && (
+            <div className="flex gap-3">
+              <Button
+                variant="secondary"
+                size="sm"
+                fullWidth
+                leftIcon={FolderPlus}
+                onClick={() => setIsCreateGroupOpen(true)}
+              >
+                New Group
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                fullWidth
+                leftIcon={Plus}
+                onClick={() => setIsCreateModalOpen(true)}
+              >
+                New Place
+              </Button>
+            </div>
+          )}
 
-            return (
-              <ListItem
-                key={place.id}
-                title={place.name}
-                subtitle={`${placeContainers.length} container${placeContainers.length !== 1 ? 's' : ''}`}
-                leftContent={
-                  <IconBadge icon={PlaceIcon} color={getPlaceColor(index)} />
-                }
-                actions={
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setDeletingPlace(place)
-                    }}
-                    className="p-3 text-text-tertiary hover:text-accent-danger transition-colors z-10"
-                  >
-                    <Trash2 size={20} strokeWidth={2} />
-                  </button>
-                }
-                onClick={() => navigate(`/places/${place.id}`)}
-              />
-            )
-          })}
+          <div className="flex flex-col gap-6">
+            {/* Groups Section */}
+            {placeGroups.length > 0 && (
+              <div className="flex flex-col gap-6">
+                {placeGroups.map((group) => {
+                  const groupPlaces = filteredPlaces.filter(p => p.groupId === group.id)
+                  if (searchQuery && groupPlaces.length === 0) return null
+
+                  return (
+                    <div key={group.id} className="flex flex-col gap-3">
+                      <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-display text-[18px] font-bold text-text-primary">
+                            {group.name}
+                          </h3>
+                          <span className="text-sm text-text-tertiary">
+                            ({groupPlaces.length})
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => setEditingGroup(group)}
+                          className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
+                        >
+                          <Pencil size={16} strokeWidth={2} />
+                        </button>
+                      </div>
+
+                      <div className="pl-4 border-l-2 border-border-standard ml-2">
+                        <div className="flex flex-col gap-3">
+                          {groupPlaces.map((place, index) => {
+                            const placeContainers = containers.filter((c) => c.placeId === place.id)
+                            const PlaceIcon = getPlaceIcon(place.type)
+
+                            return (
+                              <ListItem
+                                key={place.id}
+                                title={place.name}
+                                subtitle={`${placeContainers.length} container${placeContainers.length !== 1 ? 's' : ''}`}
+                                leftContent={
+                                  <IconBadge icon={PlaceIcon} color={getPlaceColor(index)} />
+                                }
+                                actions={
+                                  <div className="flex items-center">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setEditingPlace(place)
+                                      }}
+                                      className="p-3 text-text-tertiary hover:text-text-primary transition-colors z-10"
+                                    >
+                                      <Pencil size={20} strokeWidth={2} />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setDeletingPlace(place)
+                                      }}
+                                      className="p-3 text-text-tertiary hover:text-accent-danger transition-colors z-10"
+                                    >
+                                      <Trash2 size={20} strokeWidth={2} />
+                                    </button>
+                                  </div>
+                                }
+                                onClick={() => navigate(`/places/${place.id}`)}
+                              />
+                            )
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Ungrouped Places */}
+            <div className="flex flex-col gap-3">
+              {filteredPlaces.filter(p => !p.groupId).map((place, index) => {
+                const placeContainers = containers.filter((c) => c.placeId === place.id)
+                const PlaceIcon = getPlaceIcon(place.type)
+
+                return (
+                  <ListItem
+                    key={place.id}
+                    title={place.name}
+                    subtitle={`${placeContainers.length} container${placeContainers.length !== 1 ? 's' : ''}`}
+                    leftContent={
+                      <IconBadge icon={PlaceIcon} color={getPlaceColor(index)} />
+                    }
+                    actions={
+                      <div className="flex items-center">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setEditingPlace(place)
+                          }}
+                          className="p-3 text-text-tertiary hover:text-text-primary transition-colors z-10"
+                        >
+                          <Pencil size={20} strokeWidth={2} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setDeletingPlace(place)
+                          }}
+                          className="p-3 text-text-tertiary hover:text-accent-danger transition-colors z-10"
+                        >
+                          <Trash2 size={20} strokeWidth={2} />
+                        </button>
+                      </div>
+                    }
+                    onClick={() => navigate(`/places/${place.id}`)}
+                  />
+                )
+              })}
+            </div>
+          </div>
         </div>
       )}
 
@@ -154,6 +292,44 @@ export function Places() {
           title="Delete Place"
           message={`Are you sure you want to delete "${deletingPlace.name}"? This will also delete all containers and items within it.`}
           isDeleting={isDeleting}
+        />
+      )}
+
+      {/* Create Group Modal */}
+      <CreateGroupModal
+        isOpen={isCreateGroupOpen}
+        onClose={() => setIsCreateGroupOpen(false)}
+        onGroupCreated={refresh}
+        type="place"
+        parentId={null}
+      />
+
+      {/* Edit Group Modal */}
+      {editingGroup && (
+        <CreateGroupModal
+          isOpen={!!editingGroup}
+          onClose={() => setEditingGroup(null)}
+          onGroupCreated={refresh}
+          type="place"
+          parentId={null}
+          editMode
+          initialData={editingGroup}
+          onDelete={() => {
+            setEditingGroup(null)
+            setDeletingGroup(editingGroup)
+          }}
+        />
+      )}
+
+      {/* Delete Group Confirmation */}
+      {deletingGroup && (
+        <ConfirmDeleteModal
+          isOpen={!!deletingGroup}
+          onClose={() => setDeletingGroup(null)}
+          onConfirm={handleDeleteGroup}
+          title="Delete Group"
+          message={`Are you sure you want to delete "${deletingGroup.name}"? The places inside will not be deleted.`}
+          isDeleting={isDeletingGroup}
         />
       )}
     </div>

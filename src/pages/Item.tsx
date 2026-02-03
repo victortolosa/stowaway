@@ -1,18 +1,16 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
-import { useInventoryStore } from '@/store/inventory'
-import { CreateItemModal, ConfirmDeleteModal, AudioPlayer } from '@/components'
+import { CreateItemModal, ConfirmDeleteModal, AudioPlayer, Breadcrumbs } from '@/components'
 import { useInventory } from '@/hooks'
 import { deleteItem } from '@/services/firebaseService'
-import { ArrowLeft, ChevronRight, Pencil, Plus } from 'lucide-react'
-import { Button, Badge } from '@/components/ui'
+import { Trash2, Pencil, Plus } from 'lucide-react'
+import { Button, Badge, LoadingState, NavigationHeader } from '@/components/ui'
 
 export function Item() {
   const { id } = useParams<{ id: string }>()
   const user = useAuthStore((state) => state.user)
-  const { items, containers, places } = useInventoryStore()
-  const { refresh } = useInventory()
+  const { items, containers, places, isLoading, refresh } = useInventory()
   const navigate = useNavigate()
 
   const [isEditing, setIsEditing] = useState(false)
@@ -20,7 +18,11 @@ export function Item() {
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
 
   if (!user || !id) {
-    return <div>Loading...</div>
+    return <LoadingState />
+  }
+
+  if (isLoading) {
+    return <LoadingState message="Loading item..." />
   }
 
   const item = items.find((i) => i.id === id)
@@ -45,8 +47,44 @@ export function Item() {
 
   return (
     <div className="pb-48">
+      {/* Header */}
+      <NavigationHeader
+        backTo={`/containers/${container?.id}`}
+        actions={
+          <div className="flex items-center gap-1">
+            <Button
+              variant="icon"
+              size="icon"
+              className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
+              onClick={() => setIsEditing(true)}
+            >
+              <Pencil size={18} className="text-text-primary" strokeWidth={2} />
+            </Button>
+            <Button
+              variant="icon"
+              size="icon"
+              className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full text-accent-danger hover:bg-accent-danger/10"
+              onClick={() => setIsDeleteConfirmOpen(true)}
+            >
+              <Trash2 size={18} strokeWidth={2} />
+            </Button>
+          </div>
+        }
+      />
+
+      <div className="px-1 mb-4">
+        <Breadcrumbs
+          items={[
+            { label: 'Places', path: '/places' },
+            { label: place?.name || '...', path: `/places/${place?.id}` },
+            { label: container?.name || '...', path: `/containers/${container?.id}` },
+            { label: item.name }
+          ]}
+        />
+      </div>
+
       {/* Hero Image */}
-      <div className="relative h-[280px] bg-bg-elevated">
+      <div className="relative h-[280px] bg-bg-elevated rounded-2xl overflow-hidden mx-4">
         {item.photos[0] ? (
           <img
             src={item.photos[0]}
@@ -58,33 +96,19 @@ export function Item() {
             <span className="font-body text-text-tertiary">No photo</span>
           </div>
         )}
-        {/* Back Button */}
-        <button
-          onClick={() => navigate(`/containers/${container?.id}`)}
-          className="absolute top-4 left-6 w-11 h-11 bg-bg-page rounded-full flex items-center justify-center shadow-floating"
-        >
-          <ArrowLeft size={24} className="text-text-primary" />
-        </button>
       </div>
 
       {/* Content */}
       <div className="pt-6 space-y-6">
         {/* Item Header */}
-        <div className="space-y-2">
-          <h1 className="font-display text-[24px] font-bold text-text-primary leading-tight">
+        <div className="space-y-2 px-4">
+          <h1 className="font-display text-[28px] font-bold text-text-primary leading-tight">
             {item.name}
           </h1>
 
-          {/* Breadcrumb */}
-          <div className="flex items-center gap-1.5 text-sm">
-            <span className="font-body text-text-secondary">{place?.name}</span>
-            <ChevronRight size={14} className="text-text-tertiary" />
-            <span className="font-body text-text-secondary">{container?.name}</span>
-          </div>
-
           {/* Tags */}
           {item.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-1">
+            <div className="flex flex-wrap gap-2 pt-1 px-4">
               {item.tags.map((tag) => (
                 <Badge key={tag} variant="primary" size="md">
                   {tag}
@@ -96,7 +120,7 @@ export function Item() {
 
         {/* Voice Note Section */}
         {item.voiceNoteUrl && (
-          <div className="space-y-3">
+          <div className="space-y-3 px-4">
             <h3 className="font-display text-base font-semibold text-text-primary">
               Voice Note
             </h3>
@@ -106,7 +130,7 @@ export function Item() {
 
         {/* Description Section */}
         {item.description && (
-          <div className="space-y-3">
+          <div className="space-y-3 px-4">
             <h3 className="font-display text-base font-semibold text-text-primary">
               Description
             </h3>
@@ -117,7 +141,7 @@ export function Item() {
         )}
 
         {/* Actions Section */}
-        <div className="space-y-3 pt-2">
+        <div className="space-y-3 pt-2 px-4">
           <Button
             variant="secondary"
             size="lg"
@@ -125,15 +149,6 @@ export function Item() {
             leftIcon={Plus}
           >
             Move to Different Container
-          </Button>
-          <Button
-            variant="primary"
-            size="lg"
-            fullWidth
-            leftIcon={Pencil}
-            onClick={() => setIsEditing(true)}
-          >
-            Edit Item
           </Button>
         </div>
       </div>

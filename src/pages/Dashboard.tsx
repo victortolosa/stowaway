@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useInventory } from '@/hooks'
-import { useInventoryStore } from '@/store/inventory'
 import { Plus, Home, Briefcase, Archive, MapPin, Package, Mic, ChevronRight, ChevronDown } from 'lucide-react'
-import { Button, Card, EmptyState } from '@/components/ui'
+import { Button, Card, EmptyState, LoadingState } from '@/components/ui'
 import { Timestamp } from 'firebase/firestore'
 
 type SortOption = 'recently-added' | 'oldest-first' | 'a-z' | 'z-a' | 'recently-modified'
@@ -17,8 +16,7 @@ const toDate = (timestamp: Date | Timestamp): Date => {
 }
 
 export function Dashboard() {
-  const { refresh } = useInventory()
-  const { places, containers, items } = useInventoryStore()
+  const { places, containers, items, isLoading, refresh } = useInventory()
   const navigate = useNavigate()
   const [visibleItemsCount, setVisibleItemsCount] = useState(8)
 
@@ -120,6 +118,10 @@ export function Dashboard() {
     return `${place?.name || ''} → ${container?.name || ''}`
   }
 
+  if (isLoading) {
+    return <LoadingState message="Loading your inventory..." />
+  }
+
   return (
     <div className="flex flex-col gap-10 pb-48 w-full max-w-full">
       {/* Top Section with Logo and Add Item */}
@@ -171,11 +173,10 @@ export function Dashboard() {
                           setItemsSortBy(option)
                           setShowItemsSortMenu(false)
                         }}
-                        className={`w-full px-4 py-2 text-left font-body text-sm transition-colors ${
-                          itemsSortBy === option
-                            ? 'text-accent-aqua bg-accent-aqua/10'
-                            : 'text-text-primary hover:bg-bg-surface'
-                        }`}
+                        className={`w-full px-4 py-2 text-left font-body text-sm transition-colors ${itemsSortBy === option
+                          ? 'text-accent-aqua bg-accent-aqua/10'
+                          : 'text-text-primary hover:bg-bg-surface'
+                          }`}
                       >
                         {getSortLabel(option)}
                       </button>
@@ -187,8 +188,8 @@ export function Dashboard() {
 
             {/* Horizontal Scroll Container */}
             <div className="flex flex-col gap-4">
-              <div className="overflow-x-auto -mx-4 px-4 pb-2">
-                <div className="flex gap-4 min-w-max">
+              <div className="overflow-x-auto pb-2 w-[calc(100vw)] -ml-8 md:w-full md:ml-0">
+                <div className="flex gap-4 min-w-max pl-8 md:pl-0">
                   {recentItems.map((item) => (
                     <Card
                       key={item.id}
@@ -292,11 +293,10 @@ export function Dashboard() {
                           setContainersSortBy(option)
                           setShowContainersSortMenu(false)
                         }}
-                        className={`w-full px-4 py-2 text-left font-body text-sm transition-colors ${
-                          containersSortBy === option
-                            ? 'text-accent-aqua bg-accent-aqua/10'
-                            : 'text-text-primary hover:bg-bg-surface'
-                        }`}
+                        className={`w-full px-4 py-2 text-left font-body text-sm transition-colors ${containersSortBy === option
+                          ? 'text-accent-aqua bg-accent-aqua/10'
+                          : 'text-text-primary hover:bg-bg-surface'
+                          }`}
                       >
                         {getSortLabel(option)}
                       </button>
@@ -306,8 +306,8 @@ export function Dashboard() {
               </div>
             </div>
 
-            <div className="overflow-x-auto -mx-4 px-4 pb-2">
-              <div className="flex gap-4 min-w-max">
+            <div className="overflow-x-auto pb-2 w-[calc(100vw)] -ml-8 md:w-full md:ml-0">
+              <div className="flex gap-4 min-w-max pl-8 md:pl-0">
                 {sortItems([...containers], containersSortBy)
                   .slice(0, 8)
                   .map((container, index) => {
@@ -377,11 +377,10 @@ export function Dashboard() {
                         setPlacesSortBy(option)
                         setShowPlacesSortMenu(false)
                       }}
-                      className={`w-full px-4 py-2 text-left font-body text-sm transition-colors ${
-                        placesSortBy === option
-                          ? 'text-accent-aqua bg-accent-aqua/10'
-                          : 'text-text-primary hover:bg-bg-surface'
-                      }`}
+                      className={`w-full px-4 py-2 text-left font-body text-sm transition-colors ${placesSortBy === option
+                        ? 'text-accent-aqua bg-accent-aqua/10'
+                        : 'text-text-primary hover:bg-bg-surface'
+                        }`}
                     >
                       {getSortLabel(option)}
                     </button>
@@ -398,8 +397,8 @@ export function Dashboard() {
               onAction={() => navigate('/places')}
             />
           ) : (
-            <div className="overflow-x-auto -mx-4 px-4 pb-2">
-              <div className="flex gap-4 min-w-max">
+            <div className="overflow-x-auto pb-2 w-[calc(100vw)] -ml-8 md:w-full md:ml-0">
+              <div className="flex gap-4 min-w-max pl-8 md:pl-0">
                 {sortItems([...places], placesSortBy).map((place, index) => {
                   const placeContainers = containers.filter((c) => c.placeId === place.id)
                   const totalItems = items.filter((item) =>
@@ -418,10 +417,10 @@ export function Dashboard() {
                       <div className="flex items-center gap-3 p-5">
                         {/* Icon Badge */}
                         <div
-                          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                          className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
                           style={{ backgroundColor: getPlaceColor(index) + '15' }}
                         >
-                          <PlaceIcon size={16} style={{ color: getPlaceColor(index) }} strokeWidth={2} />
+                          <PlaceIcon size={18} style={{ color: getPlaceColor(index) }} strokeWidth={2} />
                         </div>
 
                         {/* Content */}

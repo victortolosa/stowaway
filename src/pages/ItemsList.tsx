@@ -3,7 +3,7 @@ import { useAuthStore } from '@/store/auth'
 import { useInventory } from '@/hooks'
 import { useNavigate } from 'react-router-dom'
 import { Search, Package, Mic } from 'lucide-react'
-import { PageHeader, Card, EmptyState } from '@/components/ui'
+import { PageHeader, Card, EmptyState, LoadingState } from '@/components/ui'
 import { Timestamp } from 'firebase/firestore'
 
 // Helper to convert Firestore Timestamp to Date
@@ -16,12 +16,16 @@ const toDate = (timestamp: Date | Timestamp): Date => {
 
 export function ItemsList() {
   const user = useAuthStore((state) => state.user)
-  const { items, containers, places } = useInventory()
+  const { items, containers, places, isLoading } = useInventory()
   const [searchQuery, setSearchQuery] = useState('')
   const navigate = useNavigate()
 
   if (!user) {
     return <div>Please log in</div>
+  }
+
+  if (isLoading) {
+    return <LoadingState message="Loading items..." />
   }
 
   const getItemLocation = (itemId: string) => {

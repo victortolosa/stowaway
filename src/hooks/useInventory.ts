@@ -1,7 +1,7 @@
 import { useEffect, useCallback } from 'react'
 import { useAuthStore } from '@/store/auth'
 import { useInventoryStore } from '@/store/inventory'
-import { getUserPlaces, getPlaceContainers, getContainerItems } from '@/services/firebaseService'
+import { getUserPlaces, getPlaceContainers, getContainerItems, getUserGroups } from '@/services/firebaseService'
 
 /**
  * Hook to manage inventory data loading
@@ -9,22 +9,26 @@ import { getUserPlaces, getPlaceContainers, getContainerItems } from '@/services
  */
 export function useInventory() {
   const user = useAuthStore((state) => state.user)
-  const { places, containers, items, setPlaces, setContainers, setItems } =
+  const { places, containers, items, groups, isLoading, setPlaces, setContainers, setItems, setGroups, setLoading } =
     useInventoryStore()
 
+  const userId = user?.uid
+
   const loadInventory = useCallback(async () => {
-    if (!user?.uid) return
+    if (!userId) return
 
     try {
-      console.log('useInventory: Starting load for UID:', user.uid)
+      setLoading(true)
+      console.log('useInventory: Starting load for UID:', userId)
       // Load user's places
-      const userPlaces = await getUserPlaces(user.uid)
+      const userPlaces = await getUserPlaces(userId)
       console.log('useInventory: Fetched places:', userPlaces.length)
       setPlaces(userPlaces)
 
       if (userPlaces.length === 0) {
         setContainers([])
         setItems([])
+        setLoading(false)
         return
       }
 
@@ -36,6 +40,7 @@ export function useInventory() {
 
       if (allContainers.length === 0) {
         setItems([])
+        setLoading(false)
         return
       }
 
@@ -44,14 +49,25 @@ export function useInventory() {
       const itemsResults = await Promise.all(itemsPromises)
       const allItems = itemsResults.flat()
       setItems(allItems)
+
+      // Load user's groups
+      const userGroups = await getUserGroups(userId)
+      setGroups(userGroups)
+
+      setLoading(false)
     } catch (error) {
       console.error('Error loading inventory:', error)
+      setLoading(false)
     }
-  }, [user, setPlaces, setContainers, setItems])
+  }, [userId, setPlaces, setContainers, setItems, setGroups, setLoading])
 
   useEffect(() => {
-    loadInventory()
-  }, [loadInventory])
+    // Only load if we have no places and aren't currently loading
+    // This prevents infinite loops if dependencies change but data is already there
+    if (places.length === 0 && !isLoading && user?.uid) {
+      loadInventory()
+    }
+  }, [loadInventory, places.length, isLoading, user?.uid])
 
-  return { places, containers, items, refresh: loadInventory }
+  return { places, containers, items, groups, isLoading, refresh: loadInventory }
 }
