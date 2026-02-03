@@ -79,8 +79,11 @@ export async function deletePlace(placeId: string) {
  */
 export async function createContainer(container: Omit<Container, 'id' | 'createdAt' | 'updatedAt'>) {
   try {
+    const sanitizedContainer = Object.fromEntries(
+      Object.entries(container).filter(([_, v]) => v !== undefined)
+    )
     const docRef = await addDoc(collection(db, 'containers'), {
-      ...container,
+      ...sanitizedContainer,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     })
@@ -111,8 +114,11 @@ export async function getPlaceContainers(placeId: string) {
 export async function updateContainer(containerId: string, updates: Partial<Container>) {
   try {
     const containerRef = doc(db, 'containers', containerId)
+    const sanitizedUpdates = Object.fromEntries(
+      Object.entries(updates).filter(([_, v]) => v !== undefined)
+    )
     await updateDoc(containerRef, {
-      ...updates,
+      ...sanitizedUpdates,
       updatedAt: Timestamp.now(),
     })
   } catch (error) {
