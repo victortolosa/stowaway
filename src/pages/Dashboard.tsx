@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useInventory } from '@/hooks'
-import { Plus, Home, Briefcase, Archive, MapPin, Package, Mic, ChevronRight, ChevronDown } from 'lucide-react'
+import { Plus, Home, Briefcase, Archive, MapPin, Package, ChevronRight, ChevronDown } from 'lucide-react'
 import { Button, Card, EmptyState, LoadingState } from '@/components/ui'
+import { ItemCard } from '@/components/ItemCard'
 import { Timestamp } from 'firebase/firestore'
 
 type SortOption = 'recently-added' | 'oldest-first' | 'a-z' | 'z-a' | 'recently-modified'
 
-// Helper to convert Firestore Timestamp to Date
-const toDate = (timestamp: Date | Timestamp): Date => {
+// Helper to convert Firestore Timestamp to Date (Internal to Dashboard for sorting)
+const toDateSync = (timestamp: Date | Timestamp): Date => {
   if (timestamp instanceof Timestamp) {
     return timestamp.toDate()
   }
@@ -79,20 +80,20 @@ export function Dashboard() {
     switch (sortBy) {
       case 'recently-added':
         return sorted.sort((a, b) => {
-          const dateA = toDate(a.createdAt)
-          const dateB = toDate(b.createdAt)
+          const dateA = toDateSync(a.createdAt)
+          const dateB = toDateSync(b.createdAt)
           return dateB.getTime() - dateA.getTime()
         })
       case 'recently-modified':
         return sorted.sort((a, b) => {
-          const dateA = toDate(a.lastAccessed || a.createdAt)
-          const dateB = toDate(b.lastAccessed || b.createdAt)
+          const dateA = toDateSync(a.lastAccessed || a.createdAt)
+          const dateB = toDateSync(b.lastAccessed || b.createdAt)
           return dateB.getTime() - dateA.getTime()
         })
       case 'oldest-first':
         return sorted.sort((a, b) => {
-          const dateA = toDate(a.createdAt)
-          const dateB = toDate(b.createdAt)
+          const dateA = toDateSync(a.createdAt)
+          const dateB = toDateSync(b.createdAt)
           return dateA.getTime() - dateB.getTime()
         })
       case 'a-z':
@@ -188,58 +189,16 @@ export function Dashboard() {
 
             {/* Horizontal Scroll Container */}
             <div className="flex flex-col gap-4">
-              <div className="overflow-x-auto pb-2 w-[calc(100vw)] -ml-8 md:w-full md:ml-0">
-                <div className="flex gap-4 min-w-max pl-8 md:pl-0">
+              <div className="overflow-x-auto pb-4 no-scrollbar -mx-6 px-6">
+                <div className="flex gap-4 min-w-max">
                   {recentItems.map((item) => (
-                    <Card
+                    <ItemCard
                       key={item.id}
-                      padding="none"
-                      variant="interactive"
-                      className="overflow-hidden w-[280px] flex-shrink-0"
+                      item={item}
+                      location={getItemLocation(item.id)}
                       onClick={() => navigate(`/items/${item.id}`)}
-                    >
-                      <div className="flex flex-col h-full">
-                        {/* Image */}
-                        {item.photos[0] ? (
-                          <img
-                            src={item.photos[0]}
-                            alt={item.name}
-                            className="w-full h-[140px] object-cover bg-gray-100"
-                          />
-                        ) : (
-                          <div className="w-full h-[140px] bg-bg-elevated flex items-center justify-center">
-                            <Package size={32} className="text-text-tertiary" strokeWidth={2} />
-                          </div>
-                        )}
-
-                        {/* Content */}
-                        <div className="p-4 flex flex-col gap-2">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-body text-[15px] font-semibold text-text-primary truncate flex-1">
-                              {item.name}
-                            </h3>
-                            {item.voiceNoteUrl && (
-                              <Mic size={14} className="text-accent-aqua flex-shrink-0" />
-                            )}
-                          </div>
-                          <p className="font-body text-[13px] text-text-secondary truncate">
-                            {getItemLocation(item.id)}
-                          </p>
-                          <span className="font-body text-[12px] text-text-tertiary">
-                            {(() => {
-                              const date = toDate(item.createdAt)
-                              const now = new Date()
-                              const diffMs = now.getTime() - date.getTime()
-                              const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
-                              if (diffHours < 1) return 'Just now'
-                              if (diffHours < 24) return `${diffHours}h`
-                              const diffDays = Math.floor(diffHours / 24)
-                              return `${diffDays}d`
-                            })()}
-                          </span>
-                        </div>
-                      </div>
-                    </Card>
+                      className="w-[280px] flex-shrink-0"
+                    />
                   ))}
 
                   {/* Show More Button */}
@@ -306,8 +265,8 @@ export function Dashboard() {
               </div>
             </div>
 
-            <div className="overflow-x-auto pb-2 w-[calc(100vw)] -ml-8 md:w-full md:ml-0">
-              <div className="flex gap-4 min-w-max pl-8 md:pl-0">
+            <div className="overflow-x-auto pb-4 no-scrollbar -mx-6 px-6">
+              <div className="flex gap-4 min-w-max">
                 {sortItems([...containers], containersSortBy)
                   .slice(0, 8)
                   .map((container, index) => {
@@ -397,8 +356,8 @@ export function Dashboard() {
               onAction={() => navigate('/places')}
             />
           ) : (
-            <div className="overflow-x-auto pb-2 w-[calc(100vw)] -ml-8 md:w-full md:ml-0">
-              <div className="flex gap-4 min-w-max pl-8 md:pl-0">
+            <div className="overflow-x-auto pb-4 no-scrollbar -mx-6 px-6">
+              <div className="flex gap-4 min-w-max">
                 {sortItems([...places], placesSortBy).map((place, index) => {
                   const placeContainers = containers.filter((c) => c.placeId === place.id)
                   const totalItems = items.filter((item) =>

@@ -34,7 +34,7 @@ export function Modal({
         <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" />
         <Dialog.Content
           className={cn(
-            'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full bg-bg-page rounded-card shadow-lg p-6 z-50 max-h-[90vh] overflow-y-auto',
+            'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-32px)] bg-bg-page rounded-card shadow-lg p-6 z-50 max-h-[90vh] overflow-y-auto',
             sizeClasses[size],
             className
           )}

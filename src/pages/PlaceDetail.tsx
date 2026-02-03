@@ -177,13 +177,16 @@ export function PlaceDetail() {
             </div>
 
             {/* Place Hero */}
-            <div className="flex flex-col items-center gap-4 mb-6">
-                <IconBadge icon={Package} color="#14B8A6" size="lg" />
-                <div className="text-center flex flex-col gap-1">
-                    <h1 className="font-display text-[28px] font-bold text-text-primary leading-tight">
+            <div className="flex items-center gap-4 mb-6 px-1">
+                <IconBadge icon={Package} color="#14B8A6" size="md" />
+                <div className="flex flex-col gap-0.5">
+                    <span className="text-[10px] font-bold tracking-wider text-text-tertiary uppercase">
+                        Place
+                    </span>
+                    <h1 className="font-display text-[24px] font-bold text-text-primary leading-tight">
                         {place.name}
                     </h1>
-                    <p className="font-body text-[14px] text-text-secondary">
+                    <p className="font-body text-[13px] text-text-secondary">
                         {placeContainers.length} containers · {totalItems} items
                     </p>
                 </div>
@@ -237,7 +240,7 @@ export function PlaceDetail() {
                     <div className="flex flex-col gap-4">
                         <div className="flex justify-between items-center">
                             <h2 className="font-display text-[20px] font-bold text-text-primary">
-                                {searchQuery ? 'Search Results' : 'Organization'}
+                                {searchQuery ? 'Search Results' : 'Containers'}
                             </h2>
                         </div>
 

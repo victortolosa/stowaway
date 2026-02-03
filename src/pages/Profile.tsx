@@ -3,7 +3,6 @@ import { signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/auth'
 import { useInventoryStore } from '@/store/inventory'
-import { BottomTabBar } from '@/components'
 import { User, LogOut, MapPin, Package, Box } from 'lucide-react'
 import { Card } from '@/components/ui'
 
@@ -22,8 +21,8 @@ export function Profile() {
   }
 
   return (
-    <div className="min-h-screen bg-bg-page pb-[106px]">
-      <div className="max-w-mobile mx-auto p-4">
+    <div className="pb-24 pt-2">
+      <div className="max-w-mobile mx-auto px-1">
         <h1 className="font-display text-2xl font-bold text-text-primary mb-6">Profile</h1>
 
         <Card padding="lg" className="mb-6 flex items-center gap-4">
@@ -87,8 +86,6 @@ export function Profile() {
           </Card>
         </div>
       </div>
-
-      <BottomTabBar />
     </div>
   )
 }

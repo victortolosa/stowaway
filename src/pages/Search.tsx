@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useInventory } from '@/hooks'
-import { ArrowLeft, Search as SearchIcon, Package, Home, Briefcase, Archive, MapPin, QrCode, Mic } from 'lucide-react'
-import { BottomTabBar } from '@/components'
+import { useInventory, useSearch } from '@/hooks'
+import { SearchFilterType } from '@/hooks/useSearch'
+import { Search as SearchIcon, Package, Home, Briefcase, Archive, MapPin, QrCode, Mic, Camera } from 'lucide-react'
 import { Card, IconBadge, Badge } from '@/components/ui'
 import { Timestamp } from 'firebase/firestore'
+import { cn } from '@/lib/utils'
 
 // Helper to convert Firestore Timestamp to Date
 const toDate = (timestamp: Date | Timestamp): Date => {
@@ -14,81 +15,72 @@ const toDate = (timestamp: Date | Timestamp): Date => {
   return timestamp instanceof Date ? timestamp : new Date(timestamp)
 }
 
+const getPlaceIcon = (type: string) => {
+  switch (type) {
+    case 'home': return Home
+    case 'office': return Briefcase
+    case 'storage': return Archive
+    default: return MapPin
+  }
+}
+
+const getPlaceColor = (index: number) => {
+  const colors = ['#14B8A6', '#F59E0B', '#3B82F6', '#8B5CF6']
+  return colors[index % colors.length]
+}
+
+const getContainerColor = (index: number) => {
+  const colors = ['#3B82F6', '#14B8A6', '#F59E0B', '#8B5CF6', '#F97316']
+  return colors[index % colors.length]
+}
+
 export function Search() {
   const navigate = useNavigate()
-  const { items, containers, places } = useInventory()
+  const { items: allItems, containers: allContainers, places: allPlaces } = useInventory()
   const [query, setQuery] = useState('')
+  const [filterType, setFilterType] = useState<SearchFilterType>('all')
+  const [hasPhoto, setHasPhoto] = useState(false)
+  const [hasAudio, setHasAudio] = useState(false)
+
+  const searchResults = useSearch(query, {
+    filters: {
+      type: filterType,
+      hasPhoto,
+      hasAudio
+    }
+  })
+
+  // Group results for display
+  const searchedItems = searchResults
+    .filter(r => r.type === 'item')
+    .map(r => r.item as any)
+
+  const searchedContainers = searchResults
+    .filter(r => r.type === 'container')
+    .map(r => r.item as any)
+
+  const searchedPlaces = searchResults
+    .filter(r => r.type === 'place')
+    .map(r => r.item as any)
+
+  const searchedItemCount = searchedItems.length
+  const searchedContainerCount = searchedContainers.length
+  const searchedPlaceCount = searchedPlaces.length
+  const totalResults = searchedItemCount + searchedContainerCount + searchedPlaceCount
 
   const getItemLocation = (itemId: string) => {
-    const item = items.find((i) => i.id === itemId)
+    const item = allItems.find((i) => i.id === itemId)
     if (!item) return ''
-    const container = containers.find((c) => c.id === item.containerId)
-    const place = places.find((p) => p.id === container?.placeId)
+    const container = allContainers.find((c) => c.id === item.containerId)
+    const place = allPlaces.find((p) => p.id === container?.placeId)
     return `${place?.name || ''} → ${container?.name || ''}`
   }
 
-  const getPlaceIcon = (type: string) => {
-    switch (type) {
-      case 'home': return Home
-      case 'office': return Briefcase
-      case 'storage': return Archive
-      default: return MapPin
-    }
-  }
-
-  const getPlaceColor = (index: number) => {
-    const colors = ['#14B8A6', '#F59E0B', '#3B82F6', '#8B5CF6']
-    return colors[index % colors.length]
-  }
-
-  const getContainerColor = (index: number) => {
-    const colors = ['#3B82F6', '#14B8A6', '#F59E0B', '#8B5CF6', '#F97316']
-    return colors[index % colors.length]
-  }
-
-  const searchedItems = query.trim()
-    ? items.filter(
-      (item) =>
-        item.name.toLowerCase().includes(query.toLowerCase()) ||
-        item.description?.toLowerCase().includes(query.toLowerCase()) ||
-        item.tags.some((tag) => tag.toLowerCase().includes(query.toLowerCase())) ||
-        getItemLocation(item.id).toLowerCase().includes(query.toLowerCase())
-    )
-    : []
-
-  const searchedContainers = query.trim()
-    ? containers.filter((container) => {
-        const queryLower = query.toLowerCase()
-        const place = places.find(p => p.id === container.placeId)
-        return (
-          container.name.toLowerCase().includes(queryLower) ||
-          place?.name.toLowerCase().includes(queryLower)
-        )
-      })
-    : []
-
-  const searchedPlaces = query.trim()
-    ? places.filter((place) => {
-        const queryLower = query.toLowerCase()
-        const placeContainers = containers.filter((c) => c.placeId === place.id)
-        return (
-          place.name.toLowerCase().includes(queryLower) ||
-          place.type.toLowerCase().includes(queryLower) ||
-          placeContainers.some(c => c.name.toLowerCase().includes(queryLower))
-        )
-      })
-    : []
-
-  const totalResults = searchedItems.length + searchedContainers.length + searchedPlaces.length
-
   return (
-    <div className="min-h-screen bg-bg-page pb-[106px]">
-      <div className="max-w-mobile mx-auto p-4">
+    <div className="pb-24">
+      <div className="max-w-mobile mx-auto pt-2">
         {/* Search Header */}
         <div className="flex items-center gap-3 mb-5">
-          <button onClick={() => navigate('/dashboard')} className="p-2">
-            <ArrowLeft size={24} className="text-text-primary" />
-          </button>
           <div className="flex-1 bg-white rounded-xl h-[52px] px-4 flex items-center gap-3 shadow-sm border border-black/5 focus-within:border-accent-aqua focus-within:shadow-md transition-all duration-200">
             <SearchIcon size={22} className="text-accent-aqua" strokeWidth={2.5} />
             <input
@@ -102,9 +94,55 @@ export function Search() {
           </div>
         </div>
 
+        {/* Filter Chips */}
+        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-4 px-1 -mx-1 mb-2">
+          <FilterChip
+            active={filterType === 'all'}
+            onClick={() => setFilterType('all')}
+          >
+            All
+          </FilterChip>
+          <FilterChip
+            active={filterType === 'item'}
+            onClick={() => setFilterType('item')}
+            icon={Package}
+          >
+            Items
+          </FilterChip>
+          <FilterChip
+            active={filterType === 'container'}
+            onClick={() => setFilterType('container')}
+            icon={Archive}
+          >
+            Containers
+          </FilterChip>
+          <FilterChip
+            active={filterType === 'place'}
+            onClick={() => setFilterType('place')}
+            icon={MapPin}
+          >
+            Places
+          </FilterChip>
+          <div className="w-[1px] h-8 bg-zinc-200 mx-1 flex-shrink-0" />
+          <FilterChip
+            active={hasPhoto}
+            onClick={() => setHasPhoto(!hasPhoto)}
+            icon={Camera}
+          >
+            Photo
+          </FilterChip>
+          <FilterChip
+            active={hasAudio}
+            onClick={() => setHasAudio(!hasAudio)}
+            icon={Mic}
+          >
+            Audio
+          </FilterChip>
+        </div>
+
         {/* Results Info */}
         {query.trim() && (
-          <p className="font-body text-sm text-text-secondary mb-5">
+          <p className="font-body text-sm text-text-secondary mb-5 px-1">
             {totalResults} result{totalResults !== 1 ? 's' : ''} for "{query}"
           </p>
         )}
@@ -148,7 +186,7 @@ export function Search() {
                       </p>
                       {item.tags.length > 0 && (
                         <div className="flex gap-1 mt-1">
-                          {item.tags.slice(0, 2).map((tag) => (
+                          {item.tags.slice(0, 2).map((tag: string) => (
                             <Badge key={tag} variant="success" size="sm">
                               {tag}
                             </Badge>
@@ -165,10 +203,10 @@ export function Search() {
           {/* Containers Section */}
           {searchedContainers.length > 0 && (
             <div className="space-y-3">
-              <h2 className="font-display text-[18px] font-bold text-text-primary">Containers ({searchedContainers.length})</h2>
-              {searchedContainers.map((container, index) => {
-                const place = places.find(p => p.id === container.placeId)
-                const itemCount = items.filter(item => item.containerId === container.id).length
+              <h2 className="font-display text-[18px] font-bold text-text-primary">Containers ({searchedContainerCount})</h2>
+              {searchedContainers.map((container: any, index: number) => {
+                const place = allPlaces.find(p => p.id === container.placeId)
+                const itemCount = allItems.filter(item => item.containerId === container.id).length
 
                 return (
                   <Card
@@ -212,9 +250,9 @@ export function Search() {
           {/* Places Section */}
           {searchedPlaces.length > 0 && (
             <div className="space-y-3">
-              <h2 className="font-display text-[18px] font-bold text-text-primary">Places ({searchedPlaces.length})</h2>
-              {searchedPlaces.map((place, index) => {
-                const placeContainers = containers.filter((c) => c.placeId === place.id)
+              <h2 className="font-display text-[18px] font-bold text-text-primary">Places ({searchedPlaceCount})</h2>
+              {searchedPlaces.map((place: any, index: number) => {
+                const placeContainers = allContainers.filter((c) => c.placeId === place.id)
                 const PlaceIcon = getPlaceIcon(place.type)
 
                 return (
@@ -247,8 +285,33 @@ export function Search() {
           </div>
         )}
       </div>
-
-      <BottomTabBar />
     </div>
+  )
+}
+
+function FilterChip({
+  active,
+  onClick,
+  children,
+  icon: Icon
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+  icon?: any
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-medium transition-colors border flex-shrink-0",
+        active
+          ? "bg-text-primary text-white border-text-primary"
+          : "bg-white text-text-secondary border-black/10 hover:border-black/20"
+      )}
+    >
+      {Icon && <Icon size={14} className={active ? "text-white" : "text-text-tertiary"} />}
+      {children}
+    </button>
   )
 }

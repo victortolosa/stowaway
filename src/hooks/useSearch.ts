@@ -1,11 +1,18 @@
 import { useMemo } from 'react'
 import Fuse from 'fuse.js'
 import { useInventoryStore } from '@/store/inventory'
-import { SearchResult } from '@/types'
+
+
+export type SearchFilterType = 'all' | 'item' | 'container' | 'place'
 
 interface SearchOptions {
   threshold?: number
   limit?: number
+  filters?: {
+    type?: SearchFilterType
+    hasPhoto?: boolean
+    hasAudio?: boolean
+  }
 }
 
 /**
@@ -17,33 +24,64 @@ export function useSearch(query: string, options?: SearchOptions) {
   const results = useMemo(() => {
     if (!query.trim()) return []
 
-    // Create a searchable dataset combining all data with breadcrumbs
-    const searchData: SearchResult[] = items.map((item) => {
+    // Create a searchable dataset combining all data
+    const searchItems = items.map((item) => {
       const container = containers.find((c) => c.id === item.containerId)
       const place = container ? places.find((p) => p.id === container.placeId) : null
-
-      return {
-        item,
-        container: container!,
-        place: place!,
-      }
+      return { item, container, place, type: 'item' as const }
     })
+
+    const searchContainers = containers.map((container) => {
+      const place = places.find((p) => p.id === container.placeId)
+      return { item: container, container: undefined, place, type: 'container' as const }
+    })
+
+    const searchPlaces = places.map((place) => {
+      return { item: place, container: undefined, place: undefined, type: 'place' as const }
+    })
+
+    const searchData = [...searchItems, ...searchContainers, ...searchPlaces]
 
     // Configure Fuse for fuzzy search
     const fuse = new Fuse(searchData, {
       keys: [
-        { name: 'item.name', weight: 1 },
-        { name: 'item.description', weight: 0.8 },
-        { name: 'item.tags', weight: 0.8 },
-        { name: 'container.name', weight: 0.6 },
-        { name: 'place.name', weight: 0.4 },
+        { name: 'item.name', weight: 1 },         // Works for Item, Container, Place
+        { name: 'item.description', weight: 0.8 }, // Works for Item
+        { name: 'item.tags', weight: 0.8 },       // Works for Item
+        { name: 'container.name', weight: 0.6 },  // Context for Item
+        { name: 'place.name', weight: 0.4 },      // Context for Item/Container
       ],
       threshold: options?.threshold ?? 0.4,
       includeScore: true,
     })
 
-    return fuse.search(query).slice(0, options?.limit ?? 10).map((result) => result.item)
-  }, [query, places, containers, items, options?.threshold, options?.limit])
+    let searchResults = fuse.search(query).map((result) => result.item)
+
+    // Apply Filters
+    if (options?.filters) {
+      const { type, hasPhoto, hasAudio } = options.filters
+
+      if (type && type !== 'all') {
+        searchResults = searchResults.filter((result) => result.type === type)
+      }
+
+      if (hasPhoto) {
+        searchResults = searchResults.filter((result) => {
+          const entity = result.item as any
+          return entity.photos && entity.photos.length > 0
+        })
+      }
+
+      if (hasAudio) {
+        searchResults = searchResults.filter((result) => {
+          const entity = result.item as any
+          return !!entity.voiceNoteUrl
+        })
+      }
+    }
+
+    return searchResults.slice(0, options?.limit ?? 20)
+  }, [query, places, containers, items, options?.threshold, options?.limit, options?.filters])
 
   return results
 }

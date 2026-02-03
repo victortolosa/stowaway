@@ -9,17 +9,17 @@ export function Layout() {
     const showTabBar = !['/login', '/signup', '/scan'].includes(location.pathname)
 
     return (
-        <div className="min-h-screen flex justify-center">
-            {/* 
-              Responsive Container:
-              - Mobile: Full width but with significant margins (px-8).
-              - Desktop: Centered, max-w-5xl, with ample breathing room (px-12).
-            */}
+        <div className="min-h-screen flex justify-center overflow-x-hidden">
             <div
-                className="w-full md:max-w-5xl min-h-screen relative flex flex-col transition-all duration-300 px-8 py-8 md:px-12 md:py-10"
-                style={{ paddingLeft: '32px', paddingRight: '32px', paddingBottom: '32px', paddingTop: '32px' }}
+                className="w-full md:max-w-5xl min-h-screen relative flex flex-col transition-all duration-300"
+                style={{
+                    paddingLeft: 'max(1.5rem, var(--safe-area-inset-left, 0px))',
+                    paddingRight: 'max(1.5rem, var(--safe-area-inset-right, 0px))',
+                    paddingTop: 'max(1.5rem, var(--safe-area-inset-top, 0px))',
+                    paddingBottom: 'max(2rem, var(--safe-area-inset-bottom, 0px))',
+                }}
             >
-                <main className="flex-1 pb-24 w-full">
+                <main className="flex-1 pb-32 w-full">
                     <Outlet />
                 </main>
                 {showTabBar && <BottomTabBar />}
