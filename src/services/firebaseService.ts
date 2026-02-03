@@ -15,9 +15,11 @@ import {
   getDownloadURL,
   deleteObject,
 } from 'firebase/storage'
-import { db, storage } from '@/lib/firebase'
+import { db, storage, auth } from '@/lib/firebase'
 import { Place, Container, Item, Group } from '@/types'
 import { offlineStorage } from '@/lib/offlineStorage'
+
+const getCurrentUserId = () => auth.currentUser?.uid;
 
 /**
  * PLACES OPERATIONS
@@ -26,11 +28,15 @@ export async function createPlace(place: Omit<Place, 'id' | 'createdAt' | 'updat
   console.log('FirebaseService: Attempting to create place in project:', db.app.options.projectId)
   console.log('Place Data:', place)
   try {
+    const userId = getCurrentUserId();
+    if (!userId) throw new Error("User must be logged in to create a place");
+
     const sanitizedPlace = Object.fromEntries(
       Object.entries(place).filter(([_, v]) => v !== undefined)
     )
     const docRef = await addDoc(collection(db, 'places'), {
       ...sanitizedPlace,
+      userId,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     })
@@ -84,22 +90,55 @@ export async function deletePlace(placeId: string) {
 /**
  * CONTAINERS OPERATIONS
  */
+// ... imports ...
+
+
+
+// ...
+
+/**
+ * CONTAINERS OPERATIONS
+ */
 export async function createContainer(container: Omit<Container, 'id' | 'createdAt' | 'updatedAt'>) {
   try {
+    const userId = getCurrentUserId();
+    if (!userId) throw new Error("User must be logged in to create a container");
+
     const sanitizedContainer = Object.fromEntries(
       Object.entries(container).filter(([_, v]) => v !== undefined)
     )
     const docRef = await addDoc(collection(db, 'containers'), {
       ...sanitizedContainer,
+      userId, // Ensure userId is attached
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     })
+
+    // Link pending uploads to this new document
+    // Check photoUrl
+    if (container.photoUrl && typeof container.photoUrl === 'string' && container.photoUrl.startsWith('urn:stowaway:pending:')) {
+      const pendingId = container.photoUrl.split(':').pop();
+      if (pendingId) {
+        await offlineStorage.updatePendingUpload(pendingId, {
+          metadata: {
+            collection: 'containers',
+            docId: docRef.id,
+            field: 'photoUrl'
+          }
+        });
+      }
+    }
+
     return docRef.id
   } catch (error) {
     console.error('Error creating container:', error)
     throw error
   }
 }
+
+// ... existing items/groups code ...
+
+
 
 export async function getPlaceContainers(placeId: string) {
   try {
@@ -174,11 +213,15 @@ export async function removeQRCodeFromContainer(containerId: string) {
  */
 export async function createItem(item: Omit<Item, 'id' | 'createdAt' | 'updatedAt'>) {
   try {
+    const userId = getCurrentUserId();
+    if (!userId) throw new Error("User must be logged in to create an item");
+
     const sanitizedItem = Object.fromEntries(
       Object.entries(item).filter(([_, v]) => v !== undefined)
     )
     const docRef = await addDoc(collection(db, 'items'), {
       ...sanitizedItem,
+      userId,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     })
@@ -270,11 +313,15 @@ export async function deleteItem(itemId: string) {
  */
 export async function createGroup(group: Omit<Group, 'id' | 'createdAt' | 'updatedAt'>) {
   try {
+    const userId = getCurrentUserId();
+    if (!userId) throw new Error("User must be logged in to create a group");
+
     const sanitizedGroup = Object.fromEntries(
       Object.entries(group).filter(([_, v]) => v !== undefined)
     )
     const docRef = await addDoc(collection(db, 'groups'), {
       ...sanitizedGroup,
+      userId,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     })
@@ -431,8 +478,17 @@ export async function uploadAudioWithCleanup(
   } catch (error) {
     if (uploadedUrl) {
       try {
-        await deleteStorageFile(path)
-        console.log('Cleaned up orphaned audio file:', path)
+        if (uploadedUrl.startsWith('urn:stowaway:pending:')) {
+          // Offline pending upload cleanup
+          const pendingId = uploadedUrl.split(':').pop();
+          if (pendingId) {
+            console.log('Cleaning up pending offline audio upload:', pendingId);
+            await offlineStorage.removePendingUpload(pendingId);
+          }
+        } else {
+          await deleteStorageFile(path)
+          console.log('Cleaned up orphaned audio file:', path)
+        }
       } catch (cleanupError) {
         console.error('Failed to cleanup orphaned audio file:', cleanupError)
       }
@@ -474,8 +530,18 @@ export async function uploadImageWithCleanup(
     // If anything failed and we uploaded the file, clean it up
     if (uploadedUrl) {
       try {
-        await deleteStorageFile(path)
-        console.log('Cleaned up orphaned file:', path)
+        if (uploadedUrl.startsWith('urn:stowaway:pending:')) {
+          // Offline pending upload cleanup
+          const pendingId = uploadedUrl.split(':').pop();
+          if (pendingId) {
+            console.log('Cleaning up pending offline upload:', pendingId);
+            await offlineStorage.removePendingUpload(pendingId);
+          }
+        } else {
+          // Regular cleanup
+          await deleteStorageFile(path)
+          console.log('Cleaned up orphaned file:', path)
+        }
       } catch (cleanupError) {
         console.error('Failed to cleanup orphaned file:', cleanupError)
       }
