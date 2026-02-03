@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useInventory, useSearch } from '@/hooks'
+import { useInventory, useSearch, SearchDataItem } from '@/hooks'
 import { SearchFilterType } from '@/hooks/useSearch'
+import { Item, Container, Place } from '@/types'
 import { Search as SearchIcon, Package, Home, Briefcase, Archive, MapPin, QrCode, Mic, Camera } from 'lucide-react'
 import { Card, IconBadge, Badge } from '@/components/ui'
 import { Timestamp } from 'firebase/firestore'
@@ -52,16 +53,18 @@ export function Search() {
 
   // Group results for display
   const searchedItems = searchResults
-    .filter(r => r.type === 'item')
-    .map(r => r.item as any)
+    .filter((r): r is Extract<SearchDataItem, { type: 'item' }> => r.type === 'item')
+    .map(r => r.item)
 
   const searchedContainers = searchResults
-    .filter(r => r.type === 'container')
-    .map(r => r.item as any)
+    .filter((r): r is Extract<SearchDataItem, { type: 'container' }> => r.type === 'container')
+    .map(r => r.item)
 
   const searchedPlaces = searchResults
-    .filter(r => r.type === 'place')
-    .map(r => r.item as any)
+    .filter((r): r is Extract<SearchDataItem, { type: 'place' }> => r.type === 'place')
+    .map(r => r.item)
+
+
 
   const searchedItemCount = searchedItems.length
   const searchedContainerCount = searchedContainers.length
@@ -153,7 +156,7 @@ export function Search() {
           {searchedItems.length > 0 && (
             <div className="space-y-3">
               <h2 className="font-display text-[18px] font-bold text-text-primary">Items ({searchedItems.length})</h2>
-              {searchedItems.map((item) => (
+              {searchedItems.map((item: Item) => (
                 <Card
                   key={item.id}
                   variant="interactive"
@@ -204,7 +207,7 @@ export function Search() {
           {searchedContainers.length > 0 && (
             <div className="space-y-3">
               <h2 className="font-display text-[18px] font-bold text-text-primary">Containers ({searchedContainerCount})</h2>
-              {searchedContainers.map((container: any, index: number) => {
+              {searchedContainers.map((container: Container, index: number) => {
                 const place = allPlaces.find(p => p.id === container.placeId)
                 const itemCount = allItems.filter(item => item.containerId === container.id).length
 
@@ -251,7 +254,7 @@ export function Search() {
           {searchedPlaces.length > 0 && (
             <div className="space-y-3">
               <h2 className="font-display text-[18px] font-bold text-text-primary">Places ({searchedPlaceCount})</h2>
-              {searchedPlaces.map((place: any, index: number) => {
+              {searchedPlaces.map((place: Place, index: number) => {
                 const placeContainers = allContainers.filter((c) => c.placeId === place.id)
                 const PlaceIcon = getPlaceIcon(place.type)
 
@@ -298,7 +301,7 @@ function FilterChip({
   active: boolean
   onClick: () => void
   children: React.ReactNode
-  icon?: any
+  icon?: React.ElementType
 }) {
   return (
     <button

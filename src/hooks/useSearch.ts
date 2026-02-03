@@ -1,9 +1,24 @@
 import { useMemo } from 'react'
 import Fuse from 'fuse.js'
 import { useInventoryStore } from '@/store/inventory'
-
+import { Item, Container, Place } from '@/types'
 
 export type SearchFilterType = 'all' | 'item' | 'container' | 'place'
+
+interface SearchOptions {
+  threshold?: number
+  limit?: number
+  filters?: {
+    type?: SearchFilterType
+    hasPhoto?: boolean
+    hasAudio?: boolean
+  }
+}
+
+export type SearchDataItem =
+  | { type: 'item'; item: Item; container?: Container; place?: Place }
+  | { type: 'container'; item: Container; container?: undefined; place?: Place }
+  | { type: 'place'; item: Place; container?: undefined; place?: undefined }
 
 interface SearchOptions {
   threshold?: number
@@ -20,24 +35,27 @@ interface SearchOptions {
  */
 export function useSearch(query: string, options?: SearchOptions) {
   const { places, containers, items } = useInventoryStore()
+  const threshold = options?.threshold
+  const limit = options?.limit
+  const filters = options?.filters
 
   const results = useMemo(() => {
     if (!query.trim()) return []
 
     // Create a searchable dataset combining all data
-    const searchItems = items.map((item) => {
+    const searchItems: SearchDataItem[] = items.map((item) => {
       const container = containers.find((c) => c.id === item.containerId)
-      const place = container ? places.find((p) => p.id === container.placeId) : null
-      return { item, container, place, type: 'item' as const }
+      const place = container ? places.find((p) => p.id === container.placeId) : undefined
+      return { item, container, place, type: 'item' }
     })
 
-    const searchContainers = containers.map((container) => {
+    const searchContainers: SearchDataItem[] = containers.map((container) => {
       const place = places.find((p) => p.id === container.placeId)
-      return { item: container, container: undefined, place, type: 'container' as const }
+      return { item: container, container: undefined, place, type: 'container' }
     })
 
-    const searchPlaces = places.map((place) => {
-      return { item: place, container: undefined, place: undefined, type: 'place' as const }
+    const searchPlaces: SearchDataItem[] = places.map((place) => {
+      return { item: place, container: undefined, place: undefined, type: 'place' }
     })
 
     const searchData = [...searchItems, ...searchContainers, ...searchPlaces]
@@ -51,15 +69,15 @@ export function useSearch(query: string, options?: SearchOptions) {
         { name: 'container.name', weight: 0.6 },  // Context for Item
         { name: 'place.name', weight: 0.4 },      // Context for Item/Container
       ],
-      threshold: options?.threshold ?? 0.4,
+      threshold: threshold ?? 0.4,
       includeScore: true,
     })
 
     let searchResults = fuse.search(query).map((result) => result.item)
 
     // Apply Filters
-    if (options?.filters) {
-      const { type, hasPhoto, hasAudio } = options.filters
+    if (filters) {
+      const { type, hasPhoto, hasAudio } = filters
 
       if (type && type !== 'all') {
         searchResults = searchResults.filter((result) => result.type === type)
@@ -67,21 +85,25 @@ export function useSearch(query: string, options?: SearchOptions) {
 
       if (hasPhoto) {
         searchResults = searchResults.filter((result) => {
-          const entity = result.item as any
-          return entity.photos && entity.photos.length > 0
+          if (result.type === 'item') {
+            return (result.item as Item).photos && (result.item as Item).photos.length > 0
+          }
+          return false
         })
       }
 
       if (hasAudio) {
         searchResults = searchResults.filter((result) => {
-          const entity = result.item as any
-          return !!entity.voiceNoteUrl
+          if (result.type === 'item') {
+            return !!(result.item as Item).voiceNoteUrl
+          }
+          return false
         })
       }
     }
 
-    return searchResults.slice(0, options?.limit ?? 20)
-  }, [query, places, containers, items, options?.threshold, options?.limit, options?.filters])
+    return searchResults.slice(0, limit ?? 20)
+  }, [query, places, containers, items, threshold, limit, filters])
 
   return results
 }
