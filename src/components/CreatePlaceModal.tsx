@@ -6,10 +6,12 @@ import { createPlace, updatePlace } from '@/services/firebaseService'
 import { useAuthStore } from '@/store/auth'
 import { Place } from '@/types'
 import { Modal, Button, Input, Select, FormField } from '@/components/ui'
+import { useInventory } from '@/hooks'
 
 const placeSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     type: z.enum(['home', 'office', 'storage', 'other']),
+    groupId: z.string().optional(),
 })
 
 type PlaceFormValues = z.infer<typeof placeSchema>
@@ -24,7 +26,10 @@ interface CreatePlaceModalProps {
 
 export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = false, initialData }: CreatePlaceModalProps) {
     const user = useAuthStore((state) => state.user)
+    const { groups } = useInventory()
     const [isSubmitting, setIsSubmitting] = useState(false)
+
+    const placeGroups = groups.filter(g => g.type === 'place' && g.parentId === null)
 
     const {
         register,
@@ -35,6 +40,7 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
         resolver: zodResolver(placeSchema),
         defaultValues: {
             type: 'home',
+            groupId: '',
         },
     })
 
@@ -43,11 +49,13 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
             reset({
                 name: initialData.name,
                 type: initialData.type,
+                groupId: initialData.groupId || '',
             })
         } else if (isOpen && !editMode) {
             reset({
                 type: 'home',
                 name: '',
+                groupId: '',
             })
         }
     }, [isOpen, editMode, initialData, reset])
@@ -58,12 +66,16 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
         setIsSubmitting(true)
         try {
             if (editMode && initialData) {
-                await updatePlace(initialData.id, data)
+                await updatePlace(initialData.id, {
+                    ...data,
+                    groupId: data.groupId || undefined,
+                })
             } else {
                 await createPlace({
                     name: data.name,
                     type: data.type,
                     userId: user.uid,
+                    groupId: data.groupId || undefined,
                 })
             }
 
@@ -113,6 +125,25 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                         <option value="office">Office</option>
                         <option value="storage">Storage Unit</option>
                         <option value="other">Other</option>
+                    </Select>
+                </FormField>
+
+                <FormField
+                    label="Place Group (Optional)"
+                    htmlFor="groupId"
+                    error={errors.groupId?.message}
+                >
+                    <Select
+                        id="groupId"
+                        error={!!errors.groupId}
+                        {...register('groupId')}
+                    >
+                        <option value="">None (Top Level)</option>
+                        {placeGroups.map(group => (
+                            <option key={group.id} value={group.id}>
+                                {group.name}
+                            </option>
+                        ))}
                     </Select>
                 </FormField>
 

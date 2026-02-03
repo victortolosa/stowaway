@@ -7,15 +7,16 @@ import { Mic, X } from 'lucide-react'
 import { createItem, updateItem, uploadImage, uploadAudio, deleteStorageFile } from '@/services/firebaseService'
 import { deleteField } from 'firebase/firestore'
 import { useAuthStore } from '@/store/auth'
-import { useImageCompression } from '@/hooks'
+import { useImageCompression, useInventory } from '@/hooks'
 import { ImageCropper, AudioRecorder, AudioPlayer } from '@/components'
 import { trimSilence } from '@/utils/audioUtils'
 import { Item } from '@/types'
-import { Modal, Button, Input, Textarea, FormField, Label, ImageUploader, ProgressBar } from '@/components/ui'
+import { Modal, Button, Input, Textarea, FormField, Label, ImageUploader, ProgressBar, Select } from '@/components/ui'
 
 const itemSchema = z.object({
     name: z.string().min(1, 'Name is required'),
     description: z.string().optional(),
+    groupId: z.string().optional(),
 })
 
 type ItemFormValues = z.infer<typeof itemSchema>
@@ -38,6 +39,7 @@ export function CreateItemModal({
     initialData
 }: CreateItemModalProps) {
     const user = useAuthStore((state) => state.user)
+    const { groups } = useInventory()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [photoFile, setPhotoFile] = useState<File | null>(null)
     const [photoPreview, setPhotoPreview] = useState<string | null>(null)
@@ -50,6 +52,8 @@ export function CreateItemModal({
     const [showAudioRecorder, setShowAudioRecorder] = useState(false)
     const [isTrimming, setIsTrimming] = useState(false)
 
+    const itemGroups = groups.filter(g => g.type === 'item' && g.parentId === containerId)
+
     const { compress, isCompressing, progress } = useImageCompression()
 
     const {
@@ -59,6 +63,9 @@ export function CreateItemModal({
         formState: { errors },
     } = useForm<ItemFormValues>({
         resolver: zodResolver(itemSchema),
+        defaultValues: {
+            groupId: '',
+        },
     })
 
     useEffect(() => {
@@ -66,6 +73,7 @@ export function CreateItemModal({
             reset({
                 name: initialData.name,
                 description: initialData.description || '',
+                groupId: initialData.groupId || '',
             })
             setPhotoFile(null)
             setPhotoPreview(initialData.photos[0] || null)
@@ -79,6 +87,7 @@ export function CreateItemModal({
             reset({
                 name: '',
                 description: '',
+                groupId: '',
             })
             setPhotoFile(null)
             setPhotoPreview(null)
@@ -95,7 +104,7 @@ export function CreateItemModal({
         return () => {
             if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
         }
-    }, [isOpen, editMode, initialData, reset, audioPreviewUrl])
+    }, [audioPreviewUrl])
 
     const onSubmit = async (data: ItemFormValues) => {
         if (!user) return
@@ -135,6 +144,7 @@ export function CreateItemModal({
                 ...data,
                 ...(photoUrl && { photos: [photoUrl] }),
                 ...(audioUrl && { voiceNoteUrl: audioUrl }),
+                groupId: data.groupId || undefined,
             }
 
             if (editMode && initialData) {
@@ -159,6 +169,7 @@ export function CreateItemModal({
                     photos: photoUrl ? [photoUrl] : [],
                     tags: [],
                     voiceNoteUrl: audioUrl,
+                    groupId: itemData.groupId,
                 })
             }
 
@@ -229,13 +240,9 @@ export function CreateItemModal({
 
         try {
             setIsTrimming(true)
-            // Small delay to let UI render the loading state
             await new Promise(resolve => setTimeout(resolve, 100))
-
             const trimmedBlob = await trimSilence(audioBlob)
 
-            // Check if size changed significantly to warn/inform? 
-            // For now just update it.
             if (trimmedBlob.size !== audioBlob.size) {
                 if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
                 const newUrl = URL.createObjectURL(trimmedBlob)
@@ -256,6 +263,7 @@ export function CreateItemModal({
                 isOpen={isOpen}
                 onClose={onClose}
                 title={editMode ? 'Edit Item' : 'Add New Item'}
+                description={`Form to ${editMode ? 'edit' : 'create'} an item`}
             >
                 <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
                     <FormField
@@ -282,6 +290,25 @@ export function CreateItemModal({
                             placeholder="Details about the item..."
                             {...register('description')}
                         />
+                    </FormField>
+
+                    <FormField
+                        label="Item Group (Optional)"
+                        htmlFor="groupId"
+                        error={errors.groupId?.message}
+                    >
+                        <Select
+                            id="groupId"
+                            error={!!errors.groupId}
+                            {...register('groupId')}
+                        >
+                            <option value="">None (Top Level)</option>
+                            {itemGroups.map(group => (
+                                <option key={group.id} value={group.id}>
+                                    {group.name}
+                                </option>
+                            ))}
+                        </Select>
                     </FormField>
 
                     <FormField label="Photo">
@@ -319,13 +346,11 @@ export function CreateItemModal({
                         {showAudioRecorder && !audioBlob && (
                             <AudioRecorder
                                 onRecordingComplete={(blob) => {
-                                    console.log('CreateItemModal: onRecordingComplete', { size: blob.size, type: blob.type })
                                     setAudioBlob(blob)
                                     const url = URL.createObjectURL(blob)
-                                    console.log('CreateItemModal: Created preview URL', url)
                                     setAudioPreviewUrl(url)
                                     setShowAudioRecorder(false)
-                                    setExistingAudioUrl(null) // Clear existing if new one recorded
+                                    setExistingAudioUrl(null)
                                 }}
                                 maxDuration={60}
                             />

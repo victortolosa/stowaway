@@ -16,7 +16,7 @@ export function BottomTabBar() {
 
   return (
     <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-md z-50">
-      <div className="bg-transparent pb-[34px] px-6">
+      <div className="bg-transparent pb-[34px] px-8">
         {/* Tab Bar: height 64 (taller), glassy, blur, border, shadow-floating */}
         <div className="bg-white/80 backdrop-blur-xl border border-white/40 rounded-full h-[64px] p-2 flex items-center justify-around shadow-floating ring-1 ring-black/5">
           {tabs.map((tab) => {

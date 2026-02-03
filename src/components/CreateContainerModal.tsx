@@ -5,13 +5,14 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { AnimatePresence } from 'framer-motion'
 import { createContainer, updateContainer, uploadImageWithCleanup } from '@/services/firebaseService'
 import { useAuthStore } from '@/store/auth'
-import { useImageCompression } from '@/hooks'
+import { useImageCompression, useInventory } from '@/hooks'
 import { ImageCropper } from '@/components'
 import { Container } from '@/types'
-import { Modal, Button, Input, FormField, ImageUploader, ProgressBar } from '@/components/ui'
+import { Modal, Button, Input, FormField, ImageUploader, ProgressBar, Select } from '@/components/ui'
 
 const containerSchema = z.object({
     name: z.string().min(1, 'Name is required'),
+    groupId: z.string().optional(),
 })
 
 type ContainerFormValues = z.infer<typeof containerSchema>
@@ -34,11 +35,14 @@ export function CreateContainerModal({
     initialData
 }: CreateContainerModalProps) {
     const user = useAuthStore((state) => state.user)
+    const { groups } = useInventory()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [photoFile, setPhotoFile] = useState<File | null>(null)
     const [photoPreview, setPhotoPreview] = useState<string | null>(null)
     const [showCropper, setShowCropper] = useState(false)
     const [imageToCrop, setImageToCrop] = useState<string | null>(null)
+
+    const containerGroups = groups.filter(g => g.type === 'container' && g.parentId === placeId)
 
     const { compress, isCompressing, progress } = useImageCompression()
 
@@ -49,18 +53,23 @@ export function CreateContainerModal({
         formState: { errors },
     } = useForm<ContainerFormValues>({
         resolver: zodResolver(containerSchema),
+        defaultValues: {
+            groupId: '',
+        },
     })
 
     useEffect(() => {
         if (isOpen && editMode && initialData) {
             reset({
                 name: initialData.name,
+                groupId: initialData.groupId || '',
             })
             setPhotoFile(null)
             setPhotoPreview(initialData.photoUrl || null)
         } else if (isOpen && !editMode) {
             reset({
                 name: '',
+                groupId: '',
             })
             setPhotoFile(null)
             setPhotoPreview(null)
@@ -91,6 +100,7 @@ export function CreateContainerModal({
                             await updateContainer(initialData.id, {
                                 ...data,
                                 photoUrl: url,
+                                groupId: data.groupId || undefined,
                             })
                         } else {
                             await createContainer({
@@ -98,18 +108,23 @@ export function CreateContainerModal({
                                 placeId,
                                 photoUrl: url,
                                 lastAccessed: new Date(),
+                                groupId: data.groupId || undefined,
                             })
                         }
                     }
                 )
             } else {
                 if (editMode && initialData) {
-                    await updateContainer(initialData.id, data)
+                    await updateContainer(initialData.id, {
+                        ...data,
+                        groupId: data.groupId || undefined,
+                    })
                 } else {
                     await createContainer({
                         name: data.name,
                         placeId,
                         lastAccessed: new Date(),
+                        groupId: data.groupId || undefined,
                     })
                 }
             }
@@ -185,6 +200,25 @@ export function CreateContainerModal({
                             error={!!errors.name}
                             {...register('name')}
                         />
+                    </FormField>
+
+                    <FormField
+                        label="Container Group (Optional)"
+                        htmlFor="groupId"
+                        error={errors.groupId?.message}
+                    >
+                        <Select
+                            id="groupId"
+                            error={!!errors.groupId}
+                            {...register('groupId')}
+                        >
+                            <option value="">None (Top Level)</option>
+                            {containerGroups.map(group => (
+                                <option key={group.id} value={group.id}>
+                                    {group.name}
+                                </option>
+                            ))}
+                        </Select>
                     </FormField>
 
                     <FormField label="Container Photo (Optional)">
