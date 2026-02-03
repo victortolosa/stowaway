@@ -7,8 +7,9 @@ import { QRLabelModal } from '@/components/QRLabelModal'
 import { QRManageModal } from '@/components/QRManageModal'
 import { deleteContainer, deleteItem, deleteGroup } from '@/services/firebaseService'
 import { Item, Group } from '@/types'
-import { Pencil, Trash2, ChevronRight, Package, Plus, Mic, QrCode, Search, FolderPlus } from 'lucide-react'
-import { IconBadge, EmptyState, LoadingState, Button, Card, NavigationHeader } from '@/components/ui'
+import { Pencil, Trash2, Package, Plus, QrCode, Search, FolderPlus } from 'lucide-react'
+import { IconBadge, EmptyState, LoadingState, Button, NavigationHeader } from '@/components/ui'
+import { ItemCard } from '@/components/ItemCard'
 
 export function Container() {
   const { id } = useParams<{ id: string }>()
@@ -151,13 +152,16 @@ export function Container() {
       </div>
 
       {/* Container Hero */}
-      <div className="flex flex-col items-center gap-4 mb-6">
-        <IconBadge icon={Package} color="#3B82F6" size="lg" />
-        <div className="text-center flex flex-col gap-1">
-          <h1 className="font-display text-[28px] font-bold text-text-primary leading-tight">
+      <div className="flex items-center gap-4 mb-6 px-1">
+        <IconBadge icon={Package} color="#3B82F6" size="md" />
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[10px] font-bold tracking-wider text-text-tertiary uppercase">
+            Container
+          </span>
+          <h1 className="font-display text-[24px] font-bold text-text-primary leading-tight">
             {container.name}
           </h1>
-          <p className="font-body text-[14px] text-text-secondary">
+          <p className="font-body text-[13px] text-text-secondary">
             {containerItems.length} items · {place?.name}
           </p>
         </div>
@@ -206,7 +210,7 @@ export function Container() {
         <div className="flex flex-col gap-4">
           <div className="flex justify-between items-center">
             <h2 className="font-display text-[20px] font-bold text-text-primary">
-              {searchQuery ? 'Search Results' : 'Organization'}
+              {searchQuery ? 'Search Results' : 'Items'}
             </h2>
           </div>
 
@@ -244,41 +248,14 @@ export function Container() {
                           </button>
                         </div>
 
-                        <div className="pl-4 border-l-2 border-border-standard ml-2">
-                          <div className="flex flex-col gap-3">
-                            {groupItems.map((item) => (
-                              <Card
-                                key={item.id}
-                                variant="interactive"
-                                className="flex items-center gap-[14px] p-3"
-                                onClick={() => navigate(`/items/${item.id}`)}
-                              >
-                                <div className="w-12 h-12 bg-bg-surface rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0 border border-border-standard">
-                                  {item.photos && item.photos.length > 0 ? (
-                                    <img src={item.photos[0]} alt={item.name} className="w-full h-full object-cover" />
-                                  ) : (
-                                    <Package size={24} className="text-text-tertiary" />
-                                  )}
-                                </div>
-                                <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                                  <h3 className="font-body text-[16px] font-semibold text-text-primary truncate">
-                                    {item.name}
-                                  </h3>
-                                  <div className="flex items-center gap-2">
-                                    {item.tags && item.tags.length > 0 && (
-                                      <span className="text-[12px] text-text-tertiary truncate">
-                                        {item.tags.join(', ')}
-                                      </span>
-                                    )}
-                                    {item.voiceNoteUrl && (
-                                      <Mic size={14} className="text-accent-aqua" />
-                                    )}
-                                  </div>
-                                </div>
-                                <ChevronRight size={20} className="text-text-tertiary" strokeWidth={2} />
-                              </Card>
-                            ))}
-                          </div>
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                          {groupItems.map((item) => (
+                            <ItemCard
+                              key={item.id}
+                              item={item}
+                              onClick={() => navigate(`/items/${item.id}`)}
+                            />
+                          ))}
                         </div>
                       </div>
                     )
@@ -287,38 +264,13 @@ export function Container() {
               )}
 
               {/* Ungrouped Items */}
-              <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredItems.filter(i => !i.groupId).map((item) => (
-                  <Card
+                  <ItemCard
                     key={item.id}
-                    variant="interactive"
-                    className="flex items-center gap-[14px] p-3"
+                    item={item}
                     onClick={() => navigate(`/items/${item.id}`)}
-                  >
-                    <div className="w-12 h-12 bg-bg-surface rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0 border border-border-standard">
-                      {item.photos && item.photos.length > 0 ? (
-                        <img src={item.photos[0]} alt={item.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <Package size={24} className="text-text-tertiary" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                      <h3 className="font-body text-[16px] font-semibold text-text-primary truncate">
-                        {item.name}
-                      </h3>
-                      <div className="flex items-center gap-2">
-                        {item.tags && item.tags.length > 0 && (
-                          <span className="text-[12px] text-text-tertiary truncate">
-                            {item.tags.join(', ')}
-                          </span>
-                        )}
-                        {item.voiceNoteUrl && (
-                          <Mic size={14} className="text-accent-aqua" />
-                        )}
-                      </div>
-                    </div>
-                    <ChevronRight size={20} className="text-text-tertiary" strokeWidth={2} />
-                  </Card>
+                  />
                 ))}
               </div>
             </div>
