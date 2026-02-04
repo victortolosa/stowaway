@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { useAuthStore } from '@/store/auth'
-import { useInventory } from '@/hooks'
+import { usePlaces, PLACE_KEYS } from '@/hooks/queries/usePlaces'
+import { useGroups } from '@/hooks/queries/useGroups'
+import { useAllContainers } from '@/hooks/queries/useAllContainers'
+import { useQueryClient } from '@tanstack/react-query'
 import { CreatePlaceModal, ConfirmDeleteModal, CreateGroupModal } from '@/components'
 import { useNavigate } from 'react-router-dom'
 import { deletePlace, deleteGroup } from '@/services/firebaseService'
@@ -10,7 +13,19 @@ import { PageHeader, ListItem, EmptyState, IconBadge, LoadingState, Button } fro
 
 export function Places() {
   const user = useAuthStore((state) => state.user)
-  const { places, containers, groups, isLoading, refresh } = useInventory()
+  const queryClient = useQueryClient()
+
+  const { data: places = [], isLoading: isPlacesLoading } = usePlaces()
+  const { data: containers = [] } = useAllContainers()
+  const { data: groups = [] } = useGroups()
+
+  const isLoading = isPlacesLoading
+
+  const refresh = async () => {
+    if (!user?.uid) return
+    await queryClient.invalidateQueries({ queryKey: PLACE_KEYS.list(user.uid) })
+  }
+
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')

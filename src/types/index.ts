@@ -21,6 +21,7 @@ export interface Group {
 
 export interface Container {
   id: string
+  userId: string
   placeId: string
   name: string
   qrCodeId?: string
@@ -34,7 +35,9 @@ export interface Container {
 
 export interface Item {
   id: string
+  userId: string
   containerId: string
+  placeId?: string // Optional for backward compatibility with existing items
   name: string
   description?: string
   photos: string[]

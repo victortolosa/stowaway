@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
-import { useInventory } from '@/hooks'
+import { usePlaces } from '@/hooks/queries/usePlaces'
+import { useAllContainers } from '@/hooks/queries/useAllContainers'
 import { Download, Plus, Minus, X } from 'lucide-react'
 import { generateQRCodeDataURL } from '@/utils/qrCode'
 
@@ -17,7 +18,8 @@ interface SelectedContainer {
 }
 
 export function BatchPrintModal({ isOpen, onClose }: BatchPrintModalProps) {
-  const { containers, places } = useInventory()
+  const { data: containers = [] } = useAllContainers()
+  const { data: places = [] } = usePlaces()
   const [selectedContainers, setSelectedContainers] = useState<SelectedContainer[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
 
@@ -219,8 +221,8 @@ export function BatchPrintModal({ isOpen, onClose }: BatchPrintModalProps) {
                   key={container.id}
                   onClick={() => toggleContainer(container.id, container.name)}
                   className={`w-full p-4 rounded-lg border-2 transition-all text-left ${isSelected
-                      ? 'border-accent-aqua bg-accent-aqua/5'
-                      : 'border-border-standard hover:border-accent-aqua/50 bg-bg-surface'
+                    ? 'border-accent-aqua bg-accent-aqua/5'
+                    : 'border-border-standard hover:border-accent-aqua/50 bg-bg-surface'
                     }`}
                 >
                   <div className="flex items-center justify-between">

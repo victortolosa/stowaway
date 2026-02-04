@@ -1,3 +1,5 @@
+import { Loader2 } from 'lucide-react'
+
 export interface LoadingStateProps {
   message?: string
   fullScreen?: boolean
@@ -10,9 +12,9 @@ export function LoadingState({ message = 'Loading...', fullScreen = false }: Loa
 
   return (
     <div className={containerClass}>
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-aqua mx-auto mb-4"></div>
-        <p className="font-body text-sm text-text-secondary">{message}</p>
+      <div className="text-center flex flex-col items-center gap-3">
+        <Loader2 className="animate-spin text-accent-aqua" size={32} />
+        <p className="text-body-sm text-text-secondary font-medium">{message}</p>
       </div>
     </div>
   )

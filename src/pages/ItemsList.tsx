@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useAuthStore } from '@/store/auth'
-import { useInventory } from '@/hooks'
+import { usePlaces } from '@/hooks/queries/usePlaces'
+import { useAllContainers } from '@/hooks/queries/useAllContainers'
+import { useAllItems } from '@/hooks/queries/useAllItems'
 import { useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { PageHeader, EmptyState, LoadingState } from '@/components/ui'
@@ -11,7 +13,11 @@ import { ItemCard } from '@/components/ItemCard'
 
 export function ItemsList() {
   const user = useAuthStore((state) => state.user)
-  const { items, containers, places, isLoading } = useInventory()
+  const { data: items = [], isLoading: isItemsLoading } = useAllItems()
+  const { data: containers = [] } = useAllContainers()
+  const { data: places = [] } = usePlaces()
+
+  const isLoading = isItemsLoading
   const [searchQuery, setSearchQuery] = useState('')
   const navigate = useNavigate()
 

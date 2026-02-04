@@ -4,10 +4,12 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { createGroup, updateGroup, updatePlace, updateContainer, updateItem } from '@/services/firebaseService'
 import { useAuthStore } from '@/store/auth'
-import { useInventory } from '@/hooks'
 import { Group } from '@/types'
 import { Modal, Button, Input, FormField } from '@/components/ui'
 import { Check, Package, MapPin, Search, Trash2 } from 'lucide-react'
+import { usePlaces } from '@/hooks/queries/usePlaces'
+import { useAllContainers } from '@/hooks/queries/useAllContainers'
+import { useAllItems } from '@/hooks/queries/useAllItems'
 
 const groupSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -37,7 +39,11 @@ export function CreateGroupModal({
     onDelete
 }: CreateGroupModalProps) {
     const user = useAuthStore((state) => state.user)
-    const { places, containers, items } = useInventory()
+
+    const { data: places = [] } = usePlaces()
+    const { data: containers = [] } = useAllContainers()
+    const { data: items = [] } = useAllItems()
+
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(new Set())
     const [searchQuery, setSearchQuery] = useState('')
@@ -114,7 +120,6 @@ export function CreateGroupModal({
                     name: data.name,
                     type,
                     parentId,
-                    userId: user.uid,
                 })
             }
 

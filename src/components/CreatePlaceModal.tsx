@@ -6,7 +6,8 @@ import { createPlace, updatePlace, uploadImageWithCleanup, deleteStorageFile } f
 import { useAuthStore } from '@/store/auth'
 import { Place } from '@/types'
 import { Modal, Button, Input, Select, FormField, MultiImageUploader, ProgressBar } from '@/components/ui'
-import { useInventory, useImageCompression } from '@/hooks'
+import { useImageCompression } from '@/hooks'
+import { useGroups } from '@/hooks/queries/useGroups'
 
 const placeSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -26,7 +27,7 @@ interface CreatePlaceModalProps {
 
 export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = false, initialData }: CreatePlaceModalProps) {
     const user = useAuthStore((state) => state.user)
-    const { groups } = useInventory()
+    const { data: groups = [] } = useGroups()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [images, setImages] = useState<(File | string)[]>([])
 
@@ -117,7 +118,6 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                 await createPlace({
                     name: data.name,
                     type: data.type,
-                    userId: user.uid,
                     groupId: data.groupId || null,
                     photos: finalPhotos
                 })

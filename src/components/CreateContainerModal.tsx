@@ -5,7 +5,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 
 import { createContainer, updateContainer, uploadImageWithCleanup, deleteStorageFile } from '@/services/firebaseService'
 import { useAuthStore } from '@/store/auth'
-import { useImageCompression, useInventory } from '@/hooks'
+import { useImageCompression } from '@/hooks'
+import { useGroups } from '@/hooks/queries/useGroups'
 // ImageCropper removed
 // import { ImageCropper } from '@/components'
 import { Container } from '@/types'
@@ -36,7 +37,7 @@ export function CreateContainerModal({
     initialData
 }: CreateContainerModalProps) {
     const user = useAuthStore((state) => state.user)
-    const { groups } = useInventory()
+    const { data: groups = [] } = useGroups()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [images, setImages] = useState<(File | string)[]>([])
     // Cropper removed for multi-image flow simplicity

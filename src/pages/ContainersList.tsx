@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useAuthStore } from '@/store/auth'
-import { useInventory } from '@/hooks'
+import { usePlaces } from '@/hooks/queries/usePlaces'
+import { useAllContainers } from '@/hooks/queries/useAllContainers'
+import { useAllItems } from '@/hooks/queries/useAllItems'
 import { useNavigate } from 'react-router-dom'
 import { Search, Package, QrCode } from 'lucide-react'
 import { PageHeader, Card, EmptyState, IconBadge, LoadingState } from '@/components/ui'
@@ -16,7 +18,11 @@ const toDate = (timestamp: Date | Timestamp): Date => {
 
 export function ContainersList() {
   const user = useAuthStore((state) => state.user)
-  const { containers, items, places, isLoading } = useInventory()
+  const { data: containers = [], isLoading: isContainersLoading } = useAllContainers()
+  const { data: items = [] } = useAllItems()
+  const { data: places = [] } = usePlaces()
+
+  const isLoading = isContainersLoading
   const [searchQuery, setSearchQuery] = useState('')
   const navigate = useNavigate()
 

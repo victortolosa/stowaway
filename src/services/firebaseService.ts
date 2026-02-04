@@ -6,7 +6,10 @@ import {
   query,
   where,
   getDocs,
+  getDoc,
   doc,
+  orderBy,
+  limit,
   Timestamp,
 } from 'firebase/firestore'
 import {
@@ -18,23 +21,38 @@ import {
 import { db, storage, auth } from '@/lib/firebase'
 import { Place, Container, Item, Group } from '@/types'
 import { offlineStorage } from '@/lib/offlineStorage'
-import { useUIStore } from '@/store/ui'
+import { sanitizeUndefined } from '@/utils/data'
+import { PlaceSchema, ContainerSchema, ItemSchema, GroupSchema } from '@/schemas/firestore'
 
-const getCurrentUserId = () => auth.currentUser?.uid;
+const getCurrentUserId = (): string => {
+  const uid = auth.currentUser?.uid;
+  if (!uid) {
+    throw new Error('User must be authenticated');
+  }
+  return uid;
+};
 
 /**
  * PLACES OPERATIONS
  */
-export async function createPlace(place: Omit<Place, 'id' | 'createdAt' | 'updatedAt'>) {
+export async function getPlace(id: string): Promise<Place | undefined> {
+  const docRef = doc(db, 'places', id)
+  const docSnap = await getDoc(docRef)
+  if (docSnap.exists()) {
+    const raw = { id: docSnap.id, ...docSnap.data() }
+    return PlaceSchema.parse(raw)
+  }
+  return undefined
+}
+
+export async function createPlace(place: Omit<Place, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) {
   console.log('FirebaseService: Attempting to create place in project:', db.app.options.projectId)
   console.log('Place Data:', place)
   try {
     const userId = getCurrentUserId();
     if (!userId) throw new Error("User must be logged in to create a place");
 
-    const sanitizedPlace = Object.fromEntries(
-      Object.entries(place).filter(([_, v]) => v !== undefined)
-    )
+    const sanitizedPlace = sanitizeUndefined(place)
     const docRef = await addDoc(collection(db, 'places'), {
       ...sanitizedPlace,
       userId,
@@ -44,23 +62,9 @@ export async function createPlace(place: Omit<Place, 'id' | 'createdAt' | 'updat
     console.log('FirebaseService: Place created successfully with ID:', docRef.id)
 
     // Link pending uploads to this new document
-    // Check photos
-    if (place.photos && place.photos.length > 0) {
-      for (const photoUrl of place.photos) {
-        if (typeof photoUrl === 'string' && photoUrl.startsWith('urn:stowaway:pending:')) {
-          const pendingId = photoUrl.split(':').pop();
-          if (pendingId) {
-            await offlineStorage.updatePendingUpload(pendingId, {
-              metadata: {
-                collection: 'places',
-                docId: docRef.id,
-                field: 'photos'
-              }
-            });
-          }
-        }
-      }
-    }
+    await linkPendingUploads(docRef.id, 'places', {
+      photos: place.photos
+    });
 
     return docRef.id
   } catch (error) {
@@ -69,14 +73,14 @@ export async function createPlace(place: Omit<Place, 'id' | 'createdAt' | 'updat
   }
 }
 
-export async function getUserPlaces(userId: string) {
+export async function getUserPlaces(userId: string): Promise<Place[]> {
   try {
     const q = query(collection(db, 'places'), where('userId', '==', userId))
     const snapshot = await getDocs(q)
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Place[]
+    return snapshot.docs.map((doc) => {
+      const raw = { id: doc.id, ...doc.data() }
+      return PlaceSchema.parse(raw)
+    })
   } catch (error) {
     console.error('Error fetching places:', error)
     throw error
@@ -86,9 +90,7 @@ export async function getUserPlaces(userId: string) {
 export async function updatePlace(placeId: string, updates: Partial<Place>) {
   try {
     const placeRef = doc(db, 'places', placeId)
-    const sanitizedUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([_, v]) => v !== undefined)
-    )
+    const sanitizedUpdates = sanitizeUndefined(updates)
     await updateDoc(placeRef, {
       ...sanitizedUpdates,
       updatedAt: Timestamp.now(),
@@ -120,56 +122,45 @@ export async function deletePlace(placeId: string) {
 /**
  * CONTAINERS OPERATIONS
  */
-export async function createContainer(container: Omit<Container, 'id' | 'createdAt' | 'updatedAt'>) {
+export async function getContainer(id: string): Promise<Container | undefined> {
+  const docRef = doc(db, 'containers', id)
+  const docSnap = await getDoc(docRef)
+  if (docSnap.exists()) {
+    const raw = { id: docSnap.id, ...docSnap.data() }
+    return ContainerSchema.parse(raw)
+  }
+  return undefined
+}
+
+export async function createContainer(container: Omit<Container, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) {
   try {
     const userId = getCurrentUserId();
     if (!userId) throw new Error("User must be logged in to create a container");
 
-    const sanitizedContainer = Object.fromEntries(
-      Object.entries(container).filter(([_, v]) => v !== undefined)
-    )
+    const sanitizedContainer = sanitizeUndefined(container)
 
-    const docRef = await addDoc(collection(db, 'containers'), {
+    // Build the container data object
+    const containerData: any = {
       ...sanitizedContainer,
-      // Backward compatibility: ensure photoUrl is set if photos are present
-      photoUrl: container.photoUrl || (container.photos && container.photos.length > 0 ? container.photos[0] : undefined),
       userId, // Ensure userId is attached
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
-    })
+    }
+
+    // Backward compatibility: ensure photoUrl is set if photos are present
+    // Only add photoUrl if it has a value (Firestore doesn't allow undefined)
+    const photoUrl = container.photoUrl || (container.photos && container.photos.length > 0 ? container.photos[0] : null)
+    if (photoUrl) {
+      containerData.photoUrl = photoUrl
+    }
+
+    const docRef = await addDoc(collection(db, 'containers'), containerData)
 
     // Link pending uploads to this new document
-    // Check photoUrl (legacy)
-    if (container.photoUrl && typeof container.photoUrl === 'string' && container.photoUrl.startsWith('urn:stowaway:pending:')) {
-      const pendingId = container.photoUrl.split(':').pop();
-      if (pendingId) {
-        await offlineStorage.updatePendingUpload(pendingId, {
-          metadata: {
-            collection: 'containers',
-            docId: docRef.id,
-            field: 'photoUrl'
-          }
-        });
-      }
-    }
-
-    // Check photos (new multi-image)
-    if (container.photos && container.photos.length > 0) {
-      for (const photoUrl of container.photos) {
-        if (typeof photoUrl === 'string' && photoUrl.startsWith('urn:stowaway:pending:')) {
-          const pendingId = photoUrl.split(':').pop();
-          if (pendingId) {
-            await offlineStorage.updatePendingUpload(pendingId, {
-              metadata: {
-                collection: 'containers',
-                docId: docRef.id,
-                field: 'photos'
-              }
-            });
-          }
-        }
-      }
-    }
+    await linkPendingUploads(docRef.id, 'containers', {
+      photoUrl: container.photoUrl,
+      photos: container.photos
+    });
 
     return docRef.id
   } catch (error) {
@@ -182,19 +173,33 @@ export async function createContainer(container: Omit<Container, 'id' | 'created
 
 
 
-export async function getPlaceContainers(placeId: string) {
+export async function getPlaceContainers(placeId: string): Promise<Container[]> {
   try {
     const q = query(
       collection(db, 'containers'),
       where('placeId', '==', placeId)
     )
     const snapshot = await getDocs(q)
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Container[]
+    return snapshot.docs.map((doc) => {
+      const raw = { id: doc.id, ...doc.data() }
+      return ContainerSchema.parse(raw)
+    })
   } catch (error) {
     console.error('Error fetching containers:', error)
+    throw error
+  }
+}
+
+export async function getUserContainers(userId: string): Promise<Container[]> {
+  try {
+    const q = query(collection(db, 'containers'), where('userId', '==', userId))
+    const snapshot = await getDocs(q)
+    return snapshot.docs.map((doc) => {
+      const raw = { id: doc.id, ...doc.data() }
+      return ContainerSchema.parse(raw)
+    })
+  } catch (error) {
+    console.error('Error fetching user containers:', error)
     throw error
   }
 }
@@ -202,9 +207,7 @@ export async function getPlaceContainers(placeId: string) {
 export async function updateContainer(containerId: string, updates: Partial<Container>) {
   try {
     const containerRef = doc(db, 'containers', containerId)
-    const sanitizedUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([_, v]) => v !== undefined)
-    )
+    const sanitizedUpdates = sanitizeUndefined(updates)
 
     // Backward compatibility: sync first photo to photoUrl if photos are updated
     if (updates.photos && updates.photos.length > 0) {
@@ -213,6 +216,12 @@ export async function updateContainer(containerId: string, updates: Partial<Cont
       // If photos cleared, perform logic whether to clear photoUrl? 
       // For now let's assume if explicit empty array, we might want to clear it.
       // But let's be safe and only update if specifically requested.
+    }
+
+    // Ensure userId is present (fixes data consistency issues for older/bugged containers)
+    const userId = getCurrentUserId();
+    if (userId) {
+      sanitizedUpdates.userId = userId;
     }
 
     await updateDoc(containerRef, {
@@ -263,53 +272,39 @@ export async function removeQRCodeFromContainer(containerId: string) {
 /**
  * ITEMS OPERATIONS
  */
-export async function createItem(item: Omit<Item, 'id' | 'createdAt' | 'updatedAt'>) {
+export async function getItem(id: string): Promise<Item | undefined> {
+  const docRef = doc(db, 'items', id)
+  const docSnap = await getDoc(docRef)
+  if (docSnap.exists()) {
+    const raw = { id: docSnap.id, ...docSnap.data() }
+    return ItemSchema.parse(raw)
+  }
+  return undefined
+}
+
+export async function createItem(item: Omit<Item, 'id' | 'userId' | 'placeId' | 'createdAt' | 'updatedAt'>) {
   try {
     const userId = getCurrentUserId();
     if (!userId) throw new Error("User must be logged in to create an item");
 
-    const sanitizedItem = Object.fromEntries(
-      Object.entries(item).filter(([_, v]) => v !== undefined)
-    )
+    // Fetch container to get placeId for denormalization
+    const container = await getContainer(item.containerId);
+    if (!container) throw new Error("Container not found");
+
+    const sanitizedItem = sanitizeUndefined(item)
     const docRef = await addDoc(collection(db, 'items'), {
       ...sanitizedItem,
       userId,
+      placeId: container.placeId,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     })
 
     // Link pending uploads to this new document
-    // Check photos
-    if (item.photos && item.photos.length > 0) {
-      for (const photoUrl of item.photos) {
-        if (typeof photoUrl === 'string' && photoUrl.startsWith('urn:stowaway:pending:')) {
-          const pendingId = photoUrl.split(':').pop();
-          if (pendingId) {
-            await offlineStorage.updatePendingUpload(pendingId, {
-              metadata: {
-                collection: 'items',
-                docId: docRef.id,
-                field: 'photos'
-              }
-            });
-          }
-        }
-      }
-    }
-
-    // Check voice note
-    if (item.voiceNoteUrl && item.voiceNoteUrl.startsWith('urn:stowaway:pending:')) {
-      const pendingId = item.voiceNoteUrl.split(':').pop();
-      if (pendingId) {
-        await offlineStorage.updatePendingUpload(pendingId, {
-          metadata: {
-            collection: 'items',
-            docId: docRef.id,
-            field: 'voiceNoteUrl'
-          }
-        });
-      }
-    }
+    await linkPendingUploads(docRef.id, 'items', {
+      photos: item.photos,
+      voiceNoteUrl: item.voiceNoteUrl
+    });
 
     return docRef.id
   } catch (error) {
@@ -318,19 +313,98 @@ export async function createItem(item: Omit<Item, 'id' | 'createdAt' | 'updatedA
   }
 }
 
-export async function getContainerItems(containerId: string) {
+export async function getContainerItems(containerId: string): Promise<Item[]> {
   try {
     const q = query(
       collection(db, 'items'),
       where('containerId', '==', containerId)
     )
     const snapshot = await getDocs(q)
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Item[]
+    return snapshot.docs.map((doc) => {
+      const raw = { id: doc.id, ...doc.data() }
+      return ItemSchema.parse(raw)
+    })
   } catch (error) {
     console.error('Error fetching items:', error)
+    throw error
+  }
+}
+
+export async function getPlaceItems(placeId: string): Promise<Item[]> {
+  try {
+    // Direct query for items with placeId (optimized path)
+    const q = query(
+      collection(db, 'items'),
+      where('placeId', '==', placeId)
+    )
+    const snapshot = await getDocs(q)
+    const itemsWithPlaceId = snapshot.docs.map((doc) => {
+      const raw = { id: doc.id, ...doc.data() }
+      return ItemSchema.parse(raw)
+    })
+
+    // TODO: Remove this backward compatibility code once all items have been migrated to include placeId
+    // This handles legacy items created before placeId denormalization was added
+    // Get containers to check for legacy items without placeId
+    const containers = await getPlaceContainers(placeId)
+    if (containers.length === 0) {
+      return itemsWithPlaceId
+    }
+
+    // Fetch items by container (N+1 query for legacy items without placeId)
+    const itemsPromises = containers.map(c => getContainerItems(c.id))
+    const results = await Promise.all(itemsPromises)
+    const itemsByContainer = results.flat()
+
+    // Deduplicate: combine both result sets by ID
+    const itemMap = new Map<string, Item>()
+
+    // Add items from direct query
+    itemsWithPlaceId.forEach(item => itemMap.set(item.id, item))
+
+    // Add items from container queries (only if not already present)
+    itemsByContainer.forEach(item => {
+      if (!itemMap.has(item.id)) {
+        itemMap.set(item.id, item)
+      }
+    })
+
+    return Array.from(itemMap.values())
+  } catch (error) {
+    console.error('Error fetching place items:', error)
+    throw error
+  }
+}
+
+export async function getUserItems(userId: string): Promise<Item[]> {
+  try {
+    const q = query(collection(db, 'items'), where('userId', '==', userId))
+    const snapshot = await getDocs(q)
+    return snapshot.docs.map((doc) => {
+      const raw = { id: doc.id, ...doc.data() }
+      return ItemSchema.parse(raw)
+    })
+  } catch (error) {
+    console.error('Error fetching user items:', error)
+    throw error
+  }
+}
+
+export async function getRecentItems(userId: string, limitCount = 20): Promise<Item[]> {
+  try {
+    const q = query(
+      collection(db, 'items'),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    )
+    const snapshot = await getDocs(q)
+    return snapshot.docs.map((doc) => {
+      const raw = { id: doc.id, ...doc.data() }
+      return ItemSchema.parse(raw)
+    })
+  } catch (error) {
+    console.error('Error fetching recent items:', error)
     throw error
   }
 }
@@ -338,9 +412,7 @@ export async function getContainerItems(containerId: string) {
 export async function updateItem(itemId: string, updates: Partial<Item>) {
   try {
     const itemRef = doc(db, 'items', itemId)
-    const sanitizedUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([_, v]) => v !== undefined)
-    )
+    const sanitizedUpdates = sanitizeUndefined(updates)
     await updateDoc(itemRef, {
       ...sanitizedUpdates,
       updatedAt: Timestamp.now(),
@@ -363,14 +435,12 @@ export async function deleteItem(itemId: string) {
 /**
  * GROUPS OPERATIONS
  */
-export async function createGroup(group: Omit<Group, 'id' | 'createdAt' | 'updatedAt'>) {
+export async function createGroup(group: Omit<Group, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) {
   try {
     const userId = getCurrentUserId();
     if (!userId) throw new Error("User must be logged in to create a group");
 
-    const sanitizedGroup = Object.fromEntries(
-      Object.entries(group).filter(([_, v]) => v !== undefined)
-    )
+    const sanitizedGroup = sanitizeUndefined(group)
     const docRef = await addDoc(collection(db, 'groups'), {
       ...sanitizedGroup,
       userId,
@@ -384,14 +454,14 @@ export async function createGroup(group: Omit<Group, 'id' | 'createdAt' | 'updat
   }
 }
 
-export async function getUserGroups(userId: string) {
+export async function getUserGroups(userId: string): Promise<Group[]> {
   try {
     const q = query(collection(db, 'groups'), where('userId', '==', userId))
     const snapshot = await getDocs(q)
-    return snapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...doc.data(),
-    })) as Group[]
+    return snapshot.docs.map((doc) => {
+      const raw = { id: doc.id, ...doc.data() }
+      return GroupSchema.parse(raw)
+    })
   } catch (error) {
     console.error('Error fetching user groups:', error)
     throw error
@@ -401,9 +471,7 @@ export async function getUserGroups(userId: string) {
 export async function updateGroup(groupId: string, updates: Partial<Group>) {
   try {
     const groupRef = doc(db, 'groups', groupId)
-    const sanitizedUpdates = Object.fromEntries(
-      Object.entries(updates).filter(([_, v]) => v !== undefined)
-    )
+    const sanitizedUpdates = sanitizeUndefined(updates)
     await updateDoc(groupRef, {
       ...sanitizedUpdates,
       updatedAt: Timestamp.now(),
@@ -439,6 +507,37 @@ export async function deleteGroup(groupId: string, type: 'place' | 'container' |
 }
 
 /**
+ * PENDING UPLOAD HELPERS
+ */
+// Helper to link pending uploads to a created document
+async function linkPendingUploads(
+  docId: string,
+  collection: string,
+  fields: Record<string, string | string[] | undefined>
+): Promise<void> {
+  for (const [fieldName, value] of Object.entries(fields)) {
+    if (!value) continue;
+
+    const urls = Array.isArray(value) ? value : [value];
+
+    for (const url of urls) {
+      if (typeof url === 'string' && url.startsWith('urn:stowaway:pending:')) {
+        const pendingId = url.split(':').pop();
+        if (pendingId) {
+          await offlineStorage.updatePendingUpload(pendingId, {
+            metadata: {
+              collection,
+              docId,
+              field: fieldName
+            }
+          });
+        }
+      }
+    }
+  }
+}
+
+/**
  * STORAGE OPERATIONS
  */
 // Helper to queue upload for background sync
@@ -453,9 +552,8 @@ async function queueBackgroundUpload(file: File, path: string, type: 'image' | '
     createdAt: Date.now()
   });
 
-  // Notify user
-  // We use the store directly since this is a service file
-  useUIStore.getState().showToast('No network connection - changes will be saved once reconnected', 'info');
+  // NOTE: Calling UI code (toasts) has been removed from here to decouple the service layer.
+  // The caller is responsible for notifying the user if a file is queued for offline upload.
 
   return `urn:stowaway:pending:${tempId}`;
 }

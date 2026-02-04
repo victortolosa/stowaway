@@ -2,14 +2,18 @@ import { useNavigate } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/auth'
-import { useInventoryStore } from '@/store/inventory'
+import { usePlaces } from '@/hooks/queries/usePlaces'
+import { useAllContainers } from '@/hooks/queries/useAllContainers'
+import { useAllItems } from '@/hooks/queries/useAllItems'
 import { User, LogOut, MapPin, Package, Box, WifiOff } from 'lucide-react'
 import { Card } from '@/components/ui'
 
 export function Profile() {
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
-  const { places, containers, items } = useInventoryStore()
+  const { data: places = [] } = usePlaces()
+  const { data: containers = [] } = useAllContainers()
+  const { data: items = [] } = useAllItems()
 
   const handleLogout = async () => {
     try {

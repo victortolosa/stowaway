@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useInventory, useSearch, SearchDataItem } from '@/hooks'
+import { useSearch, SearchDataItem } from '@/hooks'
+import { usePlaces } from '@/hooks/queries/usePlaces'
+import { useAllContainers } from '@/hooks/queries/useAllContainers'
+import { useAllItems } from '@/hooks/queries/useAllItems'
+import { LoadingState } from '@/components/ui'
 import { SearchFilterType } from '@/hooks/useSearch'
 import { Item, Container, Place } from '@/types'
 import { Search as SearchIcon, Package, Home, Briefcase, Archive, MapPin, QrCode, Mic, Camera } from 'lucide-react'
@@ -37,19 +41,34 @@ const getContainerColor = (index: number) => {
 
 export function Search() {
   const navigate = useNavigate()
-  const { items: allItems, containers: allContainers, places: allPlaces } = useInventory()
+
+  const { data: allPlaces = [], isLoading: isPlacesLoading } = usePlaces()
+  const { data: allContainers = [], isLoading: isContainersLoading } = useAllContainers()
+  const { data: allItems = [], isLoading: isItemsLoading } = useAllItems()
+
+  const isLoading = isPlacesLoading || isContainersLoading || isItemsLoading
+
   const [query, setQuery] = useState('')
   const [filterType, setFilterType] = useState<SearchFilterType>('all')
   const [hasPhoto, setHasPhoto] = useState(false)
   const [hasAudio, setHasAudio] = useState(false)
 
   const searchResults = useSearch(query, {
+    items: allItems,
+    containers: allContainers,
+    places: allPlaces
+  }, {
     filters: {
       type: filterType,
       hasPhoto,
       hasAudio
     }
   })
+
+  // Prevent flash of empty content while loading initial data
+  if (isLoading && !query) {
+    return <LoadingState message="Preparing search..." />
+  }
 
   // Group results for display
   const searchedItems = searchResults

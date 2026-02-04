@@ -22,30 +22,30 @@ export function ItemCard({
         <Card
             padding="none"
             variant="interactive"
-            className={`overflow-hidden flex flex-col h-full ${className}`}
+            className={`overflow-hidden flex flex-col h-full group ${className}`}
             onClick={onClick}
         >
-            {/* Image */}
             {item.photos && item.photos[0] ? (
-                <img
-                    src={item.photos[0]}
-                    alt={item.name}
-                    className="w-full h-[140px] object-cover bg-gray-100"
-                />
+                <div className="w-full aspect-[4/3] relative overflow-hidden bg-bg-surface-alt">
+                    <img
+                        src={item.photos[0]}
+                        alt={item.name}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                </div>
             ) : (
-                <div className="w-full h-[140px] bg-bg-elevated flex items-center justify-center">
-                    <Package size={32} className="text-text-tertiary" strokeWidth={2} />
+                <div className="w-full aspect-[4/3] bg-bg-surface-alt flex items-center justify-center border-b border-border-light">
+                    <Package size={24} className="text-text-tertiary opacity-50" strokeWidth={1.5} />
                 </div>
             )}
 
-            {/* Content */}
-            <div className="p-4 flex flex-col gap-2 flex-1">
-                <div className="flex items-center gap-2">
-                    <h3 className="font-body text-[15px] font-semibold text-text-primary truncate flex-1">
+            <div className="p-4 flex flex-col gap-2 flex-1 min-h-0">
+                <div className="flex items-start justify-between gap-2">
+                    <h3 className="font-display text-[16px] font-semibold text-text-primary truncate leading-snug flex-1">
                         {item.name}
                     </h3>
                     {item.voiceNoteUrl && (
-                        <Mic size={14} className="text-accent-aqua flex-shrink-0" />
+                        <Mic size={14} className="text-accent-aqua flex-shrink-0 mt-0.5" />
                     )}
                 </div>
 
@@ -56,15 +56,21 @@ export function ItemCard({
                 )}
 
                 {!location && item.tags && item.tags.length > 0 && (
-                    <p className="font-body text-[12px] text-text-tertiary truncate">
-                        {item.tags.join(', ')}
-                    </p>
+                    <div className="flex flex-wrap gap-1.5 overflow-hidden h-[20px]">
+                        {item.tags.slice(0, 2).map(tag => (
+                            <span key={tag} className="text-[11px] bg-bg-subtle text-text-secondary px-2 py-0.5 rounded-full font-medium border border-border-light">
+                                #{tag}
+                            </span>
+                        ))}
+                    </div>
                 )}
 
                 {showDate && (
-                    <span className="font-body text-[12px] text-text-tertiary mt-auto">
-                        {formatTimeAgo(item.createdAt)}
-                    </span>
+                    <div className="mt-auto pt-3 border-t border-border-light/50 flex items-center justify-between">
+                        <span className="font-body text-[12px] text-text-tertiary">
+                            {formatTimeAgo(item.createdAt)}
+                        </span>
+                    </div>
                 )}
             </div>
         </Card>

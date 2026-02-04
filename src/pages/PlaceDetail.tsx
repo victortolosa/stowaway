@@ -2,26 +2,48 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
 import { CreateContainerModal, CreatePlaceModal, ConfirmDeleteModal, CreateGroupModal, Breadcrumbs } from '@/components'
-import { useInventory } from '@/hooks'
-import { deleteContainer, deletePlace, deleteGroup } from '@/services/firebaseService'
+import { usePlace } from '@/hooks/queries/usePlaces'
+import { usePlaceContainers } from '@/hooks/queries/useContainers'
+import { usePlaceItems } from '@/hooks/queries/useItems'
+import { useGroups } from '@/hooks/queries/useGroups'
+import { useQueryClient } from '@tanstack/react-query'
+import { deleteContainer, deletePlace, deleteGroup, updatePlace } from '@/services/firebaseService'
 import { Container, Group } from '@/types'
-import { MoreVertical, ChevronRight, Package, Plus, QrCode, Search, Mic, FolderPlus, Pencil } from 'lucide-react'
-import { Button, Card, IconBadge, EmptyState, LoadingState, Badge, NavigationHeader, ImageCarousel, ImageGrid, Modal } from '@/components/ui'
-import { Timestamp } from 'firebase/firestore'
+import { PLACE_KEYS } from '@/hooks/queries/usePlaces'
+import { CONTAINER_KEYS } from '@/hooks/queries/useContainers'
+import { ITEM_KEYS } from '@/hooks/queries/useItems'
+import { GROUP_KEYS } from '@/hooks/queries/useGroups'
+import { MoreVertical, Plus, Search, FolderPlus } from 'lucide-react'
+import { Button, EmptyState, LoadingState, NavigationHeader, Modal, GalleryEditor } from '@/components/ui'
+import { PlaceHero } from '@/components/features/place/PlaceHero'
+import { ContainerList } from '@/components/features/place/ContainerList'
+import { PlaceItemsList } from '@/components/features/place/PlaceItemsList'
+import { useSearchFilter } from '@/hooks/useSearchFilter'
 
-// Helper to convert Firestore Timestamp to Date
-const toDate = (timestamp: Date | Timestamp): Date => {
-    if (timestamp instanceof Timestamp) {
-        return timestamp.toDate()
-    }
-    return timestamp instanceof Date ? timestamp : new Date(timestamp)
-}
 
 export function PlaceDetail() {
     const { id } = useParams<{ id: string }>()
     const user = useAuthStore((state) => state.user)
-    const { places, containers, items, groups, isLoading, refresh } = useInventory()
+    const queryClient = useQueryClient()
     const navigate = useNavigate()
+
+    // Fetch data using React Query
+    const { data: place, isLoading: isPlaceLoading } = usePlace(id!)
+    const { data: containers = [], isLoading: isContainersLoading } = usePlaceContainers(id!)
+    const { data: items = [], isLoading: isItemsLoading } = usePlaceItems(id!)
+    const { data: groups = [], isLoading: isGroupsLoading } = useGroups()
+
+    const isLoading = isPlaceLoading || isContainersLoading || isItemsLoading || isGroupsLoading
+
+    const refresh = async () => {
+        await Promise.all([
+            queryClient.invalidateQueries({ queryKey: PLACE_KEYS.detail(id!) }),
+            // Invalidate all container queries to ensure Dashboard (useAllContainers) is updated
+            queryClient.invalidateQueries({ queryKey: CONTAINER_KEYS.all }),
+            queryClient.invalidateQueries({ queryKey: ITEM_KEYS.byPlace(id!) }),
+            queryClient.invalidateQueries({ queryKey: GROUP_KEYS.list(user?.uid || '') })
+        ])
+    }
 
     const [isCreateContainerOpen, setIsCreateContainerOpen] = useState(false)
     const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
@@ -41,6 +63,27 @@ export function PlaceDetail() {
     const [isDeletingGroup, setIsDeletingGroup] = useState(false)
     const [showGallery, setShowGallery] = useState(false)
 
+    const placeContainers = containers // Already filtered by hook
+    const placeGroups = (groups || []).filter((g) => g.parentId === id && g.type === 'container')
+
+    // Filter content based on search query
+    const filteredContainers = useSearchFilter({
+        data: placeContainers,
+        searchQuery,
+        searchKeys: ['name']
+    })
+
+    // For items, we only want to show them if there is a search query
+    const allPlaceItems = useSearchFilter({
+        data: items,
+        searchQuery,
+        searchKeys: ['name', 'description', 'tags'],
+        additionalFilter: (item) => placeContainers.some(c => c.id === item.containerId)
+    })
+
+    // Only show items if searching
+    const filteredItems = searchQuery ? allPlaceItems : []
+
     if (!user || !id) {
         return <LoadingState />
     }
@@ -49,9 +92,6 @@ export function PlaceDetail() {
         return <LoadingState message="Loading place..." />
     }
 
-    const place = places.find((p) => p.id === id)
-    const placeContainers = containers.filter((c) => c.placeId === id)
-    const placeGroups = (groups || []).filter((g) => g.parentId === id && g.type === 'container')
 
     if (!place) {
         return <div>Place not found</div>
@@ -61,32 +101,6 @@ export function PlaceDetail() {
         placeContainers.some((c) => c.id === item.containerId)
     ).length
 
-    // Filter content based on search query
-    const filteredContainers = placeContainers.filter(container =>
-        !searchQuery || container.name.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-
-    const filteredItems = items.filter(item => {
-        if (!searchQuery) return false
-        const isInPlace = placeContainers.some(c => c.id === item.containerId)
-        if (!isInPlace) return false
-
-        const query = searchQuery.toLowerCase()
-        return (
-            item.name.toLowerCase().includes(query) ||
-            item.description?.toLowerCase().includes(query) ||
-            item.tags.some(tag => tag.toLowerCase().includes(query))
-        )
-    })
-
-    const getContainerColor = (index: number) => {
-        const colors = ['#3B82F6', '#3B82F6', '#3B82F6', '#18181B', '#F59E0B']
-        return colors[index % colors.length]
-    }
-
-    const getContainerItemCount = (containerId: string) => {
-        return (items || []).filter((item) => item.containerId === containerId).length
-    }
 
     const handleDeletePlace = async () => {
         setIsDeletingPlace(true)
@@ -128,7 +142,7 @@ export function PlaceDetail() {
     }
 
     return (
-        <div className="flex flex-col h-full pb-48">
+        <div className="flex flex-col h-full pb-48 w-full max-w-full">
             {/* Header */}
             <NavigationHeader
                 backTo="/dashboard"
@@ -168,7 +182,7 @@ export function PlaceDetail() {
                 }
             />
 
-            <div className="px-1">
+            <div className="pb-2">
                 <Breadcrumbs
                     items={[
                         { label: 'Places', path: '/places' },
@@ -178,51 +192,18 @@ export function PlaceDetail() {
             </div>
 
             {/* Place Hero */}
-            {place.photos && place.photos.length > 0 ? (
-                <div className="mb-6 px-1">
-                    <div className="rounded-2xl overflow-hidden aspect-[21/9] mb-4 shadow-sm border border-border-light bg-bg-surface">
-                        <ImageCarousel
-                            images={place.photos}
-                            alt={place.name}
-                            onImageClick={() => setShowGallery(true)}
-                        />
-                    </div>
-                    <div className="flex items-center gap-4">
-                        <div className="flex flex-col gap-0.5">
-                            <span className="text-[10px] font-bold tracking-wider text-text-tertiary uppercase">
-                                Place
-                            </span>
-                            <h1 className="font-display text-[24px] font-bold text-text-primary leading-tight">
-                                {place.name}
-                            </h1>
-                            <p className="font-body text-[13px] text-text-secondary">
-                                {placeContainers.length} containers · {totalItems} items
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            ) : (
-                <div className="flex items-center gap-4 mb-6 px-1">
-                    <IconBadge icon={Package} color="#14B8A6" size="md" />
-                    <div className="flex flex-col gap-0.5">
-                        <span className="text-[10px] font-bold tracking-wider text-text-tertiary uppercase">
-                            Place
-                        </span>
-                        <h1 className="font-display text-[24px] font-bold text-text-primary leading-tight">
-                            {place.name}
-                        </h1>
-                        <p className="font-body text-[13px] text-text-secondary">
-                            {placeContainers.length} containers · {totalItems} items
-                        </p>
-                    </div>
-                </div>
-            )}
+            <PlaceHero
+                place={place}
+                containerCount={placeContainers.length}
+                itemCount={totalItems}
+                onImageClick={() => setShowGallery(true)}
+            />
 
             {/* Search Bar */}
             {(placeContainers.length > 0 || totalItems > 0) && (
                 <>
                     <div className="mb-4">
-                        <div className="bg-white rounded-xl h-[48px] px-4 flex items-center gap-3 shadow-sm border border-black/5 focus-within:border-accent-aqua focus-within:shadow-md transition-all duration-200">
+                        <div className="bg-bg-surface rounded-xl h-[48px] px-4 flex items-center gap-3 shadow-sm border border-border-light focus-within:border-accent-aqua focus-within:shadow-md transition-all duration-200">
                             <Search size={20} className="text-accent-aqua" strokeWidth={2.5} />
                             <input
                                 type="text"
@@ -235,7 +216,7 @@ export function PlaceDetail() {
                     </div>
 
                     {!searchQuery && (
-                        <div className="flex gap-3 mb-6">
+                        <div className="flex gap-3 mb-8">
                             <Button
                                 variant="secondary"
                                 size="sm"
@@ -260,198 +241,23 @@ export function PlaceDetail() {
             )}
 
             {/* Content Section */}
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-8">
                 {/* Containers Section */}
-                {(filteredContainers.length > 0 || !searchQuery) && (
-                    <div className="flex flex-col gap-4">
-                        <div className="flex justify-between items-center">
-                            <h2 className="font-display text-[20px] font-bold text-text-primary">
-                                {searchQuery ? 'Search Results' : 'Containers'}
-                            </h2>
-                        </div>
-
-                        {placeContainers.length === 0 ? (
-                            <EmptyState
-                                message="No containers in this place yet"
-                                actionLabel="Add Your First Container"
-                                onAction={() => setIsCreateContainerOpen(true)}
-                            />
-                        ) : (
-                            <div className="flex flex-col gap-6">
-                                {/* Groups Section */}
-                                {placeGroups.length > 0 && (
-                                    <div className="flex flex-col gap-3">
-                                        {placeGroups.map((group) => {
-                                            const groupContainers = filteredContainers.filter(c => c.groupId === group.id)
-                                            if (searchQuery && groupContainers.length === 0) return null
-
-                                            return (
-                                                <div key={group.id} className="flex flex-col gap-3">
-                                                    <div className="flex items-center justify-between px-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <h3 className="font-display text-[18px] font-bold text-text-primary">
-                                                                {group.name}
-                                                            </h3>
-                                                            <span className="text-sm text-text-tertiary">
-                                                                ({groupContainers.length})
-                                                            </span>
-                                                        </div>
-                                                        <button
-                                                            onClick={() => setEditingGroup(group)}
-                                                            className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
-                                                        >
-                                                            <Pencil size={16} strokeWidth={2} />
-                                                        </button>
-                                                    </div>
-
-                                                    <div className="pl-4 border-l-2 border-border-standard ml-2">
-                                                        <div className="flex flex-col gap-3">
-                                                            {groupContainers.map((container, index) => (
-                                                                <Card
-                                                                    key={container.id}
-                                                                    variant="interactive"
-                                                                    onClick={() => navigate(`/containers/${container.id}`)}
-                                                                    className="flex items-center gap-[14px]"
-                                                                >
-                                                                    <IconBadge icon={Package} color={getContainerColor(index)} />
-                                                                    <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <h3 className="font-body text-[16px] font-semibold text-text-primary">
-                                                                                {container.name}
-                                                                            </h3>
-                                                                            {container.qrCodeId && (
-                                                                                <div className="flex items-center gap-1 px-2 py-0.5 bg-accent-aqua/10 rounded-full">
-                                                                                    <QrCode size={12} className="text-accent-aqua" strokeWidth={2} />
-                                                                                    <span className="text-[10px] font-medium text-accent-aqua">QR</span>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                        <p className="font-body text-[13px] text-text-secondary">
-                                                                            {getContainerItemCount(container.id)} items · Last updated{' '}
-                                                                            {(() => {
-                                                                                const date = toDate(container.lastAccessed)
-                                                                                const now = new Date()
-                                                                                const diffMs = now.getTime() - date.getTime()
-                                                                                const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-                                                                                if (diffDays === 0) return 'today'
-                                                                                if (diffDays === 1) return 'yesterday'
-                                                                                return `${diffDays}d ago`
-                                                                            })()}
-                                                                        </p>
-                                                                    </div>
-                                                                    <ChevronRight size={20} className="text-text-tertiary" strokeWidth={2} />
-                                                                </Card>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                )}
-
-                                {/* Ungrouped Containers */}
-                                <div className="flex flex-col gap-3">
-                                    {filteredContainers.filter(c => !c.groupId).map((container, index) => (
-                                        <Card
-                                            key={container.id}
-                                            variant="interactive"
-                                            onClick={() => navigate(`/containers/${container.id}`)}
-                                            className="flex items-center gap-[14px]"
-                                        >
-                                            <IconBadge icon={Package} color={getContainerColor(index)} />
-                                            <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                                <div className="flex items-center gap-2">
-                                                    <h3 className="font-body text-[16px] font-semibold text-text-primary">
-                                                        {container.name}
-                                                    </h3>
-                                                    {container.qrCodeId && (
-                                                        <div className="flex items-center gap-1 px-2 py-0.5 bg-accent-aqua/10 rounded-full">
-                                                            <QrCode size={12} className="text-accent-aqua" strokeWidth={2} />
-                                                            <span className="text-[10px] font-medium text-accent-aqua">QR</span>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <p className="font-body text-[13px] text-text-secondary">
-                                                    {getContainerItemCount(container.id)} items · Last updated{' '}
-                                                    {(() => {
-                                                        const date = toDate(container.lastAccessed)
-                                                        const now = new Date()
-                                                        const diffMs = now.getTime() - date.getTime()
-                                                        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-                                                        if (diffDays === 0) return 'today'
-                                                        if (diffDays === 1) return 'yesterday'
-                                                        return `${diffDays}d ago`
-                                                    })()}
-                                                </p>
-                                            </div>
-                                            <ChevronRight size={20} className="text-text-tertiary" strokeWidth={2} />
-                                        </Card>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
+                <ContainerList
+                    containers={filteredContainers}
+                    groups={placeGroups}
+                    items={items}
+                    searchQuery={searchQuery}
+                    onEditGroup={setEditingGroup}
+                    onAddContainer={() => setIsCreateContainerOpen(true)}
+                />
 
                 {/* Items Search Results */}
-                {searchQuery && filteredItems.length > 0 && (
-                    <div className="flex flex-col gap-4">
-                        <div className="flex justify-between items-center">
-                            <h2 className="font-display text-[20px] font-bold text-text-primary">
-                                Items ({filteredItems.length})
-                            </h2>
-                        </div>
-                        <div className="flex flex-col gap-3">
-                            {filteredItems.map((item) => (
-                                <Card
-                                    key={item.id}
-                                    variant="interactive"
-                                    padding="sm"
-                                    onClick={() => navigate(`/items/${item.id}`)}
-                                >
-                                    <div className="flex items-center gap-[14px]">
-                                        {item.photos[0] ? (
-                                            <img
-                                                src={item.photos[0]}
-                                                alt={item.name}
-                                                className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
-                                            />
-                                        ) : (
-                                            <div className="w-16 h-16 bg-bg-elevated rounded-xl flex items-center justify-center flex-shrink-0">
-                                                <Package size={28} className="text-text-tertiary" strokeWidth={2} />
-                                            </div>
-                                        )}
-                                        <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                            <div className="flex items-center gap-2">
-                                                <h3 className="font-body text-[16px] font-semibold text-text-primary truncate">
-                                                    {item.name}
-                                                </h3>
-                                                {item.voiceNoteUrl && (
-                                                    <Mic size={14} className="text-accent-aqua flex-shrink-0" />
-                                                )}
-                                            </div>
-                                            {/* Show which container it's in */}
-                                            <p className="font-body text-[13px] text-text-secondary line-clamp-1">
-                                                in {placeContainers.find(c => c.id === item.containerId)?.name}
-                                            </p>
-                                            {item.tags.length > 0 && (
-                                                <div className="flex gap-1 mt-1">
-                                                    {item.tags.slice(0, 2).map((tag) => (
-                                                        <Badge key={tag} variant="success" size="sm">
-                                                            {tag}
-                                                        </Badge>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                        <ChevronRight size={20} className="text-text-tertiary flex-shrink-0" strokeWidth={2} />
-                                    </div>
-                                </Card>
-                            ))}
-                        </div>
-                    </div>
-                )}
+                <PlaceItemsList
+                    items={filteredItems}
+                    containers={placeContainers}
+                    searchQuery={searchQuery}
+                />
 
                 {/* No Matches State */}
                 {searchQuery && filteredContainers.length === 0 && filteredItems.length === 0 && (
@@ -569,12 +375,19 @@ export function PlaceDetail() {
                 description={`${place.photos?.length || 0} photos`}
             >
                 <div className="max-h-[60vh] overflow-y-auto p-1">
-                    <ImageGrid
+                    <GalleryEditor
                         images={place.photos || []}
-                        alt={place.name}
-                        onImageClick={(index) => {
-                            // Optional: Could open a full screen lightbox here
-                            console.log('Clicked image index:', index)
+                        onUpdate={async (newImages) => {
+                            // Optimistic update locally? 
+                            // Since we use react-query, we should mutate. 
+                            // For now, let's just save and refresh.
+                            try {
+                                await updatePlace(place.id, { photos: newImages })
+                                await refresh()
+                            } catch (error) {
+                                console.error('Failed to update photos:', error)
+                                alert('Failed to update gallery')
+                            }
                         }}
                     />
                 </div>

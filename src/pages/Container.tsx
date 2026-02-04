@@ -1,21 +1,49 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
-import { useInventory } from '@/hooks'
+import { useContainer } from '@/hooks/queries/useContainers'
+import { useContainerItems } from '@/hooks/queries/useItems'
+import { usePlace } from '@/hooks/queries/usePlaces'
+import { useGroups } from '@/hooks/queries/useGroups'
+import { useQueryClient } from '@tanstack/react-query'
+import { CONTAINER_KEYS } from '@/hooks/queries/useContainers'
+import { ITEM_KEYS } from '@/hooks/queries/useItems'
+import { GROUP_KEYS } from '@/hooks/queries/useGroups'
 import { CreateItemModal, CreateContainerModal, ConfirmDeleteModal, CreateGroupModal, Breadcrumbs } from '@/components'
 import { QRLabelModal } from '@/components/QRLabelModal'
 import { QRManageModal } from '@/components/QRManageModal'
-import { deleteContainer, deleteItem, deleteGroup } from '@/services/firebaseService'
+import { updateContainer, deleteContainer, deleteItem, deleteGroup } from '@/services/firebaseService'
 import { Item, Group } from '@/types'
 import { Pencil, Trash2, Package, Plus, QrCode, Search, FolderPlus } from 'lucide-react'
-import { IconBadge, EmptyState, LoadingState, Button, NavigationHeader, ImageCarousel, ImageGrid, Modal } from '@/components/ui'
+import { IconBadge, EmptyState, LoadingState, Button, NavigationHeader, ImageCarousel, Modal, GalleryEditor } from '@/components/ui'
 import { ItemCard } from '@/components/ItemCard'
+import { useSearchFilter } from '@/hooks/useSearchFilter'
 
 export function Container() {
   const { id } = useParams<{ id: string }>()
   const user = useAuthStore((state) => state.user)
-  const { containers, items, groups, places, isLoading, refresh } = useInventory()
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
+
+  const { data: container, isLoading: isContainerLoading } = useContainer(id!)
+  const { data: items = [], isLoading: isItemsLoading } = useContainerItems(id!)
+  const { data: groups = [], isLoading: isGroupsLoading } = useGroups()
+
+  // We need place to show breadcrumbs.
+  // container?.placeId might be undefined initially
+  const { data: place } = usePlace(container?.placeId || '')
+
+  const isLoading = isContainerLoading || isItemsLoading || isGroupsLoading
+
+  const refresh = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: CONTAINER_KEYS.detail(id!) }),
+      // Also invalidate list queries to ensure Dashboard is updated if we edit container name/photos
+      queryClient.invalidateQueries({ queryKey: CONTAINER_KEYS.all }),
+      queryClient.invalidateQueries({ queryKey: ITEM_KEYS.byContainer(id!) }),
+      queryClient.invalidateQueries({ queryKey: GROUP_KEYS.list(user?.uid || '') })
+    ])
+  }
 
   const [isCreateItemOpen, setIsCreateItemOpen] = useState(false)
   const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
@@ -36,6 +64,16 @@ export function Container() {
   const [isDeletingGroup, setIsDeletingGroup] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
+  const containerItems = items // Already filtered by hook
+  const containerGroups = (groups || []).filter((g) => g.parentId === id && g.type === 'item')
+
+  // Filter items based on search query
+  const filteredItems = useSearchFilter({
+    data: containerItems,
+    searchQuery,
+    searchKeys: ['name', 'description', 'tags']
+  })
+
   if (!user || !id) {
     return <LoadingState />
   }
@@ -43,22 +81,6 @@ export function Container() {
   if (isLoading) {
     return <LoadingState message="Loading container..." />
   }
-
-  const container = containers.find((c) => c.id === id)
-  const place = container ? places.find((p) => p.id === container.placeId) : null
-  const containerItems = items.filter((i) => i.containerId === id)
-  const containerGroups = (groups || []).filter((g) => g.parentId === id && g.type === 'item')
-
-  // Filter items based on search query
-  const filteredItems = containerItems.filter((item) => {
-    if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
-    return (
-      item.name.toLowerCase().includes(query) ||
-      item.description?.toLowerCase().includes(query) ||
-      item.tags.some(tag => tag.toLowerCase().includes(query))
-    )
-  })
 
   if (!container) {
     return <div>Container not found</div>
@@ -108,7 +130,7 @@ export function Container() {
   }
 
   return (
-    <div className="flex flex-col h-full pb-48">
+    <div className="flex flex-col h-full pb-48 w-full max-w-full">
       {/* Header */}
       <NavigationHeader
         backTo={`/places/${place?.id}`}
@@ -142,7 +164,7 @@ export function Container() {
         }
       />
 
-      <div className="px-1">
+      <div className="pb-2">
         <Breadcrumbs
           items={[
             { label: 'Places', path: '/places' },
@@ -154,8 +176,8 @@ export function Container() {
 
       {/* Container Hero */}
       {container.photos && container.photos.length > 0 ? (
-        <div className="mb-6 px-1">
-          <div className="rounded-2xl overflow-hidden aspect-[21/9] mb-4 shadow-sm border border-border-light bg-bg-surface">
+        <div className="mb-6">
+          <div className="rounded-2xl overflow-hidden aspect-[21/9] mb-6 shadow-sm border border-border-light bg-bg-surface">
             <ImageCarousel
               images={container.photos}
               alt={container.name}
@@ -163,30 +185,30 @@ export function Container() {
             />
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex flex-col gap-0.5">
-              <span className="text-[10px] font-bold tracking-wider text-text-tertiary uppercase">
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-bold tracking-wider text-text-tertiary uppercase">
                 Container
               </span>
-              <h1 className="font-display text-[24px] font-bold text-text-primary leading-tight">
+              <h1 className="h1 text-text-primary">
                 {container.name}
               </h1>
-              <p className="font-body text-[13px] text-text-secondary">
+              <p className="text-body-sm text-text-secondary">
                 {containerItems.length} items · {place?.name}
               </p>
             </div>
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-4 mb-6 px-1">
-          <IconBadge icon={Package} color="#3B82F6" size="md" />
-          <div className="flex flex-col gap-0.5">
-            <span className="text-[10px] font-bold tracking-wider text-text-tertiary uppercase">
+        <div className="flex items-center gap-4 mb-8">
+          <IconBadge icon={Package} color="var(--color-accent-blue)" size="md" />
+          <div className="flex flex-col gap-1">
+            <span className="text-[11px] font-bold tracking-wider text-text-tertiary uppercase">
               Container
             </span>
-            <h1 className="font-display text-[24px] font-bold text-text-primary leading-tight">
+            <h1 className="h1 text-text-primary">
               {container.name}
             </h1>
-            <p className="font-body text-[13px] text-text-secondary">
+            <p className="text-body-sm text-text-secondary">
               {containerItems.length} items · {place?.name}
             </p>
           </div>
@@ -195,7 +217,7 @@ export function Container() {
 
       {/* Search Bar */}
       <div className="mb-4">
-        <div className="bg-white rounded-xl h-[48px] px-4 flex items-center gap-3 shadow-sm border border-black/5 focus-within:border-accent-aqua focus-within:shadow-md transition-all duration-200">
+        <div className="bg-bg-surface rounded-xl h-[48px] px-4 flex items-center gap-3 shadow-sm border border-border-light focus-within:border-accent-aqua focus-within:shadow-md transition-all duration-200">
           <Search size={20} className="text-accent-aqua" strokeWidth={2.5} />
           <input
             type="text"
@@ -209,7 +231,7 @@ export function Container() {
 
       {/* Quick Actions */}
       {!searchQuery && (
-        <div className="flex gap-3 mb-6">
+        <div className="flex gap-3 mb-8">
           <Button
             variant="secondary"
             size="sm"
@@ -234,8 +256,8 @@ export function Container() {
       {/* Items Section */}
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-4">
-          <div className="flex justify-between items-center">
-            <h2 className="font-display text-[20px] font-bold text-text-primary">
+          <div className="flex justify-between items-center mb-2">
+            <h2 className="h2 text-text-primary">
               {searchQuery ? 'Search Results' : 'Items'}
             </h2>
           </div>
@@ -432,9 +454,17 @@ export function Container() {
         description={`${container.photos?.length || 0} photos`}
       >
         <div className="max-h-[60vh] overflow-y-auto p-1">
-          <ImageGrid
+          <GalleryEditor
             images={container.photos || []}
-            alt={container.name}
+            onUpdate={async (newImages) => {
+              try {
+                await updateContainer(container.id, { photos: newImages })
+                await refresh()
+              } catch (error) {
+                console.error('Failed to update photos:', error)
+                alert('Failed to update gallery')
+              }
+            }}
           />
         </div>
         <div className="flex justify-end mt-4">

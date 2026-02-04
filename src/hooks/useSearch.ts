@@ -1,6 +1,5 @@
 import { useMemo } from 'react'
 import Fuse from 'fuse.js'
-import { useInventoryStore } from '@/store/inventory'
 import { Item, Container, Place } from '@/types'
 
 export type SearchFilterType = 'all' | 'item' | 'container' | 'place'
@@ -33,8 +32,15 @@ interface SearchOptions {
 /**
  * Hook for fuzzy searching across places, containers, and items
  */
-export function useSearch(query: string, options?: SearchOptions) {
-  const { places, containers, items } = useInventoryStore()
+/**
+ * Hook for fuzzy searching across places, containers, and items
+ */
+export function useSearch(
+  query: string,
+  data: { items: Item[], containers: Container[], places: Place[] },
+  options?: SearchOptions
+) {
+  const { items, containers, places } = data
   const threshold = options?.threshold
   const limit = options?.limit
   const filters = options?.filters

@@ -1,35 +1,38 @@
 @import "tailwindcss";
 
+/* Tailwind v4 uses @theme directive for custom design tokens */
 @theme {
   /* Colors */
   --color-bg-page: #F8F9FA;
-  /* Soft off-white, not harsh white */
   --color-bg-surface: #FFFFFF;
-  /* Pure white for cards */
-  --color-bg-elevated: #F4F4F5;
-  /* Slightly gray for hover/active */
+  --color-bg-surface-alt: #FAFAFA;
+  --color-bg-elevated: #FFFFFF;
+  --color-bg-subtle: #F4F4F5;
 
   --color-text-primary: #18181B;
-  /* Zinc 900 */
   --color-text-secondary: #71717A;
-  /* Zinc 500 */
   --color-text-tertiary: #A1A1AA;
-  /* Zinc 400 */
+  --color-text-on-accent: #FFFFFF;
 
-  /* Accents */
-  --color-accent-aqua: #22D3EE;
-  /* Cyan 400 */
-  --color-accent-aqua-dark: #0891B2;
-  /* Cyan 600 */
-  --color-accent-blue: #60A5FA;
-  /* Blue 400 */
+  --color-border-light: #E4E4E7;
+  --color-border-standard: #E4E4E7;
+  --color-border-active: #A1A1AA;
+
+  --color-accent-aqua: #0EA5E9;
+  --color-accent-aqua-light: #E0F2FE;
+  --color-accent-aqua-dark: #0284C7;
+  --color-accent-blue: #3B82F6;
   --color-accent-danger: #EF4444;
-  /* Red 500 */
+  --color-accent-danger-bg: #FEF2F2;
+  --color-accent-success: #10B981;
+  --color-accent-warning: #F59E0B;
 
   /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.02), 0 2px 4px -2px rgb(0 0 0 / 0.02);
-  --shadow-floating: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  --shadow-glow: 0 0 15px rgba(34, 211, 238, 0.3);
+  --shadow-card-hover: 0 10px 15px -3px rgb(0 0 0 / 0.05), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  --shadow-floating: 0 20px 25px -5px rgb(0 0 0 / 0.08), 0 8px 10px -6px rgb(0 0 0 / 0.08);
+  --shadow-glow: 0 0 15px rgba(14, 165, 233, 0.25);
 
   /* Fonts */
   --font-display: "Plus Jakarta Sans", system-ui, sans-serif;
@@ -37,25 +40,22 @@
 
   /* Radius */
   --radius-card: 1rem;
-  /* 16px */
   --radius-button: 0.75rem;
-  /* 12px */
   --radius-input: 0.75rem;
+  --radius-full: 9999px;
 }
 
-@supports (padding: max(0px)) {
-  :root {
-    --safe-area-inset-top: env(safe-area-inset-top);
-    --safe-area-inset-bottom: env(safe-area-inset-bottom);
-    --safe-area-inset-left: env(safe-area-inset-left);
-    --safe-area-inset-right: env(safe-area-inset-right);
-  }
+/* Safe area insets for mobile devices */
+:root {
+  --safe-area-inset-top: env(safe-area-inset-top);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom);
+  --safe-area-inset-left: env(safe-area-inset-left);
+  --safe-area-inset-right: env(safe-area-inset-right);
 }
 
+/* Minimal global overrides */
 * {
   margin: 0;
-  padding: 0;
-  box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -69,10 +69,34 @@ body,
   color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  font-feature-settings: "case" 1;
-  overflow-x: hidden;
-  /* Prevent horizontal jitter */
 }
 
-/* Ensure safe area padding on the root container if needed,
-   but usually handled by Layout component */
+/* Custom typography classes - TODO: Migrate to Tailwind utilities */
+/* These are used in 19+ files and can be gradually replaced with Tailwind classes */
+.h1 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.5rem; /* 24px */
+  line-height: 2rem;
+  letter-spacing: -0.025em;
+}
+
+.h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.25rem; /* 20px */
+  line-height: 1.75rem;
+  letter-spacing: -0.025em;
+}
+
+.text-body-sm {
+  font-family: var(--font-body);
+  font-size: 0.875rem; /* 14px */
+  line-height: 1.25rem;
+}
+
+.text-body-xs {
+  font-family: var(--font-body);
+  font-size: 0.8125rem; /* 13px */
+  line-height: 1.125rem;
+}

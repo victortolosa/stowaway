@@ -4,21 +4,22 @@ import { Loader2, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center font-display font-semibold transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100',
+  'inline-flex items-center justify-center font-display font-semibold transition-all duration-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 outline-none focus-visible:ring-2 focus-visible:ring-accent-aqua focus-visible:ring-offset-2',
   {
     variants: {
       variant: {
-        primary: 'bg-gradient-to-br from-accent-aqua to-accent-aqua-dark text-white shadow-lg shadow-accent-aqua/30 hover:shadow-accent-aqua/50 hover:brightness-110 border border-transparent',
-        secondary: 'bg-white text-text-primary border border-gray-200 shadow-sm hover:bg-gray-50 hover:border-gray-300',
-        danger: 'bg-accent-danger text-white shadow-md shadow-accent-danger/20 hover:bg-red-600',
+        primary: 'bg-text-primary text-white shadow-lg shadow-black/10 hover:bg-black/90 hover:shadow-black/20 border border-transparent',
+        secondary: 'bg-white text-text-primary border border-border-standard shadow-sm hover:bg-bg-subtle hover:border-border-active',
+        accent: 'bg-accent-aqua text-white shadow-lg shadow-accent-aqua/30 hover:bg-accent-aqua-dark hover:shadow-accent-aqua/40',
+        danger: 'bg-accent-danger-bg text-accent-danger border border-accent-danger/10 hover:bg-accent-danger/10',
         ghost: 'bg-transparent text-text-secondary hover:text-text-primary hover:bg-black/5',
-        icon: 'bg-transparent text-text-secondary hover:text-text-primary hover:bg-black/5 rounded-full',
+        icon: 'bg-transparent text-text-secondary hover:text-text-primary hover:bg-black/5 rounded-full aspect-square p-0',
       },
       size: {
-        sm: 'text-[13px] px-3 py-1.5 rounded-button gap-1.5 min-h-[32px]',
-        md: 'text-[15px] px-5 py-3 rounded-button gap-2 min-h-[44px]', // Mobile standard touch target
-        lg: 'text-[17px] px-7 py-4 rounded-button gap-2.5 min-h-[56px]', // Premium, chunky size
-        icon: 'p-3 rounded-full',
+        sm: 'text-xs px-3 py-1.5 rounded-button gap-1.5 h-8',
+        md: 'text-sm px-5 py-2.5 rounded-button gap-2 h-11', // Mobile standard touch target
+        lg: 'text-base px-6 py-3.5 rounded-button gap-2.5 h-14', // Premium, chunky size
+        icon: 'h-10 w-10 p-0',
       },
       fullWidth: {
         true: 'w-full',

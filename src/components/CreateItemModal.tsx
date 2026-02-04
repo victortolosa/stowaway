@@ -6,8 +6,10 @@ import { Mic, X } from 'lucide-react'
 import { createItem, updateItem, uploadImage, uploadAudio, deleteStorageFile } from '@/services/firebaseService'
 import { deleteField } from 'firebase/firestore'
 import { useAuthStore } from '@/store/auth'
-import { useImageCompression, useInventory } from '@/hooks'
-import { AudioRecorder, AudioPlayer } from '@/components'
+import { useImageCompression } from '@/hooks'
+import { useGroups } from '@/hooks/queries/useGroups'
+import { AudioRecorder } from './AudioRecorder'
+import { AudioPlayer } from './AudioPlayer'
 import { trimSilence } from '@/utils/audioUtils'
 import { Item } from '@/types'
 import { Modal, Button, Input, Textarea, FormField, Label, MultiImageUploader, ProgressBar, Select } from '@/components/ui'
@@ -38,7 +40,7 @@ export function CreateItemModal({
     initialData
 }: CreateItemModalProps) {
     const user = useAuthStore((state) => state.user)
-    const { groups } = useInventory()
+    const { data: groups = [] } = useGroups()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [images, setImages] = useState<(File | string)[]>([])
 

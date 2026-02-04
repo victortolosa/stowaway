@@ -3,7 +3,7 @@ import { BottomTabBar } from './BottomTabBar'
 import { ReloadPrompt } from './ReloadPrompt'
 import { OfflineIndicator } from './OfflineIndicator'
 import { SyncStatus } from './SyncStatus'
-import { Toast } from './ui'
+import { Toast } from './ui/Toast'
 
 export function Layout() {
     const location = useLocation()

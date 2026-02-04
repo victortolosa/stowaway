@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode'
+import { Html5Qrcode } from 'html5-qrcode'
 import { parseQRCodeURL } from '@/utils/qrCode'
 import { Button } from '@/components/ui/Button'
 import { Camera, X, AlertCircle } from 'lucide-react'
@@ -23,11 +23,25 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
 
   useEffect(() => {
     const scannerId = 'qr-scanner-region'
-    const scanner = new Html5Qrcode(scannerId)
-    scannerRef.current = scanner
+    // Use a ref to track if the specific instance is mounted and active
+    let isMounted = true
+    let scanner: Html5Qrcode | null = null
 
-    const startScanner = async () => {
+    const initScanner = async () => {
       try {
+        // cleanup previous instance if it exists (safety check)
+        if (scannerRef.current) {
+          try {
+            await scannerRef.current.stop()
+          } catch (e) {
+            // ignore stop errors on cleanup
+          }
+          scannerRef.current = null
+        }
+
+        scanner = new Html5Qrcode(scannerId)
+        scannerRef.current = scanner
+
         await scanner.start(
           { facingMode: 'environment' },
           {
@@ -36,27 +50,42 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
             aspectRatio: 1,
           },
           (decodedText) => {
+            if (!isMounted) return
+
             console.log('QR Code scanned:', decodedText)
             const containerId = parseQRCodeURL(decodedText)
             if (containerId) {
               console.log('Container ID extracted:', containerId)
-              // Stop scanner before navigating
-              scanner.stop().then(() => {
-                onScanRef.current(containerId)
-              })
+
+              // Prevent multiple calls
+              if (scannerRef.current) {
+                scannerRef.current.stop().then(() => {
+                  if (isMounted) onScanRef.current(containerId)
+                }).catch(console.error)
+              }
             } else {
               // Show feedback for invalid QR codes
               console.warn('Invalid Stowaway QR code:', decodedText)
               setScanMessage('Not a valid Stowaway QR code. Keep scanning...')
-              setTimeout(() => setScanMessage(null), 2000)
+              setTimeout(() => {
+                if (isMounted) setScanMessage(null)
+              }, 2000)
             }
           },
           () => {
             // Ignore scan failures (no QR detected)
           }
         )
-        setIsStarting(false)
+
+        if (isMounted) {
+          setIsStarting(false)
+        } else {
+          // If unmounted during start, stop immediately
+          scanner.stop().catch(console.error)
+        }
       } catch (err) {
+        if (!isMounted) return
+
         console.error('QR Scanner error:', err)
         if (err instanceof Error) {
           if (err.message.includes('Permission')) {
@@ -71,14 +100,19 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
       }
     }
 
-    startScanner()
+    // Small delay to ensure DOM is ready
+    const timerId = setTimeout(initScanner, 100)
 
     return () => {
+      isMounted = false
+      clearTimeout(timerId)
+
       if (scannerRef.current) {
-        const state = scannerRef.current.getState()
-        if (state === Html5QrcodeScannerState.SCANNING) {
-          scannerRef.current.stop().catch(console.error)
-        }
+        scannerRef.current.stop().catch((err) => {
+          // Use console.warn for cleanup errors to avoid polluting logs with expected interruptions
+          console.warn('Failed to stop scanner during cleanup:', err)
+        })
+        scannerRef.current = null
       }
     }
   }, [])

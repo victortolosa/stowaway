@@ -1,8 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useInventory } from '@/hooks'
-import { Plus, Home, Briefcase, Archive, MapPin, Package, ChevronRight, ChevronDown, User } from 'lucide-react'
-import { Button, Card, EmptyState, LoadingState } from '@/components/ui'
+import { usePlaces } from '@/hooks/queries/usePlaces'
+import { useAllContainers } from '@/hooks/queries/useAllContainers'
+// We use useAllItems for client-side filtering/sorting and counts
+import { useAllItems } from '@/hooks/queries/useAllItems'
+import { Plus, Home, Briefcase, Archive, MapPin, ChevronRight, ChevronDown, User, Package } from 'lucide-react'
+import { Button, LoadingState, Card, EmptyState, GroupFilter } from '@/components'
 import { ItemCard } from '@/components/ItemCard'
 import { Timestamp } from 'firebase/firestore'
 
@@ -17,22 +20,30 @@ const toDateSync = (timestamp: Date | Timestamp): Date => {
 }
 
 export function Dashboard() {
-  const { places, containers, items, isLoading, refresh } = useInventory()
   const navigate = useNavigate()
-  const [visibleItemsCount, setVisibleItemsCount] = useState(8)
 
-  const [itemsSortBy, setItemsSortBy] = useState<SortOption>('recently-added')
-  const [containersSortBy, setContainersSortBy] = useState<SortOption>('recently-modified')
-  const [placesSortBy, setPlacesSortBy] = useState<SortOption>('recently-modified')
+  const { data: places = [], isLoading: isPlacesLoading } = usePlaces()
+  const { data: containers = [], isLoading: isContainersLoading } = useAllContainers()
+  const { data: allItems = [], isLoading: isAllItemsLoading } = useAllItems()
+
+  const isLoading = isPlacesLoading || isContainersLoading || isAllItemsLoading
 
   const [showItemsSortMenu, setShowItemsSortMenu] = useState(false)
   const [showContainersSortMenu, setShowContainersSortMenu] = useState(false)
   const [showPlacesSortMenu, setShowPlacesSortMenu] = useState(false)
+  const [itemsSortBy, setItemsSortBy] = useState<SortOption>('recently-added')
+  const [containersSortBy, setContainersSortBy] = useState<SortOption>('recently-modified')
+  const [placesSortBy, setPlacesSortBy] = useState<SortOption>('recently-modified')
+  const [visibleItemsCount, setVisibleItemsCount] = useState(8)
 
-  useEffect(() => {
-    console.log('Dashboard: Refreshing inventory...')
-    refresh()
-  }, [refresh])
+  // Group Filters
+  const [selectedPlaceGroupId, setSelectedPlaceGroupId] = useState<string | null>(null)
+  const [selectedContainerGroupId, setSelectedContainerGroupId] = useState<string | null>(null)
+  const [selectedItemGroupId, setSelectedItemGroupId] = useState<string | null>(null)
+
+
+  // Dashboard usually doesn't need auto-refresh on mount if RQ staleTime is configured,
+  // but let's keep it simple.
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -72,6 +83,19 @@ export function Dashboard() {
     }
   }
 
+  // Filter Data
+  const filteredPlaces = places.filter(place =>
+    selectedPlaceGroupId ? place.groupId === selectedPlaceGroupId : true
+  )
+
+  const filteredContainers = containers.filter(container =>
+    selectedContainerGroupId ? container.groupId === selectedContainerGroupId : true
+  )
+
+  const filteredItems = allItems.filter(item =>
+    selectedItemGroupId ? item.groupId === selectedItemGroupId : true
+  )
+
   const sortItems = <T extends { name: string; createdAt: Date | Timestamp; lastAccessed?: Date | Timestamp }>(
     items: T[],
     sortBy: SortOption
@@ -103,7 +127,14 @@ export function Dashboard() {
     }
   }
 
-  const allRecentItems = sortItems([...items], itemsSortBy)
+  // We will use 'recentItems' from hook for the "Recently Added" section default.
+  // But the existing code sorts 'items' (which was all items).
+  // If we only fetch 20 recent items, sorting by "Oldest First" on that subset is weird.
+  // But for full feature parity, we are fetching `allItems`.
+  // So we can use `allItems` for the sort logic.
+  const itemsToDisplay = filteredItems
+
+  const allRecentItems = sortItems([...itemsToDisplay], itemsSortBy)
   const recentItems = allRecentItems.slice(0, visibleItemsCount)
   const hasMoreItems = allRecentItems.length > visibleItemsCount
 
@@ -112,11 +143,19 @@ export function Dashboard() {
   }
 
   const getItemLocation = (itemId: string) => {
-    const item = items.find(i => i.id === itemId)
-    if (!item) return ''
+    const item = allItems.find(i => i.id === itemId)
+    if (!item) return undefined
+
     const container = containers.find(c => c.id === item.containerId)
+    if (!container) return 'Location not found'
+
     const place = places.find(p => p.id === container?.placeId)
-    return `${place?.name || ''} → ${container?.name || ''}`
+
+    if (place) {
+      return `${place.name} → ${container.name}`
+    }
+
+    return container.name
   }
 
   if (isLoading) {
@@ -154,38 +193,208 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="flex flex-col gap-10">
-        {/* Items Section */}
-        {recentItems.length > 0 && (
-          <div className="flex flex-col gap-5">
-            <div className="flex items-baseline justify-between">
+      <div className="flex flex-col gap-12">
+        {/* Places Section */}
+        <div className="flex flex-col gap-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <h2 className="font-display text-xl md:text-2xl font-bold text-text-primary tracking-tight">
+                Places
+              </h2>
               <button
-                onClick={() => navigate('/items')}
-                className="flex items-center gap-2 group"
+                onClick={() => navigate('/places')}
+                className="p-1 hover:bg-bg-page/50 rounded-full text-text-tertiary hover:text-accent-aqua transition-all"
               >
-                <h2 className="font-display text-[22px] md:text-2xl font-bold text-text-primary tracking-tight">Items</h2>
-                <ChevronRight size={20} className="text-text-tertiary" strokeWidth={2} />
+                <ChevronRight size={22} strokeWidth={2.5} />
               </button>
+            </div>
+
+            <div className="relative sort-dropdown">
+              <button
+                onClick={() => setShowPlacesSortMenu(!showPlacesSortMenu)}
+                className="flex items-center gap-1.5 font-body text-[11px] font-bold text-text-tertiary tracking-wider uppercase hover:text-text-secondary transition-colors"
+              >
+                {getSortLabel(placesSortBy)}
+                <ChevronDown size={12} className="text-text-tertiary" strokeWidth={3} />
+              </button>
+              {showPlacesSortMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-bg-surface rounded-card shadow-card py-2 z-20 border border-border-standard backdrop-blur-md bg-opacity-95">
+                  {(['recently-modified', 'recently-added', 'oldest-first', 'a-z', 'z-a'] as SortOption[]).map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => {
+                        setPlacesSortBy(option)
+                        setShowPlacesSortMenu(false)
+                      }}
+                      className={`w-full px-4 py-2 text-left font-body text-sm transition-colors ${placesSortBy === option
+                        ? 'text-accent-aqua bg-accent-aqua/5 font-semibold'
+                        : 'text-text-primary hover:bg-bg-page/50'
+                        }`}
+                    >
+                      {getSortLabel(option)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <GroupFilter
+            type="place"
+            selectedGroupId={selectedPlaceGroupId}
+            onSelect={setSelectedPlaceGroupId}
+            className="mb-1"
+          />
+
+          {places.length === 0 ? (
+            <EmptyState
+              message="No places yet"
+              actionLabel="Create your first place"
+              onAction={() => navigate('/places')}
+            />
+          ) : (
+            <div
+              className="overflow-x-auto pb-8 no-scrollbar"
+              style={{
+                marginLeft: 'calc(-1 * max(1.5rem, var(--safe-area-inset-left, 0px)))',
+                marginRight: 'calc(-1 * max(1.5rem, var(--safe-area-inset-right, 0px)))',
+                paddingLeft: 'max(1.5rem, var(--safe-area-inset-left, 0px))',
+                paddingRight: 'max(1.5rem, var(--safe-area-inset-right, 0px))'
+              }}
+            >
+              <div className="flex flex-col gap-3 min-w-max">
+                {(() => {
+                  const sortedPlaces = sortItems([...filteredPlaces], placesSortBy)
+                  const row1 = sortedPlaces.filter((_, i) => i % 2 === 0)
+                  const row2 = sortedPlaces.filter((_, i) => i % 2 !== 0)
+
+                  return (
+                    <>
+                      {/* Row 1 */}
+                      <div className="flex gap-4">
+                        {row1.map((place, index) => {
+                          const placeContainers = containers.filter((c) => c.placeId === place.id)
+                          const totalItems = allItems.filter((item) =>
+                            placeContainers.some((c) => c.id === item.containerId)
+                          ).length
+                          const PlaceIcon = getPlaceIcon(place.type)
+
+                          return (
+                            <Card
+                              key={place.id}
+                              variant="interactive"
+                              onClick={() => navigate(`/places/${place.id}`)}
+                              padding="none"
+                              className="min-w-[140px] max-w-[400px] w-auto h-[68px] flex-shrink-0 overflow-hidden"
+                            >
+                              <div className="flex h-full items-stretch">
+                                <div
+                                  className="w-[68px] flex items-center justify-center flex-shrink-0"
+                                  style={{ backgroundColor: getPlaceColor(index * 2) + '15' }}
+                                >
+                                  <PlaceIcon size={20} style={{ color: getPlaceColor(index * 2) }} strokeWidth={2.5} />
+                                </div>
+                                <div
+                                  className="flex flex-col justify-center gap-1 min-w-0"
+                                  style={{ paddingLeft: '1.25rem', paddingRight: '1.25rem' }}
+                                >
+                                  <h3 className="font-display text-[16px] font-semibold text-text-primary truncate whitespace-nowrap leading-snug">
+                                    {place.name}
+                                  </h3>
+                                  <p className="font-body text-[13px] text-text-secondary truncate whitespace-nowrap">
+                                    {placeContainers.length} {placeContainers.length === 1 ? 'container' : 'containers'} · {totalItems} {totalItems === 1 ? 'item' : 'items'}
+                                  </p>
+                                </div>
+                              </div>
+                            </Card>
+                          )
+                        })}
+                      </div>
+
+                      {/* Row 2 */}
+                      <div className="flex gap-4">
+                        {row2.map((place, index) => {
+                          const placeContainers = containers.filter((c) => c.placeId === place.id)
+                          const totalItems = allItems.filter((item) =>
+                            placeContainers.some((c) => c.id === item.containerId)
+                          ).length
+                          const PlaceIcon = getPlaceIcon(place.type)
+
+                          return (
+                            <Card
+                              key={place.id}
+                              variant="interactive"
+                              onClick={() => navigate(`/places/${place.id}`)}
+                              padding="none"
+                              className="min-w-[140px] max-w-[400px] w-auto h-[68px] flex-shrink-0 overflow-hidden"
+                            >
+                              <div className="flex h-full items-stretch">
+                                <div
+                                  className="w-[68px] flex items-center justify-center flex-shrink-0"
+                                  style={{ backgroundColor: getPlaceColor(index * 2 + 1) + '15' }}
+                                >
+                                  <PlaceIcon size={20} style={{ color: getPlaceColor(index * 2 + 1) }} strokeWidth={2.5} />
+                                </div>
+                                <div
+                                  className="flex flex-col justify-center gap-1 min-w-0"
+                                  style={{ paddingLeft: '1.25rem', paddingRight: '1.25rem' }}
+                                >
+                                  <h3 className="font-display text-[16px] font-semibold text-text-primary truncate whitespace-nowrap leading-snug">
+                                    {place.name}
+                                  </h3>
+                                  <p className="font-body text-[13px] text-text-secondary truncate whitespace-nowrap">
+                                    {placeContainers.length} {placeContainers.length === 1 ? 'container' : 'containers'} · {totalItems} {totalItems === 1 ? 'item' : 'items'}
+                                  </p>
+                                </div>
+                              </div>
+                            </Card>
+                          )
+                        })}
+                      </div>
+                    </>
+                  )
+                })()}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Containers Section */}
+        {containers.length > 0 && (
+          <div className="flex flex-col gap-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h2 className="font-display text-xl md:text-2xl font-bold text-text-primary tracking-tight">
+                  Containers
+                </h2>
+                <button
+                  onClick={() => navigate('/containers')}
+                  className="p-1 hover:bg-bg-page/50 rounded-full text-text-tertiary hover:text-accent-aqua transition-all"
+                >
+                  <ChevronRight size={22} strokeWidth={2.5} />
+                </button>
+              </div>
+
               <div className="relative sort-dropdown">
                 <button
-                  onClick={() => setShowItemsSortMenu(!showItemsSortMenu)}
-                  className="flex items-center gap-1.5 font-body text-[12px] font-medium text-text-tertiary tracking-wide uppercase hover:text-text-secondary transition-colors"
+                  onClick={() => setShowContainersSortMenu(!showContainersSortMenu)}
+                  className="flex items-center gap-1.5 font-body text-[11px] font-bold text-text-tertiary tracking-wider uppercase hover:text-text-secondary transition-colors"
                 >
-                  {getSortLabel(itemsSortBy)}
-                  <ChevronDown size={14} className="text-text-tertiary" strokeWidth={2} />
+                  {getSortLabel(containersSortBy)}
+                  <ChevronDown size={12} className="text-text-tertiary" strokeWidth={3} />
                 </button>
-                {showItemsSortMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-bg-page rounded-card shadow-card py-2 z-10 border border-border-standard">
-                    {(['recently-added', 'oldest-first', 'a-z', 'z-a'] as SortOption[]).map((option) => (
+                {showContainersSortMenu && (
+                  <div className="absolute right-0 mt-2 w-48 bg-bg-surface rounded-card shadow-card py-2 z-10 border border-border-standard backdrop-blur-md bg-opacity-95">
+                    {(['recently-modified', 'recently-added', 'oldest-first', 'a-z', 'z-a'] as SortOption[]).map((option) => (
                       <button
                         key={option}
                         onClick={() => {
-                          setItemsSortBy(option)
-                          setShowItemsSortMenu(false)
+                          setContainersSortBy(option)
+                          setShowContainersSortMenu(false)
                         }}
-                        className={`w-full px-4 py-2 text-left font-body text-sm transition-colors ${itemsSortBy === option
-                          ? 'text-accent-aqua bg-accent-aqua/10'
-                          : 'text-text-primary hover:bg-bg-surface'
+                        className={`w-full px-4 py-2 text-left font-body text-sm transition-colors ${containersSortBy === option
+                          ? 'text-accent-aqua bg-accent-aqua/5 font-semibold'
+                          : 'text-text-primary hover:bg-bg-page/50'
                           }`}
                       >
                         {getSortLabel(option)}
@@ -196,9 +405,144 @@ export function Dashboard() {
               </div>
             </div>
 
-            {/* Horizontal Scroll Container */}
-            <div className="flex flex-col gap-4">
-              <div className="overflow-x-auto pb-4 no-scrollbar -mx-6 px-6">
+            <GroupFilter
+              type="container"
+              selectedGroupId={selectedContainerGroupId}
+              onSelect={setSelectedContainerGroupId}
+              className="mb-1"
+            />
+
+            {filteredContainers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 px-4 text-center border-2 border-dashed border-border-standard rounded-xl">
+                <p className="text-text-secondary font-medium">No containers found in this group</p>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="mt-3"
+                  onClick={() => setSelectedContainerGroupId(null)}
+                >
+                  Clear Filter
+                </Button>
+              </div>
+            ) : (
+              <div
+                className="overflow-x-auto pb-8 no-scrollbar"
+                style={{
+                  marginLeft: 'calc(-1 * max(1.5rem, var(--safe-area-inset-left, 0px)))',
+                  marginRight: 'calc(-1 * max(1.5rem, var(--safe-area-inset-right, 0px)))',
+                  paddingLeft: 'max(1.5rem, var(--safe-area-inset-left, 0px))',
+                  paddingRight: 'max(1.5rem, var(--safe-area-inset-right, 0px))'
+                }}
+              >
+                <div className="flex gap-4 min-w-max">
+                  {sortItems([...filteredContainers], containersSortBy)
+                    .slice(0, 8)
+                    .map((container, index) => {
+                      const place = places.find(p => p.id === container.placeId)
+                      const containerItems = allItems.filter(item => item.containerId === container.id)
+                      const containerColor = getPlaceColor(index)
+
+                      return (
+                        <Card
+                          key={container.id}
+                          variant="interactive"
+                          onClick={() => navigate(`/containers/${container.id}`)}
+                          padding="none"
+                          className="w-[280px] flex-shrink-0"
+                        >
+                          <div className="flex items-center gap-4 p-5 h-full">
+                            {/* Icon Badge */}
+                            <div
+                              className="w-[84px] h-[84px] rounded-lg flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: containerColor + '15' }}
+                            >
+                              <Package size={42} style={{ color: containerColor }} strokeWidth={2} />
+                            </div>
+
+                            {/* Content */}
+                            <div className="flex flex-col gap-1 flex-1 min-w-0">
+                              <h3 className="font-display text-[16px] font-semibold text-text-primary leading-snug">
+                                {container.name}
+                              </h3>
+                              <p className="font-body text-[13px] text-text-secondary truncate">
+                                {place?.name} · {containerItems.length} items
+                              </p>
+                            </div>
+                          </div>
+                        </Card>
+                      )
+                    })}
+                </div>
+              </div>
+            )}
+          </div>
+        )
+        }
+
+        {/* Items Section */}
+        {
+          recentItems.length > 0 && (
+            <div className="flex flex-col gap-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <h2 className="font-display text-xl md:text-2xl font-bold text-text-primary tracking-tight">
+                    Items
+                  </h2>
+                  <button
+                    onClick={() => navigate('/items')}
+                    className="p-1 hover:bg-bg-page/50 rounded-full text-text-tertiary hover:text-accent-aqua transition-all"
+                  >
+                    <ChevronRight size={22} strokeWidth={2.5} />
+                  </button>
+                </div>
+
+                <div className="relative sort-dropdown">
+                  <button
+                    onClick={() => setShowItemsSortMenu(!showItemsSortMenu)}
+                    className="flex items-center gap-1.5 font-body text-[11px] font-bold text-text-tertiary tracking-wider uppercase hover:text-text-secondary transition-colors"
+                  >
+                    {getSortLabel(itemsSortBy)}
+                    <ChevronDown size={12} className="text-text-tertiary" strokeWidth={3} />
+                  </button>
+                  {showItemsSortMenu && (
+                    <div className="absolute right-0 mt-2 w-48 bg-bg-surface rounded-card shadow-card py-2 z-20 border border-border-standard backdrop-blur-md bg-opacity-95">
+                      {(['recently-added', 'oldest-first', 'a-z', 'z-a'] as SortOption[]).map((option) => (
+                        <button
+                          key={option}
+                          onClick={() => {
+                            setItemsSortBy(option)
+                            setShowItemsSortMenu(false)
+                          }}
+                          className={`w-full px-4 py-2 text-left font-body text-sm transition-colors ${itemsSortBy === option
+                            ? 'text-accent-aqua bg-accent-aqua/5 font-semibold'
+                            : 'text-text-primary hover:bg-bg-page/50'
+                            }`}
+                        >
+                          {getSortLabel(option)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <GroupFilter
+                type="item"
+                selectedGroupId={selectedItemGroupId}
+                onSelect={setSelectedItemGroupId}
+                className="mb-1"
+              />
+
+              {/* Horizontal Scroll Container */}
+              <div
+                className="overflow-x-auto pb-8 no-scrollbar"
+                style={{
+                  marginLeft: 'calc(-1 * max(1.5rem, var(--safe-area-inset-left, 0px)))',
+                  marginRight: 'calc(-1 * max(1.5rem, var(--safe-area-inset-right, 0px)))',
+                  paddingLeft: 'max(1.5rem, var(--safe-area-inset-left, 0px))',
+                  paddingRight: 'max(1.5rem, var(--safe-area-inset-right, 0px))'
+                }}
+              >
                 <div className="flex gap-4 min-w-max">
                   {recentItems.map((item) => (
                     <ItemCard
@@ -214,14 +558,16 @@ export function Dashboard() {
                   {hasMoreItems && (
                     <button
                       onClick={loadMoreItems}
-                      className="w-[280px] flex-shrink-0 bg-bg-surface border-2 border-dashed border-border-standard rounded-card flex flex-col items-center justify-center gap-3 hover:border-accent-aqua hover:bg-accent-aqua/5 transition-all cursor-pointer min-h-[220px]"
+                      className="w-[280px] flex-shrink-0 bg-bg-surface border border-border-standard rounded-card flex flex-col items-center justify-center gap-3 hover:border-accent-aqua hover:bg-accent-aqua/5 transition-all cursor-pointer min-h-[200px]"
                     >
-                      <Plus size={32} className="text-accent-aqua" strokeWidth={2} />
+                      <div className="w-12 h-12 rounded-full bg-accent-aqua/10 flex items-center justify-center text-accent-aqua">
+                        <Plus size={24} strokeWidth={2.5} />
+                      </div>
                       <div className="text-center">
-                        <p className="font-display text-[15px] font-semibold text-text-primary">
+                        <p className="font-display text-[15px] font-bold text-text-primary">
                           Show More
                         </p>
-                        <p className="font-body text-[13px] text-text-secondary">
+                        <p className="font-body text-[13px] text-text-tertiary">
                           {allRecentItems.length - visibleItemsCount} more items
                         </p>
                       </div>
@@ -230,185 +576,9 @@ export function Dashboard() {
                 </div>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Containers Section */}
-        {containers.length > 0 && (
-          <div className="flex flex-col gap-5">
-            <div className="flex items-baseline justify-between">
-              <button
-                onClick={() => navigate('/containers')}
-                className="flex items-center gap-2 group"
-              >
-                <h2 className="font-display text-[22px] md:text-2xl font-bold text-text-primary tracking-tight">Containers</h2>
-                <ChevronRight size={20} className="text-text-tertiary" strokeWidth={2} />
-              </button>
-              <div className="relative sort-dropdown">
-                <button
-                  onClick={() => setShowContainersSortMenu(!showContainersSortMenu)}
-                  className="flex items-center gap-1.5 font-body text-[12px] font-medium text-text-tertiary tracking-wide uppercase hover:text-text-secondary transition-colors"
-                >
-                  {getSortLabel(containersSortBy)}
-                  <ChevronDown size={14} className="text-text-tertiary" strokeWidth={2} />
-                </button>
-                {showContainersSortMenu && (
-                  <div className="absolute right-0 mt-2 w-48 bg-bg-page rounded-card shadow-card py-2 z-10 border border-border-standard">
-                    {(['recently-modified', 'recently-added', 'oldest-first', 'a-z', 'z-a'] as SortOption[]).map((option) => (
-                      <button
-                        key={option}
-                        onClick={() => {
-                          setContainersSortBy(option)
-                          setShowContainersSortMenu(false)
-                        }}
-                        className={`w-full px-4 py-2 text-left font-body text-sm transition-colors ${containersSortBy === option
-                          ? 'text-accent-aqua bg-accent-aqua/10'
-                          : 'text-text-primary hover:bg-bg-surface'
-                          }`}
-                      >
-                        {getSortLabel(option)}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="overflow-x-auto pb-4 no-scrollbar -mx-6 px-6">
-              <div className="flex gap-4 min-w-max">
-                {sortItems([...containers], containersSortBy)
-                  .slice(0, 8)
-                  .map((container, index) => {
-                    const place = places.find(p => p.id === container.placeId)
-                    const containerItems = items.filter(item => item.containerId === container.id)
-                    const containerColor = getPlaceColor(index)
-
-                    return (
-                      <Card
-                        key={container.id}
-                        variant="interactive"
-                        onClick={() => navigate(`/containers/${container.id}`)}
-                        padding="none"
-                        className="w-[280px] flex-shrink-0"
-                      >
-                        <div className="flex items-center gap-4 p-5 h-full">
-                          {/* Icon Badge */}
-                          <div
-                            className="w-[84px] h-[84px] rounded-lg flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: containerColor + '15' }}
-                          >
-                            <Package size={42} style={{ color: containerColor }} strokeWidth={2} />
-                          </div>
-
-                          {/* Content */}
-                          <div className="flex flex-col gap-1 flex-1 min-w-0">
-                            <h3 className="font-display text-[16px] font-semibold text-text-primary leading-snug">
-                              {container.name}
-                            </h3>
-                            <p className="font-body text-[13px] text-text-secondary truncate">
-                              {place?.name} · {containerItems.length} items
-                            </p>
-                          </div>
-                        </div>
-                      </Card>
-                    )
-                  })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Places Section */}
-        <div className="flex flex-col gap-5">
-          <div className="flex items-baseline justify-between">
-            <button
-              onClick={() => navigate('/places')}
-              className="flex items-center gap-2 group"
-            >
-              <h2 className="font-display text-[22px] md:text-2xl font-bold text-text-primary tracking-tight">Places</h2>
-              <ChevronRight size={20} className="text-text-tertiary" strokeWidth={2} />
-            </button>
-            <div className="relative sort-dropdown">
-              <button
-                onClick={() => setShowPlacesSortMenu(!showPlacesSortMenu)}
-                className="flex items-center gap-1.5 font-body text-[12px] font-medium text-text-tertiary tracking-wide uppercase hover:text-text-secondary transition-colors"
-              >
-                {getSortLabel(placesSortBy)}
-                <ChevronDown size={14} className="text-text-tertiary" strokeWidth={2} />
-              </button>
-              {showPlacesSortMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-bg-page rounded-card shadow-card py-2 z-10 border border-border-standard">
-                  {(['recently-modified', 'recently-added', 'oldest-first', 'a-z', 'z-a'] as SortOption[]).map((option) => (
-                    <button
-                      key={option}
-                      onClick={() => {
-                        setPlacesSortBy(option)
-                        setShowPlacesSortMenu(false)
-                      }}
-                      className={`w-full px-4 py-2 text-left font-body text-sm transition-colors ${placesSortBy === option
-                        ? 'text-accent-aqua bg-accent-aqua/10'
-                        : 'text-text-primary hover:bg-bg-surface'
-                        }`}
-                    >
-                      {getSortLabel(option)}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {places.length === 0 ? (
-            <EmptyState
-              message="No places yet"
-              actionLabel="Create your first place"
-              onAction={() => navigate('/places')}
-            />
-          ) : (
-            <div className="overflow-x-auto pb-4 no-scrollbar -mx-6 px-6">
-              <div className="flex gap-4 min-w-max">
-                {sortItems([...places], placesSortBy).map((place, index) => {
-                  const placeContainers = containers.filter((c) => c.placeId === place.id)
-                  const totalItems = items.filter((item) =>
-                    placeContainers.some((c) => c.id === item.containerId)
-                  ).length
-                  const PlaceIcon = getPlaceIcon(place.type)
-
-                  return (
-                    <Card
-                      key={place.id}
-                      variant="interactive"
-                      onClick={() => navigate(`/places/${place.id}`)}
-                      padding="none"
-                      className="w-[350px] flex-shrink-0"
-                    >
-                      <div className="flex items-center gap-3 p-5">
-                        {/* Icon Badge */}
-                        <div
-                          className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={{ backgroundColor: getPlaceColor(index) + '15' }}
-                        >
-                          <PlaceIcon size={18} style={{ color: getPlaceColor(index) }} strokeWidth={2} />
-                        </div>
-
-                        {/* Content */}
-                        <div className="flex flex-col gap-1 flex-1 min-w-0">
-                          <h3 className="font-display text-[16px] font-semibold text-text-primary truncate">
-                            {place.name}
-                          </h3>
-                          <p className="font-body text-[13px] text-text-secondary truncate">
-                            {placeContainers.length} containers · {totalItems} items
-                          </p>
-                        </div>
-                      </div>
-                    </Card>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+          )
+        }
+      </div >
+    </div >
   )
 }
