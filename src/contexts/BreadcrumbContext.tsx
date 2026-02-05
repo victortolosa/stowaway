@@ -28,6 +28,7 @@ export function BreadcrumbProvider({ children }: { children: React.ReactNode }) 
     )
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function useBreadcrumbs(initialItems?: BreadcrumbItem[]) {
     const context = useContext(BreadcrumbContext)
     if (context === undefined) {
@@ -41,7 +42,9 @@ export function useBreadcrumbs(initialItems?: BreadcrumbItem[]) {
         if (initialItems) {
             setBreadcrumbs(initialItems)
         }
-    }, [initialItemsString, setBreadcrumbs, initialItems])
+        // initialItems is intentionally omitted as we use initialItemsString for deep comparison
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [initialItemsString, setBreadcrumbs])
 
     return context
 }

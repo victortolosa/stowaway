@@ -4,10 +4,11 @@ import { usePlaces } from '@/hooks/queries/usePlaces'
 import { useAllContainers } from '@/hooks/queries/useAllContainers'
 // We use useAllItems for client-side filtering/sorting and counts
 import { useAllItems } from '@/hooks/queries/useAllItems'
-import { Plus, Home, Briefcase, Archive, MapPin, ChevronRight, ChevronDown, User, Package } from 'lucide-react'
-import { Button, LoadingState, Card, EmptyState } from '@/components'
+import { Plus, ChevronRight, ChevronDown, User } from 'lucide-react'
+import { Button, LoadingState, Card, EmptyState, IconOrEmoji } from '@/components'
 import { ItemCard } from '@/components/ItemCard'
 import { Timestamp } from 'firebase/firestore'
+import { getPlaceIcon, getContainerIcon } from '@/utils/colorUtils'
 
 type SortOption = 'recently-added' | 'oldest-first' | 'a-z' | 'z-a' | 'recently-modified'
 
@@ -54,19 +55,7 @@ export function Dashboard() {
     return () => document.removeEventListener('click', handleClickOutside)
   }, [])
 
-  const getPlaceIcon = (type: string) => {
-    switch (type) {
-      case 'home': return Home
-      case 'office': return Briefcase
-      case 'storage': return Archive
-      default: return MapPin
-    }
-  }
-
-  const getPlaceColor = (index: number) => {
-    const colors = ['#F59E0B', '#14B8A6', '#FFC0CB', '#F97316', '#3B82F6']
-    return colors[index % colors.length]
-  }
+  // Color and icon now come from database
 
   const getSortLabel = (sortOption: SortOption): string => {
     switch (sortOption) {
@@ -247,12 +236,12 @@ export function Dashboard() {
                     <>
                       {/* Row 1 */}
                       <div className="flex gap-4">
-                        {row1.map((place, index) => {
+                        {row1.map((place) => {
                           const placeContainers = containers.filter((c) => c.placeId === place.id)
                           const totalItems = allItems.filter((item) =>
                             placeContainers.some((c) => c.id === item.containerId)
                           ).length
-                          const PlaceIcon = getPlaceIcon(place.type)
+                          const placeColor = place.color || '#14B8A6'
 
                           return (
                             <Card
@@ -263,11 +252,8 @@ export function Dashboard() {
                               className="min-w-[140px] max-w-[400px] w-auto h-[68px] flex-shrink-0 overflow-hidden"
                             >
                               <div className="flex h-full items-stretch">
-                                <div
-                                  className="w-[68px] flex items-center justify-center flex-shrink-0"
-                                  style={{ backgroundColor: getPlaceColor(index * 2) + '15' }}
-                                >
-                                  <PlaceIcon size={20} style={{ color: getPlaceColor(index * 2) }} strokeWidth={2.5} />
+                                <div className="flex items-center justify-center flex-shrink-0 px-3">
+                                  <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={placeColor} size="sm" />
                                 </div>
                                 <div
                                   className="flex flex-col justify-center gap-1 min-w-0"
@@ -288,12 +274,12 @@ export function Dashboard() {
 
                       {/* Row 2 */}
                       <div className="flex gap-4">
-                        {row2.map((place, index) => {
+                        {row2.map((place) => {
                           const placeContainers = containers.filter((c) => c.placeId === place.id)
                           const totalItems = allItems.filter((item) =>
                             placeContainers.some((c) => c.id === item.containerId)
                           ).length
-                          const PlaceIcon = getPlaceIcon(place.type)
+                          const placeColor = place.color || '#14B8A6'
 
                           return (
                             <Card
@@ -304,11 +290,8 @@ export function Dashboard() {
                               className="min-w-[140px] max-w-[400px] w-auto h-[68px] flex-shrink-0 overflow-hidden"
                             >
                               <div className="flex h-full items-stretch">
-                                <div
-                                  className="w-[68px] flex items-center justify-center flex-shrink-0"
-                                  style={{ backgroundColor: getPlaceColor(index * 2 + 1) + '15' }}
-                                >
-                                  <PlaceIcon size={20} style={{ color: getPlaceColor(index * 2 + 1) }} strokeWidth={2.5} />
+                                <div className="flex items-center justify-center flex-shrink-0 px-3">
+                                  <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={placeColor} size="sm" />
                                 </div>
                                 <div
                                   className="flex flex-col justify-center gap-1 min-w-0"
@@ -392,10 +375,10 @@ export function Dashboard() {
               <div className="flex gap-4 min-w-max">
                 {sortItems([...containers], containersSortBy)
                   .slice(0, 8)
-                  .map((container, index) => {
+                  .map((container) => {
                     const place = places.find(p => p.id === container.placeId)
                     const containerItems = allItems.filter(item => item.containerId === container.id)
-                    const containerColor = getPlaceColor(index)
+                    const containerColor = container.color || '#3B82F6'
 
                     return (
                       <Card
@@ -407,11 +390,8 @@ export function Dashboard() {
                       >
                         <div className="flex items-stretch h-full">
                           {/* Icon Badge */}
-                          <div
-                            className="w-[72px] flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: containerColor + '15' }}
-                          >
-                            <Package size={32} style={{ color: containerColor }} strokeWidth={2} />
+                          <div className="flex items-center justify-center flex-shrink-0 px-3">
+                            <IconOrEmoji iconValue={container.icon} defaultIcon={getContainerIcon()} color={containerColor} size="md" />
                           </div>
 
                           {/* Content */}

@@ -20,6 +20,8 @@ export const PlaceSchema = z.object({
   type: z.enum(['home', 'office', 'storage', 'other']),
   photos: z.array(z.string()).optional(),
   groupId: z.string().nullable().optional(),
+  color: z.string().optional(),
+  icon: z.string().optional(),
   createdAt: dateOrTimestampSchema,
   updatedAt: dateOrTimestampSchema,
 })
@@ -43,6 +45,8 @@ export const ContainerSchema = z.object({
   photoUrl: z.string().optional(),
   photos: z.array(z.string()).optional(),
   groupId: z.string().nullable().optional(),
+  color: z.string().optional(),
+  icon: z.string().optional(),
   lastAccessed: dateOrTimestampSchema,
   createdAt: dateOrTimestampSchema,
   updatedAt: dateOrTimestampSchema,
@@ -61,6 +65,8 @@ export const ItemSchema = z.object({
   voiceNoteUrl: z.string().optional(),
   tags: z.array(z.string()),
   groupId: z.string().nullable().optional(),
+  color: z.string().optional(),
+  icon: z.string().optional(),
   createdAt: dateOrTimestampSchema,
   updatedAt: dateOrTimestampSchema,
 })

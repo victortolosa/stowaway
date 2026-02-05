@@ -8,6 +8,7 @@ import { Place } from '@/types'
 import { Modal, Button, Input, Select, FormField, MultiImageUploader, ProgressBar } from '@/components/ui'
 import { useImageCompression } from '@/hooks'
 import { useGroups } from '@/hooks/queries/useGroups'
+import { getRandomColor } from '@/utils/colorUtils'
 
 const placeSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -115,7 +116,10 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                 await updatePlace(initialData.id, {
                     ...data,
                     groupId: data.groupId || null,
-                    photos: finalPhotos
+                    photos: finalPhotos,
+                    // Preserve existing color and icon when editing
+                    color: initialData.color,
+                    icon: initialData.icon,
                 })
                 placeId = initialData.id
             } else {
@@ -123,7 +127,9 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                     name: data.name,
                     type: data.type,
                     groupId: data.groupId || null,
-                    photos: finalPhotos
+                    photos: finalPhotos,
+                    color: getRandomColor('place'),
+                    icon: 'Home',
                 })
             }
 

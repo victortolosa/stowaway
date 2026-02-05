@@ -6,10 +6,11 @@ import { useAllItems } from '@/hooks/queries/useAllItems'
 import { useGroups } from '@/hooks/queries/useGroups'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Search, Package, QrCode, Plus, FolderPlus } from 'lucide-react'
-import { Card, EmptyState, IconBadge, LoadingState, Button } from '@/components/ui'
+import { Search, QrCode, Plus, FolderPlus } from 'lucide-react'
+import { Card, EmptyState, LoadingState, Button, IconOrEmoji } from '@/components/ui'
 import { ObjectViewTabs, MultiStepCreateContainerModal, SelectContainersForGroupModal } from '@/components'
 import { Timestamp } from 'firebase/firestore'
+import { getContainerIcon } from '@/utils/colorUtils'
 
 // Helper to convert Firestore Timestamp to Date
 const toDate = (timestamp: Date | Timestamp): Date => {
@@ -43,10 +44,7 @@ export function ContainersList() {
     return <LoadingState message="Loading containers..." />
   }
 
-  const getContainerColor = (index: number) => {
-    const colors = ['#3B82F6', '#14B8A6', '#F59E0B', '#8B5CF6', '#F97316']
-    return colors[index % colors.length]
-  }
+  // Color and icon now come from database
 
   const getContainerItemCount = (containerId: string) => {
     return items.filter((item) => item.containerId === containerId).length
@@ -112,169 +110,171 @@ export function ContainersList() {
       {/* Content Section */}
       <div className={!searchQuery ? '' : 'mt-8'}>
         {filteredContainers.length === 0 ? (
-        <EmptyState
-          message={searchQuery ? 'No containers found' : 'No containers yet'}
-          actionLabel={searchQuery ? undefined : 'Add your first container'}
-          onAction={searchQuery ? undefined : () => navigate('/places')}
-        />
-      ) : (
-        <div className="flex flex-col gap-6">
-          {/* Non-Empty Groups Section */}
-          {containerGroups.filter(group => {
-            const groupContainers = filteredContainers.filter(c => c.groupId === group.id)
-            return groupContainers.length > 0
-          }).length > 0 && (
-            <div className="flex flex-col gap-6">
-              {containerGroups.map((group) => {
-                const groupContainers = filteredContainers.filter(c => c.groupId === group.id)
-                if (groupContainers.length === 0) return null
-                if (searchQuery && groupContainers.length === 0) return null
+          <EmptyState
+            message={searchQuery ? 'No containers found' : 'No containers yet'}
+            actionLabel={searchQuery ? undefined : 'Add your first container'}
+            onAction={searchQuery ? undefined : () => navigate('/places')}
+          />
+        ) : (
+          <div className="flex flex-col gap-6">
+            {/* Non-Empty Groups Section */}
+            {containerGroups.filter(group => {
+              const groupContainers = filteredContainers.filter(c => c.groupId === group.id)
+              return groupContainers.length > 0
+            }).length > 0 && (
+                <div className="flex flex-col gap-6">
+                  {containerGroups.map((group) => {
+                    const groupContainers = filteredContainers.filter(c => c.groupId === group.id)
+                    if (groupContainers.length === 0) return null
+                    if (searchQuery && groupContainers.length === 0) return null
 
-                return (
-                  <div key={group.id} className="flex flex-col gap-3">
-                    <div
-                      className="flex items-center gap-2 px-1 cursor-pointer hover:opacity-80 transition-all"
-                      onClick={() => navigate(`/groups/${group.id}`)}
-                    >
-                      <h3 className="font-display text-[18px] font-bold text-text-primary">
-                        {group.name}
-                      </h3>
-                      <span className="text-sm text-text-tertiary">
-                        ({groupContainers.length})
-                      </span>
-                    </div>
-
-                    <div className="pl-4 border-l-2 border-border-standard ml-2">
-                      <div className="flex flex-col gap-3">
-                        {groupContainers.map((container, index) => {
-                          const place = places.find(p => p.id === container.placeId)
-                          const itemCount = getContainerItemCount(container.id)
-
-                          return (
-                            <Card
-                              key={container.id}
-                              variant="interactive"
-                              onClick={() => navigate(`/containers/${container.id}`)}
-                              className="flex items-center gap-[14px]"
-                            >
-                              <IconBadge icon={Package} color={getContainerColor(index)} />
-                              <div className="flex-1 min-w-0 flex flex-col gap-1">
-                                <div className="flex items-center gap-2">
-                                  <h3 className="font-body text-[16px] font-semibold text-text-primary">
-                                    {container.name}
-                                  </h3>
-                                  {container.qrCodeId && (
-                                    <div className="flex items-center gap-1 px-2 py-0.5 bg-accent-aqua/10 rounded-full">
-                                      <QrCode size={12} className="text-accent-aqua" strokeWidth={2} />
-                                      <span className="text-[10px] font-medium text-accent-aqua">QR</span>
-                                    </div>
-                                  )}
-                                </div>
-                                <p className="font-body text-[13px] text-text-secondary">
-                                  {place?.name} · {itemCount} items · Last updated{' '}
-                                  {(() => {
-                                    const date = toDate(container.lastAccessed)
-                                    const now = new Date()
-                                    const diffMs = now.getTime() - date.getTime()
-                                    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-                                    if (diffDays === 0) return 'today'
-                                    if (diffDays === 1) return 'yesterday'
-                                    return `${diffDays}d ago`
-                                  })()}
-                                </p>
-                              </div>
-                            </Card>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Ungrouped Containers */}
-          {filteredContainers.filter(c => !c.groupId).length > 0 && (
-            <div className="flex flex-col gap-3">
-              <h3 className="font-display text-[16px] font-semibold text-text-secondary px-1">
-                Ungrouped
-              </h3>
-              {filteredContainers.filter(c => !c.groupId).map((container, index) => {
-              const place = places.find(p => p.id === container.placeId)
-              const itemCount = getContainerItemCount(container.id)
-
-              return (
-                <Card
-                  key={container.id}
-                  variant="interactive"
-                  onClick={() => navigate(`/containers/${container.id}`)}
-                  className="flex items-center gap-[14px]"
-                >
-                  <IconBadge icon={Package} color={getContainerColor(index)} />
-                  <div className="flex-1 min-w-0 flex flex-col gap-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-body text-[16px] font-semibold text-text-primary">
-                        {container.name}
-                      </h3>
-                      {container.qrCodeId && (
-                        <div className="flex items-center gap-1 px-2 py-0.5 bg-accent-aqua/10 rounded-full">
-                          <QrCode size={12} className="text-accent-aqua" strokeWidth={2} />
-                          <span className="text-[10px] font-medium text-accent-aqua">QR</span>
+                    return (
+                      <div key={group.id} className="flex flex-col gap-3">
+                        <div
+                          className="flex items-center gap-2 px-1 cursor-pointer hover:opacity-80 transition-all"
+                          onClick={() => navigate(`/groups/${group.id}`)}
+                        >
+                          <h3 className="font-display text-[18px] font-bold text-text-primary">
+                            {group.name}
+                          </h3>
+                          <span className="text-sm text-text-tertiary">
+                            ({groupContainers.length})
+                          </span>
                         </div>
-                      )}
-                    </div>
-                    <p className="font-body text-[13px] text-text-secondary">
-                      {place?.name} · {itemCount} items · Last updated{' '}
-                      {(() => {
-                        const date = toDate(container.lastAccessed)
-                        const now = new Date()
-                        const diffMs = now.getTime() - date.getTime()
-                        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
-                        if (diffDays === 0) return 'today'
-                        if (diffDays === 1) return 'yesterday'
-                        return `${diffDays}d ago`
-                      })()}
-                    </p>
-                  </div>
-                </Card>
-              )
-            })}
-            </div>
-          )}
 
-          {/* Empty Groups */}
-          {containerGroups.filter(group => {
-            const groupContainers = filteredContainers.filter(c => c.groupId === group.id)
-            return groupContainers.length === 0
-          }).length > 0 && !searchQuery && (
-            <div className="flex flex-col gap-3">
-              <h3 className="font-display text-[16px] font-semibold text-text-secondary px-1">
-                Empty Groups
-              </h3>
-              {containerGroups.map((group) => {
-                const groupContainers = filteredContainers.filter(c => c.groupId === group.id)
-                if (groupContainers.length > 0) return null
+                        <div className="pl-4 border-l-2 border-border-standard ml-2">
+                          <div className="flex flex-col gap-3">
+                            {groupContainers.map((container) => {
+                              const place = places.find(p => p.id === container.placeId)
+                              const itemCount = getContainerItemCount(container.id)
+                              const containerColor = container.color || '#3B82F6'
 
-                return (
-                  <div
-                    key={group.id}
-                    className="flex items-center gap-2 px-1 py-2 rounded-lg hover:bg-bg-surface transition-colors cursor-pointer"
-                    onClick={() => navigate(`/groups/${group.id}`)}
-                  >
-                    <h3 className="font-body text-[15px] text-text-secondary">
-                      {group.name}
-                    </h3>
-                    <span className="text-xs text-text-tertiary">
-                      (0)
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      )}
+                              return (
+                                <Card
+                                  key={container.id}
+                                  variant="interactive"
+                                  onClick={() => navigate(`/containers/${container.id}`)}
+                                  className="flex items-center gap-[14px]"
+                                >
+                                  <IconOrEmoji iconValue={container.icon} defaultIcon={getContainerIcon()} color={containerColor} />
+                                  <div className="flex-1 min-w-0 flex flex-col gap-1">
+                                    <div className="flex items-center gap-2">
+                                      <h3 className="font-body text-[16px] font-semibold text-text-primary">
+                                        {container.name}
+                                      </h3>
+                                      {container.qrCodeId && (
+                                        <div className="flex items-center gap-1 px-2 py-0.5 bg-accent-aqua/10 rounded-full">
+                                          <QrCode size={12} className="text-accent-aqua" strokeWidth={2} />
+                                          <span className="text-[10px] font-medium text-accent-aqua">QR</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <p className="font-body text-[13px] text-text-secondary">
+                                      {place?.name} · {itemCount} items · Last updated{' '}
+                                      {(() => {
+                                        const date = toDate(container.lastAccessed)
+                                        const now = new Date()
+                                        const diffMs = now.getTime() - date.getTime()
+                                        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+                                        if (diffDays === 0) return 'today'
+                                        if (diffDays === 1) return 'yesterday'
+                                        return `${diffDays}d ago`
+                                      })()}
+                                    </p>
+                                  </div>
+                                </Card>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+            {/* Ungrouped Containers */}
+            {filteredContainers.filter(c => !c.groupId).length > 0 && (
+              <div className="flex flex-col gap-3">
+                <h3 className="font-display text-[16px] font-semibold text-text-secondary px-1">
+                  Ungrouped
+                </h3>
+                {filteredContainers.filter(c => !c.groupId).map((container) => {
+                  const place = places.find(p => p.id === container.placeId)
+                  const itemCount = getContainerItemCount(container.id)
+                  const containerColor = container.color || '#3B82F6'
+
+                  return (
+                    <Card
+                      key={container.id}
+                      variant="interactive"
+                      onClick={() => navigate(`/containers/${container.id}`)}
+                      className="flex items-center gap-[14px]"
+                    >
+                      <IconOrEmoji iconValue={container.icon} defaultIcon={getContainerIcon()} color={containerColor} />
+                      <div className="flex-1 min-w-0 flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-body text-[16px] font-semibold text-text-primary">
+                            {container.name}
+                          </h3>
+                          {container.qrCodeId && (
+                            <div className="flex items-center gap-1 px-2 py-0.5 bg-accent-aqua/10 rounded-full">
+                              <QrCode size={12} className="text-accent-aqua" strokeWidth={2} />
+                              <span className="text-[10px] font-medium text-accent-aqua">QR</span>
+                            </div>
+                          )}
+                        </div>
+                        <p className="font-body text-[13px] text-text-secondary">
+                          {place?.name} · {itemCount} items · Last updated{' '}
+                          {(() => {
+                            const date = toDate(container.lastAccessed)
+                            const now = new Date()
+                            const diffMs = now.getTime() - date.getTime()
+                            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+                            if (diffDays === 0) return 'today'
+                            if (diffDays === 1) return 'yesterday'
+                            return `${diffDays}d ago`
+                          })()}
+                        </p>
+                      </div>
+                    </Card>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Empty Groups */}
+            {containerGroups.filter(group => {
+              const groupContainers = filteredContainers.filter(c => c.groupId === group.id)
+              return groupContainers.length === 0
+            }).length > 0 && !searchQuery && (
+                <div className="flex flex-col gap-3">
+                  <h3 className="font-display text-[16px] font-semibold text-text-secondary px-1">
+                    Empty Groups
+                  </h3>
+                  {containerGroups.map((group) => {
+                    const groupContainers = filteredContainers.filter(c => c.groupId === group.id)
+                    if (groupContainers.length > 0) return null
+
+                    return (
+                      <div
+                        key={group.id}
+                        className="flex items-center gap-2 px-1 py-2 rounded-lg hover:bg-bg-surface transition-colors cursor-pointer"
+                        onClick={() => navigate(`/groups/${group.id}`)}
+                      >
+                        <h3 className="font-body text-[15px] text-text-secondary">
+                          {group.name}
+                        </h3>
+                        <span className="text-xs text-text-tertiary">
+                          (0)
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+          </div>
+        )}
       </div>
 
       <MultiStepCreateContainerModal

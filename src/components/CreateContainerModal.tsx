@@ -11,6 +11,7 @@ import { useGroups } from '@/hooks/queries/useGroups'
 // import { ImageCropper } from '@/components'
 import { Container } from '@/types'
 import { Modal, Button, Input, FormField, MultiImageUploader, ProgressBar, Select } from '@/components/ui'
+import { getRandomColor } from '@/utils/colorUtils'
 
 const containerSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -129,6 +130,9 @@ export function CreateContainerModal({
                     photos: finalPhotos,
                     // Legacy support is handled in service, but we pass photos array
                     groupId: data.groupId || null,
+                    // Preserve existing color and icon when editing
+                    color: initialData.color,
+                    icon: initialData.icon,
                 })
                 containerId = initialData.id
             } else {
@@ -138,6 +142,8 @@ export function CreateContainerModal({
                     photos: finalPhotos,
                     lastAccessed: new Date(),
                     groupId: data.groupId || null,
+                    color: getRandomColor('container'),
+                    icon: 'Package',
                 })
             }
 

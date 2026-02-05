@@ -7,10 +7,11 @@ import { useAllItems } from '@/hooks/queries/useAllItems'
 import { LoadingState } from '@/components/ui'
 import { SearchFilterType } from '@/hooks/useSearch'
 import { Item, Container, Place } from '@/types'
-import { Search as SearchIcon, Package, Home, Briefcase, Archive, MapPin, QrCode, Mic, Camera } from 'lucide-react'
-import { Card, IconBadge, Badge } from '@/components/ui'
+import { Search as SearchIcon, Package, Archive, MapPin, QrCode, Mic, Camera } from 'lucide-react'
+import { Card, IconOrEmoji, Badge } from '@/components/ui'
 import { Timestamp } from 'firebase/firestore'
 import { cn } from '@/lib/utils'
+import { getPlaceIcon, getContainerIcon, getItemIcon } from '@/utils/colorUtils'
 
 // Helper to convert Firestore Timestamp to Date
 const toDate = (timestamp: Date | Timestamp): Date => {
@@ -20,24 +21,7 @@ const toDate = (timestamp: Date | Timestamp): Date => {
   return timestamp instanceof Date ? timestamp : new Date(timestamp)
 }
 
-const getPlaceIcon = (type: string) => {
-  switch (type) {
-    case 'home': return Home
-    case 'office': return Briefcase
-    case 'storage': return Archive
-    default: return MapPin
-  }
-}
-
-const getPlaceColor = (index: number) => {
-  const colors = ['#14B8A6', '#F59E0B', '#3B82F6', '#8B5CF6']
-  return colors[index % colors.length]
-}
-
-const getContainerColor = (index: number) => {
-  const colors = ['#3B82F6', '#14B8A6', '#F59E0B', '#8B5CF6', '#F97316']
-  return colors[index % colors.length]
-}
+// Color and icon now come from database
 
 export function Search() {
   const navigate = useNavigate()
@@ -191,7 +175,7 @@ export function Search() {
                       />
                     ) : (
                       <div className="w-16 h-16 bg-bg-elevated rounded-xl flex items-center justify-center flex-shrink-0">
-                        <Package size={28} className="text-text-tertiary" strokeWidth={2} />
+                        <IconOrEmoji iconValue={item.icon} defaultIcon={getItemIcon()} color={item.color || '#3B82F6'} />
                       </div>
                     )}
                     <div className="flex-1 min-w-0 flex flex-col gap-1">
@@ -226,9 +210,10 @@ export function Search() {
           {searchedContainers.length > 0 && (
             <div className="space-y-3">
               <h2 className="font-display text-[18px] font-bold text-text-primary">Containers ({searchedContainerCount})</h2>
-              {searchedContainers.map((container: Container, index: number) => {
+              {searchedContainers.map((container: Container) => {
                 const place = allPlaces.find(p => p.id === container.placeId)
                 const itemCount = allItems.filter(item => item.containerId === container.id).length
+                const containerColor = container.color || '#3B82F6'
 
                 return (
                   <Card
@@ -237,7 +222,7 @@ export function Search() {
                     onClick={() => navigate(`/containers/${container.id}`)}
                     className="flex items-center gap-[14px]"
                   >
-                    <IconBadge icon={Package} color={getContainerColor(index)} />
+                    <IconOrEmoji iconValue={container.icon} defaultIcon={getContainerIcon()} color={containerColor} />
                     <div className="flex-1 min-w-0 flex flex-col gap-1">
                       <div className="flex items-center gap-2">
                         <h3 className="font-body text-[16px] font-semibold text-text-primary">
@@ -273,9 +258,9 @@ export function Search() {
           {searchedPlaces.length > 0 && (
             <div className="space-y-3">
               <h2 className="font-display text-[18px] font-bold text-text-primary">Places ({searchedPlaceCount})</h2>
-              {searchedPlaces.map((place: Place, index: number) => {
+              {searchedPlaces.map((place: Place) => {
                 const placeContainers = allContainers.filter((c) => c.placeId === place.id)
-                const PlaceIcon = getPlaceIcon(place.type)
+                const placeColor = place.color || '#14B8A6'
 
                 return (
                   <Card
@@ -284,7 +269,7 @@ export function Search() {
                     onClick={() => navigate(`/places/${place.id}`)}
                     className="flex items-center gap-[14px]"
                   >
-                    <IconBadge icon={PlaceIcon} color={getPlaceColor(index)} />
+                    <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={placeColor} />
                     <div className="flex-1 min-w-0">
                       <h3 className="font-body text-[16px] font-semibold text-text-primary">
                         {place.name}

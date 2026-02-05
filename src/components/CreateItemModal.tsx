@@ -12,7 +12,8 @@ import { AudioRecorder } from './AudioRecorder'
 import { AudioPlayer } from './AudioPlayer'
 import { trimSilence } from '@/utils/audioUtils'
 import { Item } from '@/types'
-import { Modal, Button, Input, Textarea, FormField, Label, MultiImageUploader, ProgressBar, Select } from '@/components/ui'
+import { Modal, Button, Input, Textarea, FormField, Label, MultiImageUploader, ProgressBar, Select, EmojiPicker } from '@/components/ui'
+import { getRandomColor } from '@/utils/colorUtils'
 
 const itemSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -58,6 +59,10 @@ export function CreateItemModal({
     const [showAudioRecorder, setShowAudioRecorder] = useState(false)
     const [isTrimming, setIsTrimming] = useState(false)
 
+    // Emoji state
+    const [selectedEmoji, setSelectedEmoji] = useState<string>('')
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+
     const itemGroups = groups.filter(g => g.type === 'item' && g.parentId === containerId)
 
     const { compress, isCompressing, progress } = useImageCompression()
@@ -88,6 +93,8 @@ export function CreateItemModal({
             if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
             setAudioPreviewUrl(null)
             setShowAudioRecorder(false)
+            setSelectedEmoji(initialData.icon || '')
+            setShowEmojiPicker(false)
         } else if (isOpen && !editMode) {
             reset({
                 name: '',
@@ -101,6 +108,8 @@ export function CreateItemModal({
             if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
             setAudioPreviewUrl(null)
             setShowAudioRecorder(false)
+            setSelectedEmoji('')
+            setShowEmojiPicker(false)
         }
     }, [isOpen, editMode, initialData, reset, audioPreviewUrl, preselectedGroupId])
 
@@ -170,6 +179,9 @@ export function CreateItemModal({
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 const updatePayload: any = {
                     ...itemData,
+                    // Preserve existing color but allow icon to be updated
+                    color: initialData.color,
+                    icon: selectedEmoji || initialData.icon,
                 }
 
                 // If we have a new audio URL, set it
@@ -193,6 +205,8 @@ export function CreateItemModal({
                     tags: [],
                     voiceNoteUrl: audioUrl || undefined,
                     groupId: itemData.groupId,
+                    color: getRandomColor('item'),
+                    icon: selectedEmoji || '🦆',
                 })
             }
 
@@ -249,19 +263,47 @@ export function CreateItemModal({
             description={`Form to ${editMode ? 'edit' : 'create'} an item`}
         >
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                {/* Item Name with Emoji Button */}
                 <FormField
                     label="Item Name"
                     htmlFor="name"
                     error={errors.name?.message}
                 >
-                    <Input
-                        id="name"
-                        type="text"
-                        placeholder="e.g., Vintage Lamp"
-                        error={!!errors.name}
-                        {...register('name')}
-                    />
+                    <div className="flex gap-2">
+                        <Input
+                            id="name"
+                            type="text"
+                            placeholder="e.g., Vintage Lamp"
+                            error={!!errors.name}
+                            {...register('name')}
+                            className="flex-1"
+                        />
+                        <button
+                            type="button"
+                            onClick={() => setShowEmojiPicker(true)}
+                            className="w-12 h-12 flex items-center justify-center text-2xl bg-bg-surface hover:bg-bg-elevated rounded-xl border border-border-light transition-colors shrink-0"
+                            title="Choose icon"
+                        >
+                            {selectedEmoji || '🦆'}
+                        </button>
+                    </div>
                 </FormField>
+
+                {/* Emoji Picker Modal */}
+                {showEmojiPicker && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4" onClick={() => setShowEmojiPicker(false)}>
+                        <div onClick={(e) => e.stopPropagation()}>
+                            <EmojiPicker
+                                selectedEmoji={selectedEmoji}
+                                onEmojiSelect={(emoji) => {
+                                    setSelectedEmoji(emoji || '🦆')
+                                    setShowEmojiPicker(false)
+                                }}
+                                onClose={() => setShowEmojiPicker(false)}
+                            />
+                        </div>
+                    </div>
+                )}
 
                 <FormField
                     label="Description (Optional)"

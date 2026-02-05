@@ -4,14 +4,15 @@ import { useGroup } from '@/hooks/queries/useGroups'
 import { usePlaces } from '@/hooks/queries/usePlaces'
 import { useAllContainers } from '@/hooks/queries/useAllContainers'
 import { useAllItems } from '@/hooks/queries/useAllItems'
-import { ListItem, LoadingState, EmptyState, IconBadge, NavigationHeader, Button } from '@/components/ui'
-import { Home, Briefcase, Archive, MapPin, Package, Plus } from 'lucide-react'
+import { ListItem, LoadingState, EmptyState, IconOrEmoji, NavigationHeader, Button } from '@/components/ui'
+import { Plus } from 'lucide-react'
 import { ItemCard } from '@/components/ItemCard'
 import { CreatePlaceModal, CreateContainerModal, CreateItemModal } from '@/components'
 import { useQueryClient } from '@tanstack/react-query'
 import { PLACE_KEYS } from '@/hooks/queries/usePlaces'
 import { CONTAINER_KEYS } from '@/hooks/queries/useContainers'
 import { ITEM_KEYS } from '@/hooks/queries/useItems'
+import { getPlaceIcon, getContainerIcon } from '@/utils/colorUtils'
 
 export function GroupDetail() {
     const { id } = useParams<{ id: string }>()
@@ -42,19 +43,7 @@ export function GroupDetail() {
         )
     }
 
-    const getPlaceIcon = (type: string) => {
-        switch (type) {
-            case 'home': return Home
-            case 'office': return Briefcase
-            case 'storage': return Archive
-            default: return MapPin
-        }
-    }
-
-    const getPlaceColor = (index: number) => {
-        const colors = ['#14B8A6', '#F59E0B', '#3B82F6', '#8B5CF6']
-        return colors[index % colors.length]
-    }
+    // Color and icon now come from database
 
     const renderContent = () => {
         if (group.type === 'place') {
@@ -64,15 +53,16 @@ export function GroupDetail() {
             }
             return (
                 <div className="flex flex-col gap-3">
-                    {groupPlaces.map((place, index) => {
+                    {groupPlaces.map((place) => {
                         const placeContainers = containers.filter(c => c.placeId === place.id)
+                        const placeColor = place.color || '#14B8A6'
                         return (
                             <ListItem
                                 key={place.id}
                                 title={place.name}
                                 subtitle={`${placeContainers.length} container${placeContainers.length !== 1 ? 's' : ''}`}
                                 leftContent={
-                                    <IconBadge icon={getPlaceIcon(place.type)} color={getPlaceColor(index)} />
+                                    <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={placeColor} />
                                 }
                                 onClick={() => navigate(`/places/${place.id}`)}
                             />
@@ -89,16 +79,17 @@ export function GroupDetail() {
             }
             return (
                 <div className="flex flex-col gap-3">
-                    {groupContainers.map((container, index) => {
+                    {groupContainers.map((container) => {
                         const place = places.find(p => p.id === container.placeId)
                         const containerItems = items.filter(i => i.containerId === container.id)
+                        const containerColor = container.color || '#3B82F6'
                         return (
                             <ListItem
                                 key={container.id}
                                 title={container.name}
                                 subtitle={`${place?.name || 'Unknown Location'} · ${containerItems.length} items`}
                                 leftContent={
-                                    <IconBadge icon={Package} color={getPlaceColor(index)} />
+                                    <IconOrEmoji iconValue={container.icon} defaultIcon={getContainerIcon()} color={containerColor} />
                                 }
                                 onClick={() => navigate(`/containers/${container.id}`)}
                             />

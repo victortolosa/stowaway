@@ -1,4 +1,4 @@
-import { Package, Mic } from 'lucide-react'
+import { Mic } from 'lucide-react'
 import { Card } from '@/components/ui'
 import { Item } from '@/types'
 import { formatTimeAgo } from '@/utils/date'
@@ -35,7 +35,7 @@ export function ItemCard({
                 </div>
             ) : (
                 <div className="w-full aspect-[4/3] bg-bg-surface-alt flex items-center justify-center border-b border-border-light">
-                    <Package size={24} className="text-text-tertiary opacity-50" strokeWidth={1.5} />
+                    <span className="text-5xl">{item.icon || '🦆'}</span>
                 </div>
             )}
 

@@ -8,8 +8,9 @@ import { CreatePlaceModal, ConfirmDeleteModal, CreateGroupModal, ObjectViewTabs 
 import { useNavigate } from 'react-router-dom'
 import { deletePlace, deleteGroup } from '@/services/firebaseService'
 import { Place, Group } from '@/types'
-import { Trash2, Home, Briefcase, Archive, MapPin, Search, FolderPlus, Plus, Pencil } from 'lucide-react'
-import { ListItem, EmptyState, IconBadge, LoadingState, Button } from '@/components/ui'
+import { Trash2, Search, FolderPlus, Plus, Pencil } from 'lucide-react'
+import { ListItem, EmptyState, LoadingState, Button, IconOrEmoji } from '@/components/ui'
+import { getPlaceIcon } from '@/utils/colorUtils'
 
 export function Places() {
   const user = useAuthStore((state) => state.user)
@@ -76,19 +77,7 @@ export function Places() {
     }
   }
 
-  const getPlaceIcon = (type: string) => {
-    switch (type) {
-      case 'home': return Home
-      case 'office': return Briefcase
-      case 'storage': return Archive
-      default: return MapPin
-    }
-  }
-
-  const getPlaceColor = (index: number) => {
-    const colors = ['#14B8A6', '#F59E0B', '#3B82F6', '#8B5CF6']
-    return colors[index % colors.length]
-  }
+  // Color and icon now come from database
 
   const filteredPlaces = places.filter((place) => {
     if (!searchQuery) return true
@@ -153,36 +142,165 @@ export function Places() {
       {/* Content Section */}
       <div className={!searchQuery ? '' : 'mt-8'}>
         {filteredPlaces.length === 0 ? (
-        <EmptyState
-          message={searchQuery ? 'No places found' : 'No places yet'}
-          actionLabel={searchQuery ? undefined : 'Create Your First Place'}
-          onAction={searchQuery ? undefined : () => setIsCreateModalOpen(true)}
-        />
-      ) : (
-        <div className="flex flex-col gap-6">
-          {/* Non-Empty Groups Section */}
+          <EmptyState
+            message={searchQuery ? 'No places found' : 'No places yet'}
+            actionLabel={searchQuery ? undefined : 'Create Your First Place'}
+            onAction={searchQuery ? undefined : () => setIsCreateModalOpen(true)}
+          />
+        ) : (
+          <div className="flex flex-col gap-6">
+            {/* Non-Empty Groups Section */}
             {placeGroups.filter(group => {
               const groupPlaces = filteredPlaces.filter(p => p.groupId === group.id)
               return groupPlaces.length > 0
             }).length > 0 && (
-              <div className="flex flex-col gap-6">
-                {placeGroups.map((group) => {
-                  const groupPlaces = filteredPlaces.filter(p => p.groupId === group.id)
-                  if (groupPlaces.length === 0) return null
-                  if (searchQuery && groupPlaces.length === 0) return null
+                <div className="flex flex-col gap-6">
+                  {placeGroups.map((group) => {
+                    const groupPlaces = filteredPlaces.filter(p => p.groupId === group.id)
+                    if (groupPlaces.length === 0) return null
+                    if (searchQuery && groupPlaces.length === 0) return null
+
+                    return (
+                      <div key={group.id} className="flex flex-col gap-3">
+                        <div className="flex items-center justify-between px-1">
+                          <div
+                            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-all"
+                            onClick={() => navigate(`/groups/${group.id}`)}
+                          >
+                            <h3 className="font-display text-[18px] font-bold text-text-primary">
+                              {group.name}
+                            </h3>
+                            <span className="text-sm text-text-tertiary">
+                              ({groupPlaces.length})
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => setEditingGroup(group)}
+                            className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
+                          >
+                            <Pencil size={16} strokeWidth={2} />
+                          </button>
+                        </div>
+
+                        <div className="pl-4 border-l-2 border-border-standard ml-2">
+                          <div className="flex flex-col gap-3">
+                            {groupPlaces.map((place) => {
+                              const placeContainers = containers.filter((c) => c.placeId === place.id)
+                              const placeColor = place.color || '#14B8A6'
+
+                              return (
+                                <ListItem
+                                  key={place.id}
+                                  title={place.name}
+                                  subtitle={`${placeContainers.length} container${placeContainers.length !== 1 ? 's' : ''}`}
+                                  leftContent={
+                                    <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={placeColor} />
+                                  }
+                                  actions={
+                                    <div className="flex items-center">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setEditingPlace(place)
+                                        }}
+                                        className="p-3 text-text-tertiary hover:text-text-primary transition-colors z-10"
+                                      >
+                                        <Pencil size={20} strokeWidth={2} />
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setDeletingPlace(place)
+                                        }}
+                                        className="p-3 text-text-tertiary hover:text-accent-danger transition-colors z-10"
+                                      >
+                                        <Trash2 size={20} strokeWidth={2} />
+                                      </button>
+                                    </div>
+                                  }
+                                  onClick={() => navigate(`/places/${place.id}`)}
+                                />
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+            {/* Ungrouped Places */}
+            {filteredPlaces.filter(p => !p.groupId).length > 0 && (
+              <div className="flex flex-col gap-3">
+                <h3 className="font-display text-[16px] font-semibold text-text-secondary px-1">
+                  Ungrouped
+                </h3>
+                {filteredPlaces.filter(p => !p.groupId).map((place) => {
+                  const placeContainers = containers.filter((c) => c.placeId === place.id)
+                  const placeColor = place.color || '#14B8A6'
 
                   return (
-                    <div key={group.id} className="flex flex-col gap-3">
-                      <div className="flex items-center justify-between px-1">
+                    <ListItem
+                      key={place.id}
+                      title={place.name}
+                      subtitle={`${placeContainers.length} container${placeContainers.length !== 1 ? 's' : ''}`}
+                      leftContent={
+                        <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={placeColor} />
+                      }
+                      actions={
+                        <div className="flex items-center">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setEditingPlace(place)
+                            }}
+                            className="p-3 text-text-tertiary hover:text-text-primary transition-colors z-10"
+                          >
+                            <Pencil size={20} strokeWidth={2} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setDeletingPlace(place)
+                            }}
+                            className="p-3 text-text-tertiary hover:text-accent-danger transition-colors z-10"
+                          >
+                            <Trash2 size={20} strokeWidth={2} />
+                          </button>
+                        </div>
+                      }
+                      onClick={() => navigate(`/places/${place.id}`)}
+                    />
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Empty Groups */}
+            {placeGroups.filter(group => {
+              const groupPlaces = filteredPlaces.filter(p => p.groupId === group.id)
+              return groupPlaces.length === 0
+            }).length > 0 && !searchQuery && (
+                <div className="flex flex-col gap-3">
+                  <h3 className="font-display text-[16px] font-semibold text-text-secondary px-1">
+                    Empty Groups
+                  </h3>
+                  {placeGroups.map((group) => {
+                    const groupPlaces = filteredPlaces.filter(p => p.groupId === group.id)
+                    if (groupPlaces.length > 0) return null
+
+                    return (
+                      <div key={group.id} className="flex items-center justify-between px-1 py-2 rounded-lg hover:bg-bg-surface transition-colors">
                         <div
-                          className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-all"
+                          className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-all flex-1"
                           onClick={() => navigate(`/groups/${group.id}`)}
                         >
-                          <h3 className="font-display text-[18px] font-bold text-text-primary">
+                          <h3 className="font-body text-[15px] text-text-secondary">
                             {group.name}
                           </h3>
-                          <span className="text-sm text-text-tertiary">
-                            ({groupPlaces.length})
+                          <span className="text-xs text-text-tertiary">
+                            (0)
                           </span>
                         </div>
                         <button
@@ -192,141 +310,12 @@ export function Places() {
                           <Pencil size={16} strokeWidth={2} />
                         </button>
                       </div>
-
-                      <div className="pl-4 border-l-2 border-border-standard ml-2">
-                        <div className="flex flex-col gap-3">
-                          {groupPlaces.map((place, index) => {
-                            const placeContainers = containers.filter((c) => c.placeId === place.id)
-                            const PlaceIcon = getPlaceIcon(place.type)
-
-                            return (
-                              <ListItem
-                                key={place.id}
-                                title={place.name}
-                                subtitle={`${placeContainers.length} container${placeContainers.length !== 1 ? 's' : ''}`}
-                                leftContent={
-                                  <IconBadge icon={PlaceIcon} color={getPlaceColor(index)} />
-                                }
-                                actions={
-                                  <div className="flex items-center">
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setEditingPlace(place)
-                                      }}
-                                      className="p-3 text-text-tertiary hover:text-text-primary transition-colors z-10"
-                                    >
-                                      <Pencil size={20} strokeWidth={2} />
-                                    </button>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation()
-                                        setDeletingPlace(place)
-                                      }}
-                                      className="p-3 text-text-tertiary hover:text-accent-danger transition-colors z-10"
-                                    >
-                                      <Trash2 size={20} strokeWidth={2} />
-                                    </button>
-                                  </div>
-                                }
-                                onClick={() => navigate(`/places/${place.id}`)}
-                              />
-                            )
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-
-            {/* Ungrouped Places */}
-            {filteredPlaces.filter(p => !p.groupId).length > 0 && (
-              <div className="flex flex-col gap-3">
-                <h3 className="font-display text-[16px] font-semibold text-text-secondary px-1">
-                  Ungrouped
-                </h3>
-                {filteredPlaces.filter(p => !p.groupId).map((place, index) => {
-                const placeContainers = containers.filter((c) => c.placeId === place.id)
-                const PlaceIcon = getPlaceIcon(place.type)
-
-                return (
-                  <ListItem
-                    key={place.id}
-                    title={place.name}
-                    subtitle={`${placeContainers.length} container${placeContainers.length !== 1 ? 's' : ''}`}
-                    leftContent={
-                      <IconBadge icon={PlaceIcon} color={getPlaceColor(index)} />
-                    }
-                    actions={
-                      <div className="flex items-center">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setEditingPlace(place)
-                          }}
-                          className="p-3 text-text-tertiary hover:text-text-primary transition-colors z-10"
-                        >
-                          <Pencil size={20} strokeWidth={2} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            setDeletingPlace(place)
-                          }}
-                          className="p-3 text-text-tertiary hover:text-accent-danger transition-colors z-10"
-                        >
-                          <Trash2 size={20} strokeWidth={2} />
-                        </button>
-                      </div>
-                    }
-                    onClick={() => navigate(`/places/${place.id}`)}
-                  />
-                )
-              })}
-              </div>
-            )}
-
-            {/* Empty Groups */}
-            {placeGroups.filter(group => {
-              const groupPlaces = filteredPlaces.filter(p => p.groupId === group.id)
-              return groupPlaces.length === 0
-            }).length > 0 && !searchQuery && (
-              <div className="flex flex-col gap-3">
-                <h3 className="font-display text-[16px] font-semibold text-text-secondary px-1">
-                  Empty Groups
-                </h3>
-                {placeGroups.map((group) => {
-                  const groupPlaces = filteredPlaces.filter(p => p.groupId === group.id)
-                  if (groupPlaces.length > 0) return null
-
-                  return (
-                    <div key={group.id} className="flex items-center justify-between px-1 py-2 rounded-lg hover:bg-bg-surface transition-colors">
-                      <div
-                        className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-all flex-1"
-                        onClick={() => navigate(`/groups/${group.id}`)}
-                      >
-                        <h3 className="font-body text-[15px] text-text-secondary">
-                          {group.name}
-                        </h3>
-                        <span className="text-xs text-text-tertiary">
-                          (0)
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => setEditingGroup(group)}
-                        className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
-                      >
-                        <Pencil size={16} strokeWidth={2} />
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-        </div>
-      )}
+                    )
+                  })}
+                </div>
+              )}
+          </div>
+        )}
       </div>
 
       <CreatePlaceModal

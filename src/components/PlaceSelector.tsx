@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Modal, Button, Card, IconBadge, EmptyState } from './ui'
+import { Modal, Button, Card, IconOrEmoji, EmptyState } from './ui'
 import { usePlaces } from '@/hooks/queries/usePlaces'
 import { useAllContainers } from '@/hooks/queries/useAllContainers'
 import { CreatePlaceModal } from './CreatePlaceModal'
 import { useQueryClient } from '@tanstack/react-query'
-import { Search, Home, Briefcase, Archive, MapPin, Plus } from 'lucide-react'
+import { Search, Plus } from 'lucide-react'
+import { getPlaceIcon } from '@/utils/colorUtils'
 
 export function PlaceSelector({
   isOpen,
@@ -23,19 +24,7 @@ export function PlaceSelector({
   const [searchQuery, setSearchQuery] = useState('')
   const [isCreatePlaceOpen, setIsCreatePlaceOpen] = useState(false)
 
-  const getPlaceIcon = (type: string) => {
-    switch (type) {
-      case 'home': return Home
-      case 'office': return Briefcase
-      case 'storage': return Archive
-      default: return MapPin
-    }
-  }
-
-  const getPlaceColor = (index: number) => {
-    const colors = ['#14B8A6', '#F59E0B', '#3B82F6', '#8B5CF6']
-    return colors[index % colors.length]
-  }
+  // Color and icon now come from database
 
   const filteredPlaces = places.filter((place) => {
     if (!searchQuery) return true
@@ -91,9 +80,9 @@ export function PlaceSelector({
             <EmptyState message="No places found" />
           ) : (
             <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto">
-              {filteredPlaces.map((place, index) => {
-                const PlaceIcon = getPlaceIcon(place.type)
+              {filteredPlaces.map((place) => {
                 const containerCount = containers.filter(c => c.placeId === place.id).length
+                const placeColor = place.color || '#14B8A6'
 
                 return (
                   <Card
@@ -102,7 +91,7 @@ export function PlaceSelector({
                     onClick={() => onPlaceSelect(place.id)}
                     className="flex items-center gap-4"
                   >
-                    <IconBadge icon={PlaceIcon} color={getPlaceColor(index)} />
+                    <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={placeColor} />
                     <div className="flex-1 min-w-0">
                       <h3 className="font-body text-[15px] font-semibold text-text-primary">
                         {place.name}

@@ -7,6 +7,8 @@ export interface Place {
   updatedAt: Date
   groupId?: string | null
   photos?: string[]
+  color?: string
+  icon?: string
 }
 
 export interface Group {
@@ -31,6 +33,8 @@ export interface Container {
   updatedAt: Date
   groupId?: string | null
   photos?: string[]
+  color?: string
+  icon?: string
 }
 
 export interface Item {
@@ -46,6 +50,8 @@ export interface Item {
   createdAt: Date
   updatedAt: Date
   groupId?: string | null
+  color?: string
+  icon?: string
 }
 
 export interface SearchResult {

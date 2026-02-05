@@ -14,11 +14,12 @@ import { QRLabelModal } from '@/components/QRLabelModal'
 import { QRManageModal } from '@/components/QRManageModal'
 import { updateContainer, deleteContainer, deleteItem, deleteGroup } from '@/services/firebaseService'
 import { Item, Group } from '@/types'
-import { Pencil, Trash2, Package, Plus, QrCode, Search, FolderPlus } from 'lucide-react'
-import { IconBadge, EmptyState, LoadingState, Button, NavigationHeader, ImageCarousel, Modal, GalleryEditor } from '@/components/ui'
+import { Pencil, Trash2, Plus, QrCode, Search, FolderPlus } from 'lucide-react'
+import { IconOrEmoji, EmptyState, LoadingState, Button, NavigationHeader, ImageCarousel, Modal, GalleryEditor } from '@/components/ui'
 import { ItemCard } from '@/components/ItemCard'
 import { useSearchFilter } from '@/hooks/useSearchFilter'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
+import { getContainerIcon, DEFAULT_CONTAINER_COLOR } from '@/utils/colorUtils'
 
 export function Container() {
   const { id } = useParams<{ id: string }>()
@@ -206,7 +207,7 @@ export function Container() {
         </div>
       ) : (
         <div className="flex items-center gap-4 mb-8">
-          <IconBadge icon={Package} color="var(--color-accent-blue)" size="md" />
+          <IconOrEmoji iconValue={container.icon} defaultIcon={getContainerIcon()} color={container.color || DEFAULT_CONTAINER_COLOR} size="md" />
           <div className="flex flex-col gap-1">
             <span className="text-[11px] font-bold tracking-wider text-text-tertiary uppercase">
               Container

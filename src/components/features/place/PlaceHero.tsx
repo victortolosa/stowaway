@@ -1,6 +1,7 @@
 import { Place } from '@/types'
-import { Package } from 'lucide-react'
-import { ImageCarousel, IconBadge } from '@/components/ui'
+import { IconOrEmoji } from '@/components/ui'
+import { ImageCarousel } from '@/components/ui'
+import { getPlaceIcon, DEFAULT_PLACE_COLOR } from '@/utils/colorUtils'
 
 interface PlaceHeroProps {
     place: Place
@@ -39,7 +40,7 @@ export function PlaceHero({ place, containerCount, itemCount, onImageClick }: Pl
 
     return (
         <div className="flex items-center gap-4 mb-8">
-            <IconBadge icon={Package} color="var(--color-accent-aqua)" size="md" />
+            <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={place.color || DEFAULT_PLACE_COLOR} size="md" />
             <div className="flex flex-col gap-1">
                 <span className="text-[11px] font-bold tracking-wider text-text-tertiary uppercase">
                     Place

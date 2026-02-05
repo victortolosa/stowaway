@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Modal, Button, Card, IconBadge, EmptyState } from './ui'
+import { Modal, Button, Card, IconOrEmoji, EmptyState } from './ui'
 import { useAllContainers } from '@/hooks/queries/useAllContainers'
 import { useAllItems } from '@/hooks/queries/useAllItems'
 import { CreateContainerModal } from './CreateContainerModal'
 import { useQueryClient } from '@tanstack/react-query'
-import { Search, Package, Plus } from 'lucide-react'
+import { Search, Plus } from 'lucide-react'
+import { getContainerIcon } from '@/utils/colorUtils'
 
 export function ContainerSelector({
   isOpen,
@@ -35,10 +36,7 @@ export function ContainerSelector({
     return container.name.toLowerCase().includes(query)
   })
 
-  const getContainerColor = (index: number) => {
-    const colors = ['#3B82F6', '#14B8A6', '#F59E0B', '#8B5CF6']
-    return colors[index % colors.length]
-  }
+  // Color and icon now come from database
 
   const handleContainerCreated = async (containerId?: string) => {
     setIsCreateContainerOpen(false)
@@ -110,8 +108,9 @@ export function ContainerSelector({
             )
           ) : (
             <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto">
-              {filteredContainers.map((container, index) => {
+              {filteredContainers.map((container) => {
                 const itemCount = items.filter(i => i.containerId === container.id).length
+                const containerColor = container.color || '#3B82F6'
 
                 return (
                   <Card
@@ -120,7 +119,7 @@ export function ContainerSelector({
                     onClick={() => onContainerSelect(container.id)}
                     className="flex items-center gap-4"
                   >
-                    <IconBadge icon={Package} color={getContainerColor(index)} />
+                    <IconOrEmoji iconValue={container.icon} defaultIcon={getContainerIcon()} color={containerColor} />
                     <div className="flex-1 min-w-0">
                       <h3 className="font-body text-[15px] font-semibold text-text-primary">
                         {container.name}
