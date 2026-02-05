@@ -9,7 +9,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Search, Plus, FolderPlus } from 'lucide-react'
 import { EmptyState, LoadingState, Button } from '@/components/ui'
 import { ItemCard } from '@/components/ItemCard'
-import { ObjectViewTabs, MultiStepCreateItemModal, SelectItemsForGroupModal } from '@/components'
+import { MultiStepCreateItemModal, SelectItemsForGroupModal } from '@/components'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 import { SortOption, sortItems } from '@/utils/sortUtils'
 import { SortDropdown } from '@/components/ui'
@@ -70,7 +70,6 @@ export function ItemsList() {
 
   return (
     <div className="flex flex-col pb-48">
-      <ObjectViewTabs />
 
       {/* Title and Search Row */}
       <div className="flex items-center justify-between gap-4 mb-6 mt-2">

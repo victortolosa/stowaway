@@ -8,7 +8,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { Search, QrCode, Plus, FolderPlus } from 'lucide-react'
 import { Card, EmptyState, LoadingState, Button, IconOrEmoji } from '@/components/ui'
-import { ObjectViewTabs, MultiStepCreateContainerModal, SelectContainersForGroupModal } from '@/components'
+import { MultiStepCreateContainerModal, SelectContainersForGroupModal } from '@/components'
 import { Timestamp } from 'firebase/firestore'
 import { getContainerIcon } from '@/utils/colorUtils'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
@@ -72,7 +72,6 @@ export function ContainersList() {
 
   return (
     <div className="flex flex-col pb-48">
-      <ObjectViewTabs />
 
       {/* Title and Search Row */}
       <div className="flex items-center justify-between gap-4 mb-6 mt-2">

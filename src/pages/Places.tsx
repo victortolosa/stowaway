@@ -4,7 +4,7 @@ import { usePlaces, PLACE_KEYS } from '@/hooks/queries/usePlaces'
 import { useGroups } from '@/hooks/queries/useGroups'
 import { useAllContainers } from '@/hooks/queries/useAllContainers'
 import { useQueryClient } from '@tanstack/react-query'
-import { CreatePlaceModal, ConfirmDeleteModal, CreateGroupModal, ObjectViewTabs } from '@/components'
+import { CreatePlaceModal, ConfirmDeleteModal, CreateGroupModal } from '@/components'
 import { useNavigate } from 'react-router-dom'
 import { deletePlace, deleteGroup } from '@/services/firebaseService'
 import { Place, Group } from '@/types'
@@ -104,7 +104,6 @@ export function Places() {
 
   return (
     <div className="flex flex-col pb-48">
-      <ObjectViewTabs />
 
       {/* Title and Search Row */}
       <div className="flex items-center justify-between gap-4 mb-6 mt-2">
