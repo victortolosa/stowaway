@@ -100,7 +100,6 @@ export function Item() {
     <div className="pb-48">
       {/* Header */}
       <NavigationHeader
-        backTo={`/containers/${container?.id}`}
         actions={
           <div className="flex items-center gap-1">
             <Button

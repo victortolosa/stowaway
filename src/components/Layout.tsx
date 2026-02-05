@@ -13,7 +13,7 @@ function GlobalBreadcrumbs() {
     if (items.length === 0) return null
 
     return (
-        <div className="mb-2 w-full">
+        <div className="w-full">
             <Breadcrumbs items={items} />
         </div>
     )
@@ -33,7 +33,7 @@ export function Layout() {
                     style={{
                         paddingLeft: 'max(1.5rem, var(--safe-area-inset-left, 0px))',
                         paddingRight: 'max(1.5rem, var(--safe-area-inset-right, 0px))',
-                        paddingTop: 'max(1.5rem, var(--safe-area-inset-top, 0px))',
+                        paddingTop: 'max(0.75rem, var(--safe-area-inset-top, 0px))',
                         paddingBottom: 'max(2rem, var(--safe-area-inset-bottom, 0px))',
                     }}
                 >

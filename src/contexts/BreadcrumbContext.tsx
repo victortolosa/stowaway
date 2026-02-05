@@ -13,12 +13,11 @@ export function BreadcrumbProvider({ children }: { children: React.ReactNode }) 
     const [items, setItems] = useState<BreadcrumbItem[]>([])
     const location = useLocation()
 
-    // Reset breadcrumbs on route change to prevent stale state
+    // Reset breadcrumbs on route change. 
+    // This ensures that pages that don't call useBreadcrumbs(items) 
+    // will have an empty breadcrumb list.
     useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            setItems((current) => (current.length > 0 ? [] : current))
-        }, 0)
-        return () => clearTimeout(timeoutId)
+        setItems([])
     }, [location.pathname])
 
     return (

@@ -142,7 +142,6 @@ export function Container() {
     <div className="flex flex-col h-full pb-48 w-full max-w-full">
       {/* Header */}
       <NavigationHeader
-        backTo={`/places/${place?.id}`}
         actions={
           <div className="flex items-center gap-1">
             <Button
@@ -192,10 +191,7 @@ export function Container() {
             />
           </div>
           <div className="flex items-center gap-4">
-            <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-bold tracking-wider text-text-tertiary uppercase">
-                Container
-              </span>
+            <div className="flex flex-col">
               <h1 className="h1 text-text-primary">
                 {container.name}
               </h1>
@@ -208,10 +204,7 @@ export function Container() {
       ) : (
         <div className="flex items-center gap-4 mb-8">
           <IconOrEmoji iconValue={container.icon} defaultIcon={getContainerIcon()} color={container.color || DEFAULT_CONTAINER_COLOR} size="md" />
-          <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-bold tracking-wider text-text-tertiary uppercase">
-              Container
-            </span>
+          <div className="flex flex-col">
             <h1 className="h1 text-text-primary">
               {container.name}
             </h1>

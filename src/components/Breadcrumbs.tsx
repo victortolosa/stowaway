@@ -139,14 +139,14 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps & { className
     }, [items])
 
     return (
-        <div className={cn("relative mb-8 w-screen left-1/2 -translate-x-1/2 z-20")}>
+        <div className={cn("relative mb-2 w-screen left-1/2 -translate-x-1/2 z-20 bg-bg-surface/60 border-b border-border-light/50 backdrop-blur-md -mt-2")}>
             {/* Left Gradient Fade - Absolute to breakout container edges */}
             <div className="absolute left-0 top-0 bottom-0 w-[max(1.5rem,var(--safe-area-inset-left,0px))] pointer-events-none bg-gradient-to-r from-bg-page via-bg-page/80 to-transparent z-30" />
 
             <nav
                 ref={scrollContainerRef}
                 className={cn(
-                    "flex items-center gap-x-2 overflow-x-auto no-scrollbar whitespace-nowrap py-1 scroll-smooth",
+                    "flex items-center gap-x-2 overflow-x-auto no-scrollbar whitespace-nowrap py-0.5 scroll-smooth",
                     // Content alignment:
                     // Mobile: standard padding
                     "px-[max(1.5rem,var(--safe-area-inset-left,0px))]",
@@ -172,12 +172,12 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps & { className
                                 item.categoryPath ? (
                                     <Link
                                         to={item.categoryPath}
-                                        className="text-[10px] font-bold text-text-tertiary hover:text-text-primary uppercase tracking-widest transition-colors font-display"
+                                        className="text-[9px] font-bold text-text-tertiary hover:text-text-primary uppercase tracking-widest transition-colors font-display"
                                     >
                                         {item.category}
                                     </Link>
                                 ) : (
-                                    <span className="text-[10px] font-bold text-text-tertiary uppercase tracking-widest font-display">
+                                    <span className="text-[9px] font-bold text-text-tertiary uppercase tracking-widest font-display">
                                         {item.category}
                                     </span>
                                 )
@@ -186,7 +186,7 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps & { className
                                 <div className="flex items-center">
                                     <Link
                                         to={item.path}
-                                        className="hover:text-text-primary text-text-secondary transition-colors font-medium text-[15px]"
+                                        className="hover:text-text-primary text-text-secondary transition-colors font-medium text-[14px]"
                                     >
                                         {item.label}
                                     </Link>
@@ -200,7 +200,7 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps & { className
                                 </div>
                             ) : (
                                 <div className="flex items-center">
-                                    <span className="font-bold text-text-primary cursor-default text-[15px]">
+                                    <span className="font-bold text-text-primary cursor-default text-[14px]">
                                         {item.label}
                                     </span>
                                     {item.groupId && item.type && (

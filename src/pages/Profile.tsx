@@ -7,6 +7,7 @@ import { useAllContainers } from '@/hooks/queries/useAllContainers'
 import { useAllItems } from '@/hooks/queries/useAllItems'
 import { User, LogOut, MapPin, Package, Box, WifiOff } from 'lucide-react'
 import { Card } from '@/components/ui'
+import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 
 export function Profile() {
   const navigate = useNavigate()
@@ -14,6 +15,9 @@ export function Profile() {
   const { data: places = [] } = usePlaces()
   const { data: containers = [] } = useAllContainers()
   const { data: items = [] } = useAllItems()
+
+  // Set global breadcrumbs
+  useBreadcrumbs([{ label: 'Profile', categoryPath: '/profile' }])
 
   const handleLogout = async () => {
     try {

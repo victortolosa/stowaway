@@ -2,9 +2,13 @@ import { useState } from 'react'
 import { Card } from '@/components/ui'
 import { Printer } from 'lucide-react'
 import { BatchPrintModal } from '@/components/BatchPrintModal'
+import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 
 export function Tools() {
   const [showBatchPrint, setShowBatchPrint] = useState(false)
+
+  // Set global breadcrumbs
+  useBreadcrumbs([{ label: 'Tools', categoryPath: '/tools' }])
 
   const tools = [
     {

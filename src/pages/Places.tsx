@@ -11,6 +11,9 @@ import { Place, Group } from '@/types'
 import { Trash2, Search, FolderPlus, Plus, Pencil } from 'lucide-react'
 import { ListItem, EmptyState, LoadingState, Button, IconOrEmoji } from '@/components/ui'
 import { getPlaceIcon } from '@/utils/colorUtils'
+import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
+import { SortOption, sortItems } from '@/utils/sortUtils'
+import { SortDropdown } from '@/components/ui'
 
 export function Places() {
   const user = useAuthStore((state) => state.user)
@@ -38,8 +41,12 @@ export function Places() {
   const [editingGroup, setEditingGroup] = useState<Group | null>(null)
   const [deletingGroup, setDeletingGroup] = useState<Group | null>(null)
   const [isDeletingGroup, setIsDeletingGroup] = useState(false)
+  const [sortBy, setSortBy] = useState<SortOption>('recently-modified')
 
   const navigate = useNavigate()
+
+  // Set global breadcrumbs
+  useBreadcrumbs([{ label: 'All Places', category: 'PLACES', categoryPath: '/places' }])
 
   if (!user) {
     return <div>Please log in</div>
@@ -79,16 +86,19 @@ export function Places() {
 
   // Color and icon now come from database
 
-  const filteredPlaces = places.filter((place) => {
-    if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
-    const placeContainers = containers.filter((c) => c.placeId === place.id)
-    return (
-      place.name.toLowerCase().includes(query) ||
-      place.type.toLowerCase().includes(query) ||
-      placeContainers.some(c => c.name.toLowerCase().includes(query))
-    )
-  })
+  const filteredPlaces = sortItems(
+    places.filter((place) => {
+      if (!searchQuery) return true
+      const query = searchQuery.toLowerCase()
+      const placeContainers = containers.filter((c) => c.placeId === place.id)
+      return (
+        place.name.toLowerCase().includes(query) ||
+        place.type.toLowerCase().includes(query) ||
+        placeContainers.some(c => c.name.toLowerCase().includes(query))
+      )
+    }),
+    sortBy
+  )
 
   const placeGroups = (groups || []).filter((g) => g && g.type === 'place' && g.parentId === null)
 
@@ -115,29 +125,35 @@ export function Places() {
         </div>
       </div>
 
-      {/* Action Buttons */}
-      {!searchQuery && (
-        <div className="flex gap-3 mb-8">
-          <Button
-            variant="primary"
-            size="sm"
-            fullWidth
-            leftIcon={Plus}
-            onClick={() => setIsCreateModalOpen(true)}
-          >
-            New Place
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            fullWidth
-            leftIcon={FolderPlus}
-            onClick={() => setIsCreateGroupOpen(true)}
-          >
-            New Group
-          </Button>
+      {/* Action Buttons and Sort */}
+      <div className="flex flex-col gap-6 mb-8">
+        {!searchQuery && (
+          <div className="flex gap-3">
+            <Button
+              variant="primary"
+              size="sm"
+              fullWidth
+              leftIcon={Plus}
+              onClick={() => setIsCreateModalOpen(true)}
+            >
+              New Place
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              fullWidth
+              leftIcon={FolderPlus}
+              onClick={() => setIsCreateGroupOpen(true)}
+            >
+              New Group
+            </Button>
+          </div>
+        )}
+
+        <div className="flex justify-end px-1">
+          <SortDropdown value={sortBy} onChange={setSortBy} />
         </div>
-      )}
+      </div>
 
       {/* Content Section */}
       <div className={!searchQuery ? '' : 'mt-8'}>

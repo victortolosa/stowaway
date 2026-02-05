@@ -151,7 +151,6 @@ export function PlaceDetail() {
         <div className="flex flex-col h-full pb-48 w-full max-w-full">
             {/* Header */}
             <NavigationHeader
-                backTo="/dashboard"
                 actions={
                     <div className="relative">
                         <Button

@@ -33,7 +33,7 @@ export function NavigationHeader({
 
     return (
         <div className={cn(
-            "flex items-center justify-between py-4 min-h-[60px]",
+            "flex items-center justify-between pt-0 pb-4 min-h-[60px]",
             transparent ? "bg-transparent" : "",
             className
         )}>

@@ -22,10 +22,7 @@ export function PlaceHero({ place, containerCount, itemCount, onImageClick }: Pl
                     />
                 </div>
                 <div className="flex items-center gap-4">
-                    <div className="flex flex-col gap-1">
-                        <span className="text-[11px] font-bold tracking-wider text-text-tertiary uppercase">
-                            Place
-                        </span>
+                    <div className="flex flex-col">
                         <h1 className="h1 text-text-primary">
                             {place.name}
                         </h1>
@@ -41,10 +38,7 @@ export function PlaceHero({ place, containerCount, itemCount, onImageClick }: Pl
     return (
         <div className="flex items-center gap-4 mb-8">
             <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={place.color || DEFAULT_PLACE_COLOR} size="md" />
-            <div className="flex flex-col gap-1">
-                <span className="text-[11px] font-bold tracking-wider text-text-tertiary uppercase">
-                    Place
-                </span>
+            <div className="flex flex-col">
                 <h1 className="h1 text-text-primary">
                     {place.name}
                 </h1>

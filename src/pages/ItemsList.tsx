@@ -10,6 +10,9 @@ import { Search, Plus, FolderPlus } from 'lucide-react'
 import { EmptyState, LoadingState, Button } from '@/components/ui'
 import { ItemCard } from '@/components/ItemCard'
 import { ObjectViewTabs, MultiStepCreateItemModal, SelectItemsForGroupModal } from '@/components'
+import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
+import { SortOption, sortItems } from '@/utils/sortUtils'
+import { SortDropdown } from '@/components/ui'
 
 
 
@@ -26,7 +29,11 @@ export function ItemsList() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isMultiStepCreateOpen, setIsMultiStepCreateOpen] = useState(false)
   const [isSelectItemsGroupOpen, setIsSelectItemsGroupOpen] = useState(false)
+  const [sortBy, setSortBy] = useState<SortOption>('recently-modified')
   const navigate = useNavigate()
+
+  // Set global breadcrumbs
+  useBreadcrumbs([{ label: 'All Items', category: 'ITEMS', categoryPath: '/items' }])
 
   const itemGroups = (groups || []).filter((g) => g && g.type === 'item')
 
@@ -46,17 +53,20 @@ export function ItemsList() {
     return `${place?.name || ''} → ${container?.name || ''}`
   }
 
-  const filteredItems = items.filter((item) => {
-    if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
-    const location = getItemLocation(item.id).toLowerCase()
-    return (
-      item.name.toLowerCase().includes(query) ||
-      item.description?.toLowerCase().includes(query) ||
-      item.tags.some(tag => tag.toLowerCase().includes(query)) ||
-      location.includes(query)
-    )
-  })
+  const filteredItems = sortItems(
+    items.filter((item) => {
+      if (!searchQuery) return true
+      const query = searchQuery.toLowerCase()
+      const location = getItemLocation(item.id).toLowerCase()
+      return (
+        item.name.toLowerCase().includes(query) ||
+        item.description?.toLowerCase().includes(query) ||
+        item.tags.some(tag => tag.toLowerCase().includes(query)) ||
+        location.includes(query)
+      )
+    }),
+    sortBy
+  )
 
   return (
     <div className="flex flex-col pb-48">
@@ -83,134 +93,139 @@ export function ItemsList() {
 
       {/* Action Buttons */}
       {!searchQuery && (
-        <div className="flex gap-3 mb-8">
-          <Button
-            variant="primary"
-            size="sm"
-            fullWidth
-            leftIcon={Plus}
-            onClick={() => setIsMultiStepCreateOpen(true)}
-          >
-            New Item
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            fullWidth
-            leftIcon={FolderPlus}
-            onClick={() => setIsSelectItemsGroupOpen(true)}
-          >
-            New Group
-          </Button>
-        </div>
+        <>
+          <div className="flex gap-3 mb-8">
+            <Button
+              variant="primary"
+              size="sm"
+              fullWidth
+              leftIcon={Plus}
+              onClick={() => setIsMultiStepCreateOpen(true)}
+            >
+              New Item
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              fullWidth
+              leftIcon={FolderPlus}
+              onClick={() => setIsSelectItemsGroupOpen(true)}
+            >
+              New Group
+            </Button>
+          </div>
+          <div className="flex justify-end px-1">
+            <SortDropdown value={sortBy} onChange={setSortBy} />
+          </div>
+        </>
       )}
 
       {/* Content Section */}
       <div className={!searchQuery ? '' : 'mt-8'}>
         {filteredItems.length === 0 ? (
-        <EmptyState
-          message={searchQuery ? 'No items found' : 'No items yet'}
-          actionLabel={searchQuery ? undefined : 'Add your first item'}
-          onAction={searchQuery ? undefined : () => navigate('/places')}
-        />
-      ) : (
-        <div className="flex flex-col gap-6">
-          {/* Non-Empty Groups Section */}
-          {itemGroups.filter(group => {
-            const groupItems = filteredItems.filter(i => i.groupId === group.id)
-            return groupItems.length > 0
-          }).length > 0 && (
-            <div className="flex flex-col gap-6">
-              {itemGroups.map((group) => {
-                const groupItems = filteredItems.filter(i => i.groupId === group.id)
-                if (groupItems.length === 0) return null
-                if (searchQuery && groupItems.length === 0) return null
+          <EmptyState
+            message={searchQuery ? 'No items found' : 'No items yet'}
+            actionLabel={searchQuery ? undefined : 'Add your first item'}
+            onAction={searchQuery ? undefined : () => navigate('/places')}
+          />
+        ) : (
+          <div className="flex flex-col gap-6">
+            {/* Non-Empty Groups Section */}
+            {itemGroups.filter(group => {
+              const groupItems = filteredItems.filter(i => i.groupId === group.id)
+              return groupItems.length > 0
+            }).length > 0 && (
+                <div className="flex flex-col gap-6">
+                  {itemGroups.map((group) => {
+                    const groupItems = filteredItems.filter(i => i.groupId === group.id)
+                    if (groupItems.length === 0) return null
+                    if (searchQuery && groupItems.length === 0) return null
 
-                return (
-                  <div key={group.id} className="flex flex-col gap-3">
-                    <div
-                      className="flex items-center gap-2 px-1 cursor-pointer hover:opacity-80 transition-all"
-                      onClick={() => navigate(`/groups/${group.id}`)}
-                    >
-                      <h3 className="font-display text-[18px] font-bold text-text-primary">
-                        {group.name}
-                      </h3>
-                      <span className="text-sm text-text-tertiary">
-                        ({groupItems.length})
-                      </span>
-                    </div>
+                    return (
+                      <div key={group.id} className="flex flex-col gap-3">
+                        <div
+                          className="flex items-center gap-2 px-1 cursor-pointer hover:opacity-80 transition-all"
+                          onClick={() => navigate(`/groups/${group.id}`)}
+                        >
+                          <h3 className="font-display text-[18px] font-bold text-text-primary">
+                            {group.name}
+                          </h3>
+                          <span className="text-sm text-text-tertiary">
+                            ({groupItems.length})
+                          </span>
+                        </div>
 
-                    <div className="pl-4 border-l-2 border-border-standard ml-2">
-                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                        {groupItems.map((item) => (
-                          <ItemCard
-                            key={item.id}
-                            item={item}
-                            location={getItemLocation(item.id)}
-                            onClick={() => navigate(`/items/${item.id}`)}
-                            showDate={true}
-                          />
-                        ))}
+                        <div className="pl-4 border-l-2 border-border-standard ml-2">
+                          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                            {groupItems.map((item) => (
+                              <ItemCard
+                                key={item.id}
+                                item={item}
+                                location={getItemLocation(item.id)}
+                                onClick={() => navigate(`/items/${item.id}`)}
+                                showDate={true}
+                              />
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+                    )
+                  })}
+                </div>
+              )}
 
-          {/* Ungrouped Items */}
-          {filteredItems.filter(i => !i.groupId).length > 0 && (
-            <div className="flex flex-col gap-3">
-              <h3 className="font-display text-[16px] font-semibold text-text-secondary px-1">
-                Ungrouped
-              </h3>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredItems.filter(i => !i.groupId).map((item) => (
-                  <ItemCard
-                    key={item.id}
-                    item={item}
-                    location={getItemLocation(item.id)}
-                    onClick={() => navigate(`/items/${item.id}`)}
-                    showDate={true}
-                  />
-                ))}
+            {/* Ungrouped Items */}
+            {filteredItems.filter(i => !i.groupId).length > 0 && (
+              <div className="flex flex-col gap-3">
+                <h3 className="font-display text-[16px] font-semibold text-text-secondary px-1">
+                  Ungrouped
+                </h3>
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredItems.filter(i => !i.groupId).map((item) => (
+                    <ItemCard
+                      key={item.id}
+                      item={item}
+                      location={getItemLocation(item.id)}
+                      onClick={() => navigate(`/items/${item.id}`)}
+                      showDate={true}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Empty Groups */}
-          {itemGroups.filter(group => {
-            const groupItems = filteredItems.filter(i => i.groupId === group.id)
-            return groupItems.length === 0
-          }).length > 0 && !searchQuery && (
-            <div className="flex flex-col gap-3">
-              <h3 className="font-display text-[16px] font-semibold text-text-secondary px-1">
-                Empty Groups
-              </h3>
-              {itemGroups.map((group) => {
-                const groupItems = filteredItems.filter(i => i.groupId === group.id)
-                if (groupItems.length > 0) return null
+            {/* Empty Groups */}
+            {itemGroups.filter(group => {
+              const groupItems = filteredItems.filter(i => i.groupId === group.id)
+              return groupItems.length === 0
+            }).length > 0 && !searchQuery && (
+                <div className="flex flex-col gap-3">
+                  <h3 className="font-display text-[16px] font-semibold text-text-secondary px-1">
+                    Empty Groups
+                  </h3>
+                  {itemGroups.map((group) => {
+                    const groupItems = filteredItems.filter(i => i.groupId === group.id)
+                    if (groupItems.length > 0) return null
 
-                return (
-                  <div
-                    key={group.id}
-                    className="flex items-center gap-2 px-1 py-2 rounded-lg hover:bg-bg-surface transition-colors cursor-pointer"
-                    onClick={() => navigate(`/groups/${group.id}`)}
-                  >
-                    <h3 className="font-body text-[15px] text-text-secondary">
-                      {group.name}
-                    </h3>
-                    <span className="text-xs text-text-tertiary">
-                      (0)
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      )}
+                    return (
+                      <div
+                        key={group.id}
+                        className="flex items-center gap-2 px-1 py-2 rounded-lg hover:bg-bg-surface transition-colors cursor-pointer"
+                        onClick={() => navigate(`/groups/${group.id}`)}
+                      >
+                        <h3 className="font-body text-[15px] text-text-secondary">
+                          {group.name}
+                        </h3>
+                        <span className="text-xs text-text-tertiary">
+                          (0)
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+          </div>
+        )}
       </div>
 
       <MultiStepCreateItemModal

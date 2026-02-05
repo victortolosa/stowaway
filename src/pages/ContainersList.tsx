@@ -11,6 +11,9 @@ import { Card, EmptyState, LoadingState, Button, IconOrEmoji } from '@/component
 import { ObjectViewTabs, MultiStepCreateContainerModal, SelectContainersForGroupModal } from '@/components'
 import { Timestamp } from 'firebase/firestore'
 import { getContainerIcon } from '@/utils/colorUtils'
+import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
+import { SortOption, sortItems } from '@/utils/sortUtils'
+import { SortDropdown } from '@/components/ui'
 
 // Helper to convert Firestore Timestamp to Date
 const toDate = (timestamp: Date | Timestamp): Date => {
@@ -32,7 +35,11 @@ export function ContainersList() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isMultiStepCreateOpen, setIsMultiStepCreateOpen] = useState(false)
   const [isSelectContainersGroupOpen, setIsSelectContainersGroupOpen] = useState(false)
+  const [sortBy, setSortBy] = useState<SortOption>('recently-modified')
   const navigate = useNavigate()
+
+  // Set global breadcrumbs
+  useBreadcrumbs([{ label: 'All Containers', category: 'CONTAINERS', categoryPath: '/containers' }])
 
   const containerGroups = (groups || []).filter((g) => g && g.type === 'container')
 
@@ -50,15 +57,18 @@ export function ContainersList() {
     return items.filter((item) => item.containerId === containerId).length
   }
 
-  const filteredContainers = containers.filter((container) => {
-    if (!searchQuery) return true
-    const query = searchQuery.toLowerCase()
-    const place = places.find(p => p.id === container.placeId)
-    return (
-      container.name.toLowerCase().includes(query) ||
-      place?.name.toLowerCase().includes(query)
-    )
-  })
+  const filteredContainers = sortItems(
+    containers.filter((container) => {
+      if (!searchQuery) return true
+      const query = searchQuery.toLowerCase()
+      const place = places.find(p => p.id === container.placeId)
+      return (
+        container.name.toLowerCase().includes(query) ||
+        place?.name.toLowerCase().includes(query)
+      )
+    }),
+    sortBy
+  )
 
   return (
     <div className="flex flex-col pb-48">
@@ -104,6 +114,9 @@ export function ContainersList() {
           >
             New Group
           </Button>
+          <div className="flex justify-end px-1">
+            <SortDropdown value={sortBy} onChange={setSortBy} />
+          </div>
         </div>
       )}
 

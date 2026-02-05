@@ -12,6 +12,7 @@ import { Card, IconOrEmoji, Badge } from '@/components/ui'
 import { Timestamp } from 'firebase/firestore'
 import { cn } from '@/lib/utils'
 import { getPlaceIcon, getContainerIcon, getItemIcon } from '@/utils/colorUtils'
+import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 
 // Helper to convert Firestore Timestamp to Date
 const toDate = (timestamp: Date | Timestamp): Date => {
@@ -25,6 +26,9 @@ const toDate = (timestamp: Date | Timestamp): Date => {
 
 export function Search() {
   const navigate = useNavigate()
+
+  // Set global breadcrumbs
+  useBreadcrumbs([{ label: 'Search', categoryPath: '/search' }])
 
   const { data: allPlaces = [], isLoading: isPlacesLoading } = usePlaces()
   const { data: allContainers = [], isLoading: isContainersLoading } = useAllContainers()
