@@ -29,6 +29,9 @@ interface CreateItemModalProps {
     containerId: string
     editMode?: boolean
     initialData?: Item
+    preselectedGroupId?: string | null
+    showBackButton?: boolean
+    onBack?: () => void
 }
 
 export function CreateItemModal({
@@ -37,7 +40,10 @@ export function CreateItemModal({
     onItemCreated,
     containerId,
     editMode = false,
-    initialData
+    initialData,
+    preselectedGroupId,
+    showBackButton = false,
+    onBack
 }: CreateItemModalProps) {
     const user = useAuthStore((state) => state.user)
     const { data: groups = [] } = useGroups()
@@ -86,7 +92,7 @@ export function CreateItemModal({
             reset({
                 name: '',
                 description: '',
-                groupId: '',
+                groupId: preselectedGroupId || '',
             })
             setImages([])
             setAudioBlob(null)
@@ -96,7 +102,7 @@ export function CreateItemModal({
             setAudioPreviewUrl(null)
             setShowAudioRecorder(false)
         }
-    }, [isOpen, editMode, initialData, reset, audioPreviewUrl])
+    }, [isOpen, editMode, initialData, reset, audioPreviewUrl, preselectedGroupId])
 
     useEffect(() => {
         return () => {
@@ -383,6 +389,11 @@ export function CreateItemModal({
                 </div>
 
                 <div className="flex justify-end gap-3 pt-2">
+                    {showBackButton && onBack && (
+                        <Button type="button" variant="secondary" onClick={onBack}>
+                            Back
+                        </Button>
+                    )}
                     <Button type="button" variant="secondary" onClick={onClose}>
                         Cancel
                     </Button>

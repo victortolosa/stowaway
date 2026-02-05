@@ -22,6 +22,7 @@ const Search = lazy(() => import('@/pages/Search').then(m => ({ default: m.Searc
 const Profile = lazy(() => import('@/pages/Profile').then(m => ({ default: m.Profile })))
 const Scan = lazy(() => import('@/pages/Scan').then(m => ({ default: m.Scan })))
 const Tools = lazy(() => import('@/pages/Tools').then(m => ({ default: m.Tools })))
+const GroupDetail = lazy(() => import('@/pages/GroupDetail').then(m => ({ default: m.GroupDetail })))
 
 function App() {
   const { setUser, setLoading } = useAuthStore()
@@ -46,29 +47,30 @@ function App() {
           }>
             <div className="fixed inset-0 min-h-screen w-full bg-bg-page -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-100/20 via-bg-page to-bg-page pointer-events-none" />
             <Routes>
-            {/* Public routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/signup" element={<SignUp />} />
+              {/* Public routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<SignUp />} />
 
-            {/* Protected routes wrapped in Layout */}
-            <Route element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }>
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/places" element={<Places />} />
-              <Route path="/items" element={<ItemsList />} />
-              <Route path="/containers" element={<ContainersList />} />
-              <Route path="/places/:id" element={<PlaceDetail />} />
-              <Route path="/containers/:id" element={<Container />} />
-              <Route path="/items/:id" element={<Item />} />
-              <Route path="/search" element={<Search />} />
-              <Route path="/scan" element={<Scan />} />
-              <Route path="/profile" element={<Profile />} />
-              <Route path="/tools" element={<Tools />} />
-            </Route>
+              {/* Protected routes wrapped in Layout */}
+              <Route element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }>
+                <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/places" element={<Places />} />
+                <Route path="/items" element={<ItemsList />} />
+                <Route path="/containers" element={<ContainersList />} />
+                <Route path="/places/:id" element={<PlaceDetail />} />
+                <Route path="/containers/:id" element={<Container />} />
+                <Route path="/items/:id" element={<Item />} />
+                <Route path="/search" element={<Search />} />
+                <Route path="/scan" element={<Scan />} />
+                <Route path="/profile" element={<Profile />} />
+                <Route path="/tools" element={<Tools />} />
+                <Route path="/groups/:id" element={<GroupDetail />} />
+              </Route>
             </Routes>
           </Suspense>
         </Router>

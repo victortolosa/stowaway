@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
-/* Tailwind v4 uses @theme directive for custom design tokens */
+/**
+ * Custom Design Tokens
+ * Tailwind v4 uses the @theme directive for custom design tokens
+ * These can be used in your classes like: bg-bg-page, text-text-primary, etc.
+ */
 @theme {
   /* Colors */
   --color-bg-page: #F8F9FA;
@@ -45,7 +49,10 @@
   --radius-full: 9999px;
 }
 
-/* Safe area insets for mobile devices */
+/**
+ * PWA Safe Area Insets
+ * Required for proper display on devices with notches/rounded corners
+ */
 :root {
   --safe-area-inset-top: env(safe-area-inset-top);
   --safe-area-inset-bottom: env(safe-area-inset-bottom);
@@ -53,12 +60,9 @@
   --safe-area-inset-right: env(safe-area-inset-right);
 }
 
-/* Minimal global overrides */
-* {
-  margin: 0;
-  -webkit-tap-highlight-color: transparent;
-}
-
+/**
+ * Global App Styles
+ */
 html,
 body,
 #root {
@@ -71,8 +75,20 @@ body,
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom typography classes - TODO: Migrate to Tailwind utilities */
-/* These are used in 19+ files and can be gradually replaced with Tailwind classes */
+/* Remove tap highlight on mobile for better UX */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/**
+ * Legacy Typography Classes
+ * TODO: Gradually migrate these to Tailwind utilities
+ * Used in 19+ files - can be replaced with:
+ *   .h1 → font-display text-2xl font-bold leading-8 tracking-tight
+ *   .h2 → font-display text-xl font-semibold leading-7 tracking-tight
+ *   .text-body-sm → font-body text-sm leading-5
+ *   .text-body-xs → font-body text-[13px] leading-[18px]
+ */
 .h1 {
   font-family: var(--font-display);
   font-weight: 700;

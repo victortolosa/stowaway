@@ -140,7 +140,7 @@ export async function createContainer(container: Omit<Container, 'id' | 'userId'
     const sanitizedContainer = sanitizeUndefined(container)
 
     // Build the container data object
-    const containerData: any = {
+    const containerData: Record<string, unknown> = {
       ...sanitizedContainer,
       userId, // Ensure userId is attached
       createdAt: Timestamp.now(),
@@ -435,6 +435,16 @@ export async function deleteItem(itemId: string) {
 /**
  * GROUPS OPERATIONS
  */
+export async function getGroup(id: string): Promise<Group | undefined> {
+  const docRef = doc(db, 'groups', id)
+  const docSnap = await getDoc(docRef)
+  if (docSnap.exists()) {
+    const raw = { id: docSnap.id, ...docSnap.data() }
+    return GroupSchema.parse(raw)
+  }
+  return undefined
+}
+
 export async function createGroup(group: Omit<Group, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) {
   try {
     const userId = getCurrentUserId();
@@ -502,6 +512,26 @@ export async function deleteGroup(groupId: string, type: 'place' | 'container' |
     await deleteDoc(doc(db, 'groups', groupId))
   } catch (error) {
     console.error('Error deleting group:', error)
+    throw error
+  }
+}
+
+export async function getObjectsByGroup(groupId: string, type: 'place' | 'container' | 'item'): Promise<(Place | Container | Item)[]> {
+  try {
+    const collectionName = type === 'place' ? 'places' : type === 'container' ? 'containers' : 'items'
+    const q = query(
+      collection(db, collectionName),
+      where('groupId', '==', groupId)
+    )
+    const snapshot = await getDocs(q)
+    return snapshot.docs.map((doc) => {
+      const raw = { id: doc.id, ...doc.data() }
+      if (type === 'place') return PlaceSchema.parse(raw)
+      if (type === 'container') return ContainerSchema.parse(raw)
+      return ItemSchema.parse(raw)
+    })
+  } catch (error) {
+    console.error(`Error fetching ${type}s by group:`, error)
     throw error
   }
 }

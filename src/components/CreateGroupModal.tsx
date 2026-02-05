@@ -26,6 +26,8 @@ interface CreateGroupModalProps {
     editMode?: boolean
     initialData?: Group
     onDelete?: () => void
+    showBackButton?: boolean
+    onBack?: () => void
 }
 
 export function CreateGroupModal({
@@ -36,7 +38,9 @@ export function CreateGroupModal({
     parentId,
     editMode = false,
     initialData,
-    onDelete
+    onDelete,
+    showBackButton = false,
+    onBack
 }: CreateGroupModalProps) {
     const user = useAuthStore((state) => state.user)
 
@@ -258,6 +262,11 @@ export function CreateGroupModal({
                         </div>
                     )}
                     <div className="flex gap-3">
+                        {showBackButton && onBack && (
+                            <Button type="button" variant="secondary" onClick={onBack}>
+                                Back
+                            </Button>
+                        )}
                         <Button type="button" variant="secondary" onClick={onClose}>
                             Cancel
                         </Button>

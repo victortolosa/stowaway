@@ -9,7 +9,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { CONTAINER_KEYS } from '@/hooks/queries/useContainers'
 import { ITEM_KEYS } from '@/hooks/queries/useItems'
 import { GROUP_KEYS } from '@/hooks/queries/useGroups'
-import { CreateItemModal, CreateContainerModal, ConfirmDeleteModal, CreateGroupModal, Breadcrumbs } from '@/components'
+import { CreateItemModal, CreateContainerModal, ConfirmDeleteModal, CreateGroupModal } from '@/components'
 import { QRLabelModal } from '@/components/QRLabelModal'
 import { QRManageModal } from '@/components/QRManageModal'
 import { updateContainer, deleteContainer, deleteItem, deleteGroup } from '@/services/firebaseService'
@@ -18,6 +18,7 @@ import { Pencil, Trash2, Package, Plus, QrCode, Search, FolderPlus } from 'lucid
 import { IconBadge, EmptyState, LoadingState, Button, NavigationHeader, ImageCarousel, Modal, GalleryEditor } from '@/components/ui'
 import { ItemCard } from '@/components/ItemCard'
 import { useSearchFilter } from '@/hooks/useSearchFilter'
+import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 
 export function Container() {
   const { id } = useParams<{ id: string }>()
@@ -63,6 +64,7 @@ export function Container() {
   const [deletingGroup, setDeletingGroup] = useState<Group | null>(null)
   const [isDeletingGroup, setIsDeletingGroup] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [isCreateSiblingContainerOpen, setIsCreateSiblingContainerOpen] = useState(false)
 
   const containerItems = items // Already filtered by hook
   const containerGroups = (groups || []).filter((g) => g.parentId === id && g.type === 'item')
@@ -73,6 +75,12 @@ export function Container() {
     searchQuery,
     searchKeys: ['name', 'description', 'tags']
   })
+
+  // Set global breadcrumbs
+  useBreadcrumbs([
+    { label: place?.name || '...', path: `/places/${place?.id}`, category: 'PLACES', categoryPath: '/places' },
+    { label: container?.name || '...', category: 'CONTAINERS', categoryPath: '/containers', groupId: container?.groupId || undefined, type: 'container' }
+  ])
 
   if (!user || !id) {
     return <LoadingState />
@@ -148,6 +156,14 @@ export function Container() {
               variant="icon"
               size="icon"
               className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
+              onClick={() => setIsCreateSiblingContainerOpen(true)}
+            >
+              <Plus size={18} className="text-text-primary" strokeWidth={2} />
+            </Button>
+            <Button
+              variant="icon"
+              size="icon"
+              className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
               onClick={() => setIsEditingContainer(true)}
             >
               <Pencil size={18} className="text-text-primary" strokeWidth={2} />
@@ -163,16 +179,6 @@ export function Container() {
           </div>
         }
       />
-
-      <div className="pb-2">
-        <Breadcrumbs
-          items={[
-            { label: 'Places', path: '/places' },
-            { label: place?.name || '...', path: `/places/${place?.id}` },
-            { label: container.name }
-          ]}
-        />
-      </div>
 
       {/* Container Hero */}
       {container.photos && container.photos.length > 0 ? (
@@ -280,7 +286,10 @@ export function Container() {
                     return (
                       <div key={group.id} className="flex flex-col gap-3">
                         <div className="flex items-center justify-between px-1">
-                          <div className="flex items-center gap-2">
+                          <div
+                            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-all"
+                            onClick={() => navigate(`/groups/${group.id}`)}
+                          >
                             <h3 className="font-display text-[18px] font-bold text-text-primary">
                               {group.name}
                             </h3>
@@ -351,6 +360,18 @@ export function Container() {
           initialData={container}
         />
       )}
+
+      {/* Create Sibling Container Modal */}
+      <CreateContainerModal
+        isOpen={isCreateSiblingContainerOpen}
+        onClose={() => setIsCreateSiblingContainerOpen(false)}
+        onContainerCreated={() => {
+          refresh()
+          setIsCreateSiblingContainerOpen(false)
+        }}
+        placeId={place?.id || ''}
+        preselectedGroupId={container.groupId}
+      />
 
       {/* Edit Item Modal */}
       {editingItem && (

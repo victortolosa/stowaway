@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/auth'
 export const GROUP_KEYS = {
     all: ['groups'] as const,
     list: (userId: string) => [...GROUP_KEYS.all, 'list', userId] as const,
+    detail: (id: string) => [...GROUP_KEYS.all, 'detail', id] as const,
 }
 
 export function useGroups() {
@@ -17,5 +18,19 @@ export function useGroups() {
             return getUserGroups(user.uid)
         },
         enabled: !!user?.uid,
+    })
+}
+
+export function useGroup(id: string | undefined) {
+    return useQuery({
+        queryKey: id ? GROUP_KEYS.detail(id) : ['groups', 'disabled'],
+        queryFn: async () => {
+            if (!id) throw new Error('Group ID is required')
+            const { getGroup } = await import('@/services/firebaseService')
+            const group = await getGroup(id)
+            if (!group) throw new Error('Group not found')
+            return group
+        },
+        enabled: !!id,
     })
 }

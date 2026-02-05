@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
-import { CreateContainerModal, CreatePlaceModal, ConfirmDeleteModal, CreateGroupModal, Breadcrumbs } from '@/components'
+import { CreateContainerModal, CreatePlaceModal, ConfirmDeleteModal, CreateGroupModal } from '@/components'
 import { usePlace } from '@/hooks/queries/usePlaces'
 import { usePlaceContainers } from '@/hooks/queries/useContainers'
 import { usePlaceItems } from '@/hooks/queries/useItems'
@@ -19,6 +19,7 @@ import { PlaceHero } from '@/components/features/place/PlaceHero'
 import { ContainerList } from '@/components/features/place/ContainerList'
 import { PlaceItemsList } from '@/components/features/place/PlaceItemsList'
 import { useSearchFilter } from '@/hooks/useSearchFilter'
+import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 
 
 export function PlaceDetail() {
@@ -62,6 +63,7 @@ export function PlaceDetail() {
     const [deletingGroup, setDeletingGroup] = useState<Group | null>(null)
     const [isDeletingGroup, setIsDeletingGroup] = useState(false)
     const [showGallery, setShowGallery] = useState(false)
+    const [isCreateSiblingPlaceOpen, setIsCreateSiblingPlaceOpen] = useState(false)
 
     const placeContainers = containers // Already filtered by hook
     const placeGroups = (groups || []).filter((g) => g.parentId === id && g.type === 'container')
@@ -84,6 +86,11 @@ export function PlaceDetail() {
     // Only show items if searching
     const filteredItems = searchQuery ? allPlaceItems : []
 
+    // Set global breadcrumbs
+    useBreadcrumbs([
+        { label: place?.name || '...', category: 'PLACES', categoryPath: '/places', groupId: place?.groupId || undefined, type: 'place' }
+    ])
+
     if (!user || !id) {
         return <LoadingState />
     }
@@ -100,7 +107,6 @@ export function PlaceDetail() {
     const totalItems = (items || []).filter((item) =>
         placeContainers.some((c) => c.id === item.containerId)
     ).length
-
 
     const handleDeletePlace = async () => {
         setIsDeletingPlace(true)
@@ -152,6 +158,14 @@ export function PlaceDetail() {
                             variant="icon"
                             size="icon"
                             className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
+                            onClick={() => setIsCreateSiblingPlaceOpen(true)}
+                        >
+                            <Plus size={20} className="text-text-primary" strokeWidth={2} />
+                        </Button>
+                        <Button
+                            variant="icon"
+                            size="icon"
+                            className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
                             onClick={() => setShowMenu(!showMenu)}
                         >
                             <MoreVertical size={20} className="text-text-primary" strokeWidth={2} />
@@ -181,15 +195,6 @@ export function PlaceDetail() {
                     </div>
                 }
             />
-
-            <div className="pb-2">
-                <Breadcrumbs
-                    items={[
-                        { label: 'Places', path: '/places' },
-                        { label: place.name }
-                    ]}
-                />
-            </div>
 
             {/* Place Hero */}
             <PlaceHero
@@ -291,6 +296,17 @@ export function PlaceDetail() {
                     initialData={place}
                 />
             )}
+
+            {/* Create Sibling Place Modal */}
+            <CreatePlaceModal
+                isOpen={isCreateSiblingPlaceOpen}
+                onClose={() => setIsCreateSiblingPlaceOpen(false)}
+                onPlaceCreated={() => {
+                    refresh()
+                    setIsCreateSiblingPlaceOpen(false)
+                }}
+                preselectedGroupId={place.groupId}
+            />
 
             {/* Edit Container Modal */}
             {editingContainer && (

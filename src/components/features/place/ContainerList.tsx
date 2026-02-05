@@ -13,7 +13,7 @@ const toDate = (timestamp: Date | Timestamp | null | undefined): Date => {
         // @ts-expect-error - Timestamp type checking
         return timestamp.toDate()
     }
-    return timestamp instanceof Date ? timestamp : new Date(timestamp as any)
+    return timestamp instanceof Date ? timestamp : new Date(Number(timestamp))
 }
 
 interface ContainerListProps {
@@ -75,7 +75,10 @@ export function ContainerList({
                             return (
                                 <div key={group.id} className="flex flex-col gap-3">
                                     <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
+                                        <div
+                                            className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-all"
+                                            onClick={() => navigate(`/groups/${group.id}`)}
+                                        >
                                             <h3 className="font-display text-[18px] font-bold text-text-primary">
                                                 {group.name}
                                             </h3>

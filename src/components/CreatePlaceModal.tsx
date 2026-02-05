@@ -20,12 +20,13 @@ type PlaceFormValues = z.infer<typeof placeSchema>
 interface CreatePlaceModalProps {
     isOpen: boolean
     onClose: () => void
-    onPlaceCreated: () => void
+    onPlaceCreated: (placeId?: string) => void
     editMode?: boolean
     initialData?: Place
+    preselectedGroupId?: string | null
 }
 
-export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = false, initialData }: CreatePlaceModalProps) {
+export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = false, initialData, preselectedGroupId }: CreatePlaceModalProps) {
     const user = useAuthStore((state) => state.user)
     const { data: groups = [] } = useGroups()
     const [isSubmitting, setIsSubmitting] = useState(false)
@@ -61,11 +62,11 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
             reset({
                 type: 'home',
                 name: '',
-                groupId: '',
+                groupId: preselectedGroupId || '',
             })
             setImages([])
         }
-    }, [isOpen, editMode, initialData, reset])
+    }, [isOpen, editMode, initialData, reset, preselectedGroupId])
 
     const onSubmit = async (data: PlaceFormValues) => {
         if (!user) return
@@ -108,14 +109,17 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
 
             const finalPhotos = [...existingPhotos, ...newPhotos]
 
+            let placeId: string | undefined
+
             if (editMode && initialData) {
                 await updatePlace(initialData.id, {
                     ...data,
                     groupId: data.groupId || null,
                     photos: finalPhotos
                 })
+                placeId = initialData.id
             } else {
-                await createPlace({
+                placeId = await createPlace({
                     name: data.name,
                     type: data.type,
                     groupId: data.groupId || null,
@@ -125,7 +129,7 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
 
             reset()
             setImages([])
-            onPlaceCreated()
+            onPlaceCreated(placeId)
             onClose()
         } catch (error) {
             console.error('Failed to save place:', error)

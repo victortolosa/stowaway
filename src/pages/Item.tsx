@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
-import { CreateItemModal, ConfirmDeleteModal, AudioPlayer, Breadcrumbs } from '@/components'
+import { CreateItemModal, ConfirmDeleteModal, AudioPlayer } from '@/components'
 import { useItem } from '@/hooks/queries/useItems'
 import { useContainer } from '@/hooks/queries/useContainers'
 import { usePlace } from '@/hooks/queries/usePlaces'
@@ -11,6 +11,7 @@ import { CONTAINER_KEYS } from '@/hooks/queries/useContainers'
 import { deleteItem, updateItem } from '@/services/firebaseService'
 import { Trash2, Pencil, Plus } from 'lucide-react'
 import { Button, Badge, LoadingState, NavigationHeader, ImageCarousel, Modal, GalleryEditor } from '@/components/ui'
+import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 
 export function Item() {
   const { id } = useParams<{ id: string }>()
@@ -38,6 +39,14 @@ export function Item() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false)
   const [showGallery, setShowGallery] = useState(false)
+  const [isCreateSiblingItemOpen, setIsCreateSiblingItemOpen] = useState(false)
+
+  // Set global breadcrumbs
+  useBreadcrumbs([
+    { label: place?.name || '...', path: `/places/${place?.id}`, category: 'PLACES', categoryPath: '/places' },
+    { label: container?.name || '...', path: `/containers/${container?.id}`, category: 'CONTAINERS', categoryPath: '/containers' },
+    { label: item?.name || '...', category: 'ITEMS', categoryPath: '/items', groupId: item?.groupId || undefined, type: 'item' }
+  ])
 
   if (!user || !id) {
     return <LoadingState />
@@ -76,6 +85,14 @@ export function Item() {
               variant="icon"
               size="icon"
               className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
+              onClick={() => setIsCreateSiblingItemOpen(true)}
+            >
+              <Plus size={18} className="text-text-primary" strokeWidth={2} />
+            </Button>
+            <Button
+              variant="icon"
+              size="icon"
+              className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
               onClick={() => setIsEditing(true)}
             >
               <Pencil size={18} className="text-text-primary" strokeWidth={2} />
@@ -91,17 +108,6 @@ export function Item() {
           </div>
         }
       />
-
-      <div className="px-1 mb-4">
-        <Breadcrumbs
-          items={[
-            { label: 'Places', path: '/places' },
-            { label: place?.name || '...', path: `/places/${place?.id}` },
-            { label: container?.name || '...', path: `/containers/${container?.id}` },
-            { label: item.name }
-          ]}
-        />
-      </div>
 
       {/* Hero Image */}
       <div className="relative h-[280px] bg-bg-elevated rounded-2xl overflow-hidden mx-4 shadow-sm border border-border-light">
@@ -188,6 +194,18 @@ export function Item() {
           initialData={item}
         />
       )}
+
+      {/* Create Sibling Item Modal */}
+      <CreateItemModal
+        isOpen={isCreateSiblingItemOpen}
+        onClose={() => setIsCreateSiblingItemOpen(false)}
+        onItemCreated={() => {
+          refresh()
+          setIsCreateSiblingItemOpen(false)
+        }}
+        containerId={container?.id || ''}
+        preselectedGroupId={item.groupId}
+      />
 
       {/* Delete Item Confirmation */}
       <ConfirmDeleteModal

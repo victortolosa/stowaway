@@ -5,7 +5,7 @@ import { useAllContainers } from '@/hooks/queries/useAllContainers'
 // We use useAllItems for client-side filtering/sorting and counts
 import { useAllItems } from '@/hooks/queries/useAllItems'
 import { Plus, Home, Briefcase, Archive, MapPin, ChevronRight, ChevronDown, User, Package } from 'lucide-react'
-import { Button, LoadingState, Card, EmptyState, GroupFilter } from '@/components'
+import { Button, LoadingState, Card, EmptyState } from '@/components'
 import { ItemCard } from '@/components/ItemCard'
 import { Timestamp } from 'firebase/firestore'
 
@@ -35,11 +35,6 @@ export function Dashboard() {
   const [containersSortBy, setContainersSortBy] = useState<SortOption>('recently-modified')
   const [placesSortBy, setPlacesSortBy] = useState<SortOption>('recently-modified')
   const [visibleItemsCount, setVisibleItemsCount] = useState(8)
-
-  // Group Filters
-  const [selectedPlaceGroupId, setSelectedPlaceGroupId] = useState<string | null>(null)
-  const [selectedContainerGroupId, setSelectedContainerGroupId] = useState<string | null>(null)
-  const [selectedItemGroupId, setSelectedItemGroupId] = useState<string | null>(null)
 
 
   // Dashboard usually doesn't need auto-refresh on mount if RQ staleTime is configured,
@@ -83,19 +78,6 @@ export function Dashboard() {
     }
   }
 
-  // Filter Data
-  const filteredPlaces = places.filter(place =>
-    selectedPlaceGroupId ? place.groupId === selectedPlaceGroupId : true
-  )
-
-  const filteredContainers = containers.filter(container =>
-    selectedContainerGroupId ? container.groupId === selectedContainerGroupId : true
-  )
-
-  const filteredItems = allItems.filter(item =>
-    selectedItemGroupId ? item.groupId === selectedItemGroupId : true
-  )
-
   const sortItems = <T extends { name: string; createdAt: Date | Timestamp; lastAccessed?: Date | Timestamp }>(
     items: T[],
     sortBy: SortOption
@@ -132,7 +114,7 @@ export function Dashboard() {
   // If we only fetch 20 recent items, sorting by "Oldest First" on that subset is weird.
   // But for full feature parity, we are fetching `allItems`.
   // So we can use `allItems` for the sort logic.
-  const itemsToDisplay = filteredItems
+  const itemsToDisplay = allItems
 
   const allRecentItems = sortItems([...itemsToDisplay], itemsSortBy)
   const recentItems = allRecentItems.slice(0, visibleItemsCount)
@@ -239,13 +221,6 @@ export function Dashboard() {
             </div>
           </div>
 
-          <GroupFilter
-            type="place"
-            selectedGroupId={selectedPlaceGroupId}
-            onSelect={setSelectedPlaceGroupId}
-            className="mb-1"
-          />
-
           {places.length === 0 ? (
             <EmptyState
               message="No places yet"
@@ -254,7 +229,7 @@ export function Dashboard() {
             />
           ) : (
             <div
-              className="overflow-x-auto pb-8 no-scrollbar"
+              className="overflow-x-auto pb-4 no-scrollbar"
               style={{
                 marginLeft: 'calc(-1 * max(1.5rem, var(--safe-area-inset-left, 0px)))',
                 marginRight: 'calc(-1 * max(1.5rem, var(--safe-area-inset-right, 0px)))',
@@ -264,7 +239,7 @@ export function Dashboard() {
             >
               <div className="flex flex-col gap-3 min-w-max">
                 {(() => {
-                  const sortedPlaces = sortItems([...filteredPlaces], placesSortBy)
+                  const sortedPlaces = sortItems([...places], placesSortBy)
                   const row1 = sortedPlaces.filter((_, i) => i % 2 === 0)
                   const row2 = sortedPlaces.filter((_, i) => i % 2 !== 0)
 
@@ -405,76 +380,55 @@ export function Dashboard() {
               </div>
             </div>
 
-            <GroupFilter
-              type="container"
-              selectedGroupId={selectedContainerGroupId}
-              onSelect={setSelectedContainerGroupId}
-              className="mb-1"
-            />
+            <div
+              className="overflow-x-auto pb-4 no-scrollbar"
+              style={{
+                marginLeft: 'calc(-1 * max(1.5rem, var(--safe-area-inset-left, 0px)))',
+                marginRight: 'calc(-1 * max(1.5rem, var(--safe-area-inset-right, 0px)))',
+                paddingLeft: 'max(1.5rem, var(--safe-area-inset-left, 0px))',
+                paddingRight: 'max(1.5rem, var(--safe-area-inset-right, 0px))'
+              }}
+            >
+              <div className="flex gap-4 min-w-max">
+                {sortItems([...containers], containersSortBy)
+                  .slice(0, 8)
+                  .map((container, index) => {
+                    const place = places.find(p => p.id === container.placeId)
+                    const containerItems = allItems.filter(item => item.containerId === container.id)
+                    const containerColor = getPlaceColor(index)
 
-            {filteredContainers.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 px-4 text-center border-2 border-dashed border-border-standard rounded-xl">
-                <p className="text-text-secondary font-medium">No containers found in this group</p>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => setSelectedContainerGroupId(null)}
-                >
-                  Clear Filter
-                </Button>
-              </div>
-            ) : (
-              <div
-                className="overflow-x-auto pb-8 no-scrollbar"
-                style={{
-                  marginLeft: 'calc(-1 * max(1.5rem, var(--safe-area-inset-left, 0px)))',
-                  marginRight: 'calc(-1 * max(1.5rem, var(--safe-area-inset-right, 0px)))',
-                  paddingLeft: 'max(1.5rem, var(--safe-area-inset-left, 0px))',
-                  paddingRight: 'max(1.5rem, var(--safe-area-inset-right, 0px))'
-                }}
-              >
-                <div className="flex gap-4 min-w-max">
-                  {sortItems([...filteredContainers], containersSortBy)
-                    .slice(0, 8)
-                    .map((container, index) => {
-                      const place = places.find(p => p.id === container.placeId)
-                      const containerItems = allItems.filter(item => item.containerId === container.id)
-                      const containerColor = getPlaceColor(index)
-
-                      return (
-                        <Card
-                          key={container.id}
-                          variant="interactive"
-                          onClick={() => navigate(`/containers/${container.id}`)}
-                          padding="none"
-                          className="w-[280px] flex-shrink-0"
-                        >
-                          <div className="flex items-center gap-4 p-5 h-full">
-                            {/* Icon Badge */}
-                            <div
-                              className="w-[84px] h-[84px] rounded-lg flex items-center justify-center flex-shrink-0"
-                              style={{ backgroundColor: containerColor + '15' }}
-                            >
-                              <Package size={42} style={{ color: containerColor }} strokeWidth={2} />
-                            </div>
-
-                            {/* Content */}
-                            <div className="flex flex-col gap-1 flex-1 min-w-0">
-                              <h3 className="font-display text-[16px] font-semibold text-text-primary leading-snug">
-                                {container.name}
-                              </h3>
-                              <p className="font-body text-[13px] text-text-secondary truncate">
-                                {place?.name} · {containerItems.length} items
-                              </p>
-                            </div>
+                    return (
+                      <Card
+                        key={container.id}
+                        variant="interactive"
+                        onClick={() => navigate(`/containers/${container.id}`)}
+                        padding="none"
+                        className="w-[280px] flex-shrink-0 overflow-hidden"
+                      >
+                        <div className="flex items-stretch h-full">
+                          {/* Icon Badge */}
+                          <div
+                            className="w-[72px] flex items-center justify-center flex-shrink-0"
+                            style={{ backgroundColor: containerColor + '15' }}
+                          >
+                            <Package size={32} style={{ color: containerColor }} strokeWidth={2} />
                           </div>
-                        </Card>
-                      )
-                    })}
-                </div>
+
+                          {/* Content */}
+                          <div className="flex flex-col justify-center gap-1 min-w-0 p-4">
+                            <h3 className="font-display text-[16px] font-semibold text-text-primary leading-snug">
+                              {container.name}
+                            </h3>
+                            <p className="font-body text-[13px] text-text-secondary truncate">
+                              {place?.name} · {containerItems.length} items
+                            </p>
+                          </div>
+                        </div>
+                      </Card>
+                    )
+                  })}
               </div>
-            )}
+            </div>
           </div>
         )
         }
@@ -525,13 +479,6 @@ export function Dashboard() {
                   )}
                 </div>
               </div>
-
-              <GroupFilter
-                type="item"
-                selectedGroupId={selectedItemGroupId}
-                onSelect={setSelectedItemGroupId}
-                className="mb-1"
-              />
 
               {/* Horizontal Scroll Container */}
               <div

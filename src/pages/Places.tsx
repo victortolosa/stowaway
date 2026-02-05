@@ -4,12 +4,12 @@ import { usePlaces, PLACE_KEYS } from '@/hooks/queries/usePlaces'
 import { useGroups } from '@/hooks/queries/useGroups'
 import { useAllContainers } from '@/hooks/queries/useAllContainers'
 import { useQueryClient } from '@tanstack/react-query'
-import { CreatePlaceModal, ConfirmDeleteModal, CreateGroupModal } from '@/components'
+import { CreatePlaceModal, ConfirmDeleteModal, CreateGroupModal, ObjectViewTabs } from '@/components'
 import { useNavigate } from 'react-router-dom'
 import { deletePlace, deleteGroup } from '@/services/firebaseService'
 import { Place, Group } from '@/types'
 import { Trash2, Home, Briefcase, Archive, MapPin, Search, FolderPlus, Plus, Pencil } from 'lucide-react'
-import { PageHeader, ListItem, EmptyState, IconBadge, LoadingState, Button } from '@/components/ui'
+import { ListItem, EmptyState, IconBadge, LoadingState, Button } from '@/components/ui'
 
 export function Places() {
   const user = useAuthStore((state) => state.user)
@@ -104,28 +104,55 @@ export function Places() {
   const placeGroups = (groups || []).filter((g) => g && g.type === 'place' && g.parentId === null)
 
   return (
-    <div className="flex flex-col h-full pb-48">
-      <PageHeader
-        title="Places"
-        actionLabel="Add Place"
-        onAction={() => setIsCreateModalOpen(true)}
-      />
+    <div className="flex flex-col pb-48">
+      <ObjectViewTabs />
 
-      {/* Search Bar */}
-      <div className="mb-6">
-        <div className="bg-white rounded-xl h-[52px] px-4 flex items-center gap-3 shadow-sm border border-black/5 focus-within:border-accent-aqua focus-within:shadow-md transition-all duration-200">
-          <Search size={22} className="text-accent-aqua" strokeWidth={2.5} />
-          <input
-            type="text"
-            placeholder="Search places..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 font-body text-[16px] text-text-primary placeholder:text-text-tertiary outline-none bg-transparent"
-          />
+      {/* Title and Search Row */}
+      <div className="flex items-center justify-between gap-4 mb-6 mt-2">
+        <h1 className="font-display text-2xl font-bold text-text-primary tracking-tight">
+          Places
+        </h1>
+        <div className="flex-1 max-w-md">
+          <div className="bg-white rounded-xl h-[52px] px-4 flex items-center gap-3 shadow-sm border border-black/5 focus-within:border-accent-aqua focus-within:shadow-md transition-all duration-200">
+            <Search size={22} className="text-accent-aqua" strokeWidth={2.5} />
+            <input
+              type="text"
+              placeholder="Search places..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 font-body text-[16px] text-text-primary placeholder:text-text-tertiary outline-none bg-transparent"
+            />
+          </div>
         </div>
       </div>
 
-      {filteredPlaces.length === 0 ? (
+      {/* Action Buttons */}
+      {!searchQuery && (
+        <div className="flex gap-3 mb-8">
+          <Button
+            variant="primary"
+            size="sm"
+            fullWidth
+            leftIcon={Plus}
+            onClick={() => setIsCreateModalOpen(true)}
+          >
+            New Place
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            fullWidth
+            leftIcon={FolderPlus}
+            onClick={() => setIsCreateGroupOpen(true)}
+          >
+            New Group
+          </Button>
+        </div>
+      )}
+
+      {/* Content Section */}
+      <div className={!searchQuery ? '' : 'mt-8'}>
+        {filteredPlaces.length === 0 ? (
         <EmptyState
           message={searchQuery ? 'No places found' : 'No places yet'}
           actionLabel={searchQuery ? undefined : 'Create Your First Place'}
@@ -133,42 +160,24 @@ export function Places() {
         />
       ) : (
         <div className="flex flex-col gap-6">
-          {/* Quick Actions */}
-          {!searchQuery && (
-            <div className="flex gap-3">
-              <Button
-                variant="secondary"
-                size="sm"
-                fullWidth
-                leftIcon={FolderPlus}
-                onClick={() => setIsCreateGroupOpen(true)}
-              >
-                New Group
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                fullWidth
-                leftIcon={Plus}
-                onClick={() => setIsCreateModalOpen(true)}
-              >
-                New Place
-              </Button>
-            </div>
-          )}
-
-          <div className="flex flex-col gap-6">
-            {/* Groups Section */}
-            {placeGroups.length > 0 && (
+          {/* Non-Empty Groups Section */}
+            {placeGroups.filter(group => {
+              const groupPlaces = filteredPlaces.filter(p => p.groupId === group.id)
+              return groupPlaces.length > 0
+            }).length > 0 && (
               <div className="flex flex-col gap-6">
                 {placeGroups.map((group) => {
                   const groupPlaces = filteredPlaces.filter(p => p.groupId === group.id)
+                  if (groupPlaces.length === 0) return null
                   if (searchQuery && groupPlaces.length === 0) return null
 
                   return (
                     <div key={group.id} className="flex flex-col gap-3">
                       <div className="flex items-center justify-between px-1">
-                        <div className="flex items-center gap-2">
+                        <div
+                          className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-all"
+                          onClick={() => navigate(`/groups/${group.id}`)}
+                        >
                           <h3 className="font-display text-[18px] font-bold text-text-primary">
                             {group.name}
                           </h3>
@@ -233,8 +242,12 @@ export function Places() {
             )}
 
             {/* Ungrouped Places */}
-            <div className="flex flex-col gap-3">
-              {filteredPlaces.filter(p => !p.groupId).map((place, index) => {
+            {filteredPlaces.filter(p => !p.groupId).length > 0 && (
+              <div className="flex flex-col gap-3">
+                <h3 className="font-display text-[16px] font-semibold text-text-secondary px-1">
+                  Ungrouped
+                </h3>
+                {filteredPlaces.filter(p => !p.groupId).map((place, index) => {
                 const placeContainers = containers.filter((c) => c.placeId === place.id)
                 const PlaceIcon = getPlaceIcon(place.type)
 
@@ -272,10 +285,49 @@ export function Places() {
                   />
                 )
               })}
-            </div>
-          </div>
+              </div>
+            )}
+
+            {/* Empty Groups */}
+            {placeGroups.filter(group => {
+              const groupPlaces = filteredPlaces.filter(p => p.groupId === group.id)
+              return groupPlaces.length === 0
+            }).length > 0 && !searchQuery && (
+              <div className="flex flex-col gap-3">
+                <h3 className="font-display text-[16px] font-semibold text-text-secondary px-1">
+                  Empty Groups
+                </h3>
+                {placeGroups.map((group) => {
+                  const groupPlaces = filteredPlaces.filter(p => p.groupId === group.id)
+                  if (groupPlaces.length > 0) return null
+
+                  return (
+                    <div key={group.id} className="flex items-center justify-between px-1 py-2 rounded-lg hover:bg-bg-surface transition-colors">
+                      <div
+                        className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-all flex-1"
+                        onClick={() => navigate(`/groups/${group.id}`)}
+                      >
+                        <h3 className="font-body text-[15px] text-text-secondary">
+                          {group.name}
+                        </h3>
+                        <span className="text-xs text-text-tertiary">
+                          (0)
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setEditingGroup(group)}
+                        className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
+                      >
+                        <Pencil size={16} strokeWidth={2} />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
         </div>
       )}
+      </div>
 
       <CreatePlaceModal
         isOpen={isCreateModalOpen}

@@ -22,10 +22,13 @@ type ContainerFormValues = z.infer<typeof containerSchema>
 interface CreateContainerModalProps {
     isOpen: boolean
     onClose: () => void
-    onContainerCreated: () => void
+    onContainerCreated: (containerId?: string) => void
     placeId: string
     editMode?: boolean
     initialData?: Container
+    preselectedGroupId?: string | null
+    showBackButton?: boolean
+    onBack?: () => void
 }
 
 export function CreateContainerModal({
@@ -34,7 +37,10 @@ export function CreateContainerModal({
     onContainerCreated,
     placeId,
     editMode = false,
-    initialData
+    initialData,
+    preselectedGroupId,
+    showBackButton = false,
+    onBack
 }: CreateContainerModalProps) {
     const user = useAuthStore((state) => state.user)
     const { data: groups = [] } = useGroups()
@@ -71,11 +77,11 @@ export function CreateContainerModal({
         } else if (isOpen && !editMode) {
             reset({
                 name: '',
-                groupId: '',
+                groupId: preselectedGroupId || '',
             })
             setImages([])
         }
-    }, [isOpen, editMode, initialData, reset])
+    }, [isOpen, editMode, initialData, reset, preselectedGroupId])
 
     const onSubmit = async (data: ContainerFormValues) => {
         if (!user) return
@@ -115,6 +121,8 @@ export function CreateContainerModal({
 
             const finalPhotos = [...existingPhotos, ...newPhotos]
 
+            let containerId: string | undefined
+
             if (editMode && initialData) {
                 await updateContainer(initialData.id, {
                     ...data,
@@ -122,8 +130,9 @@ export function CreateContainerModal({
                     // Legacy support is handled in service, but we pass photos array
                     groupId: data.groupId || null,
                 })
+                containerId = initialData.id
             } else {
-                await createContainer({
+                containerId = await createContainer({
                     name: data.name,
                     placeId,
                     photos: finalPhotos,
@@ -134,7 +143,7 @@ export function CreateContainerModal({
 
             reset()
             setImages([])
-            onContainerCreated()
+            onContainerCreated(containerId)
             onClose()
         } catch (error) {
             console.error('Failed to save container:', error)
@@ -211,6 +220,11 @@ export function CreateContainerModal({
                     </FormField>
 
                     <div className="flex justify-end gap-3 pt-2">
+                        {showBackButton && onBack && (
+                            <Button type="button" variant="secondary" onClick={onBack}>
+                                Back
+                            </Button>
+                        )}
                         <Button type="button" variant="secondary" onClick={onClose}>
                             Cancel
                         </Button>

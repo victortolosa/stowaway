@@ -33,7 +33,7 @@ export function QRScanner({ onScan, onClose }: QRScannerProps) {
         if (scannerRef.current) {
           try {
             await scannerRef.current.stop()
-          } catch (e) {
+          } catch {
             // ignore stop errors on cleanup
           }
           scannerRef.current = null

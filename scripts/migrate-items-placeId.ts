@@ -16,9 +16,7 @@ import {
   getDocs,
   doc,
   updateDoc,
-  getDoc,
-  query,
-  where
+  getDoc
 } from 'firebase/firestore'
 
 // Initialize Firebase (you'll need to add your config)
