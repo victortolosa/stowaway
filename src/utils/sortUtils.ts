@@ -2,18 +2,20 @@ import { Timestamp } from 'firebase/firestore'
 
 export type SortOption = 'recently-added' | 'oldest-first' | 'a-z' | 'z-a' | 'recently-modified'
 
-export const toDate = (timestamp: Date | Timestamp | any): Date => {
+export const toDate = (timestamp: Date | Timestamp | { seconds: number; nanoseconds: number } | null | undefined): Date => {
     if (timestamp instanceof Timestamp) {
         return timestamp.toDate()
     }
     if (timestamp instanceof Date) {
         return timestamp
     }
-    // Handle serialized timestamps or other formats
-    if (timestamp?.seconds !== undefined) {
+    if (timestamp && typeof timestamp === 'object' && 'seconds' in timestamp) {
         return new Date(timestamp.seconds * 1000)
     }
-    return new Date(timestamp || 0)
+    if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+        return new Date(timestamp)
+    }
+    return new Date(0)
 }
 
 export const getSortLabel = (sortOption: SortOption): string => {

@@ -16,9 +16,11 @@ export function BreadcrumbProvider({ children }: { children: React.ReactNode }) 
     // Reset breadcrumbs on route change. 
     // This ensures that pages that don't call useBreadcrumbs(items) 
     // will have an empty breadcrumb list.
-    useEffect(() => {
+    const [prevPath, setPrevPath] = useState(location.pathname)
+    if (location.pathname !== prevPath) {
+        setPrevPath(location.pathname)
         setItems([])
-    }, [location.pathname])
+    }
 
     return (
         <BreadcrumbContext.Provider value={{ items, setBreadcrumbs: setItems }}>
