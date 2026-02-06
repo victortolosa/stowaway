@@ -35,7 +35,7 @@ export function Dashboard() {
   const [showCreateItemModal, setShowCreateItemModal] = useState(false)
 
   const addMenuRef = useRef<HTMLDivElement>(null)
-  useOnClickOutside(addMenuRef, useCallback(() => setShowAddMenu(false), []))
+  useOnClickOutside(addMenuRef, useCallback(() => setShowAddMenu(false), [setShowAddMenu]))
 
 
   // Dashboard usually doesn't need auto-refresh on mount if RQ staleTime is configured,
