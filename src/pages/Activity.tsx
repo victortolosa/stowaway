@@ -1,6 +1,6 @@
 import { useAuthStore } from '@/store/auth'
 import { useQuery } from '@tanstack/react-query'
-import { getUserRecentActivity } from '@/services/firebaseService'
+import { getAccessibleRecentActivity } from '@/services/firebaseService'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 import { ActivityFeed } from '@/components/ActivityFeed'
 
@@ -13,8 +13,8 @@ export function Activity() {
   ])
 
   const { data: activities = [], isLoading, error } = useQuery({
-    queryKey: ['activity', 'user', user?.uid],
-    queryFn: () => getUserRecentActivity(user!.uid, 100),
+    queryKey: ['activity', 'accessible', user?.uid],
+    queryFn: () => getAccessibleRecentActivity(user!.uid, 100),
     enabled: !!user?.uid,
     staleTime: 1000 * 60,
     retry: false,

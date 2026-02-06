@@ -46,6 +46,7 @@ export function MultiStepCreateContainerGroupModal({
         onClose={handleClose}
         onPlaceSelect={handlePlaceSelect}
         title="Create Container Group - Select Place"
+        filterMode="editable"
       />
     )
   }

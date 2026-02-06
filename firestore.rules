@@ -11,6 +11,46 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function getPlaceDoc(placeId) {
+      return get(/databases/$(database)/documents/places/$(placeId));
+    }
+
+    function isPlaceOwner(placeId) {
+      return isAuthenticated() &&
+        (
+          getPlaceDoc(placeId).data.ownerId == request.auth.uid ||
+          getPlaceDoc(placeId).data.userId == request.auth.uid
+        );
+    }
+
+    function isPlaceMember(placeId) {
+      return isAuthenticated() && (
+        isPlaceOwner(placeId) ||
+        (
+          getPlaceDoc(placeId).data.memberIds != null &&
+          request.auth.uid in getPlaceDoc(placeId).data.memberIds
+        )
+      );
+    }
+
+    function placeRole(placeId) {
+      return getPlaceDoc(placeId).data.memberRoles != null
+        ? getPlaceDoc(placeId).data.memberRoles[request.auth.uid]
+        : null;
+    }
+
+    function isPlaceEditor(placeId) {
+      return isPlaceOwner(placeId) || placeRole(placeId) == 'editor';
+    }
+
+    function getContainerPlaceId(containerId) {
+      return get(/databases/$(database)/documents/containers/$(containerId)).data.placeId;
+    }
+
+    function getItemPlaceId(data) {
+      return data.placeId != null ? data.placeId : getContainerPlaceId(data.containerId);
+    }
+
     // Helper to validate URLs (allows standard https URLs OR our offline placeholders)
     function isValidUrlOrPlaceholder(url) {
       return url.matches('^https://.*') || url.matches('^urn:stowaway:pending:.*');
@@ -18,25 +58,76 @@ service cloud.firestore {
 
     // 1. Rules for the new Groups collection
     match /groups/{groupId} {
-      allow create: if isOwner(request.resource.data.userId);
-      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if
+        (request.resource.data.placeId != null && isPlaceEditor(request.resource.data.placeId)) ||
+        (request.resource.data.placeId == null && isOwner(request.resource.data.userId));
+      allow read: if
+        (resource.data.placeId != null && isPlaceMember(resource.data.placeId)) ||
+        (resource.data.placeId == null && isOwner(resource.data.userId));
+      allow update, delete: if
+        (resource.data.placeId != null && isPlaceEditor(resource.data.placeId)) ||
+        (resource.data.placeId == null && isOwner(resource.data.userId));
+    }
+
+    // 1b. Rules for Users (profiles for sharing by email)
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if false;
     }
 
     // 2. Rules for Places
     match /places/{placeId} {
-      allow create: if isOwner(request.resource.data.userId);
-      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if
+        isOwner(request.resource.data.userId) &&
+        (
+          !('ownerId' in request.resource.data) ||
+          request.resource.data.ownerId == request.auth.uid
+        ) &&
+        (
+          !('memberIds' in request.resource.data) ||
+          request.auth.uid in request.resource.data.memberIds
+        ) &&
+        (
+          !('memberRoles' in request.resource.data) ||
+          request.resource.data.memberRoles[request.auth.uid] == 'owner'
+        );
+      allow read: if isPlaceMember(placeId);
+      allow update: if
+        isPlaceOwner(placeId) ||
+        (
+          isPlaceEditor(placeId) &&
+          request.resource.data.memberIds == resource.data.memberIds &&
+          request.resource.data.memberRoles == resource.data.memberRoles &&
+          request.resource.data.ownerId == resource.data.ownerId
+        );
+      allow delete: if isPlaceOwner(placeId);
     }
     
     // 3. Rules for Containers
     match /containers/{containerId} {
-      allow create: if isOwner(request.resource.data.userId);
-      allow read, update, delete: if isOwner(resource.data.userId);
+      allow create: if isPlaceEditor(request.resource.data.placeId);
+      allow read: if isPlaceMember(resource.data.placeId);
+      allow update: if
+        isPlaceEditor(resource.data.placeId) &&
+        (
+          request.resource.data.placeId == resource.data.placeId ||
+          isPlaceEditor(request.resource.data.placeId)
+        );
+      allow delete: if isPlaceEditor(resource.data.placeId);
     }
 
     // 4. Rules for Items
     match /items/{itemId} {
-      allow create: if isOwner(request.resource.data.userId)
+      allow create: if
+        (
+          request.resource.data.placeId != null &&
+          isPlaceEditor(request.resource.data.placeId)
+        ) ||
+        (
+          request.resource.data.placeId == null &&
+          isPlaceEditor(get(/databases/$(database)/documents/containers/$(request.resource.data.containerId)).data.placeId)
+        )
         // Optional: Add specific validation for photos/voiceNoteUrl here if needed
         // && (
         //   !('photos' in request.resource.data) ||
@@ -44,18 +135,42 @@ service cloud.firestore {
         //   isValidUrlOrPlaceholder(request.resource.data.photos[0])
         // )
         ;
-      allow read, update, delete: if isOwner(resource.data.userId);
+      ;
+      allow read: if
+        (
+          resource.data.placeId != null &&
+          isPlaceMember(resource.data.placeId)
+        ) ||
+        (
+          resource.data.placeId == null &&
+          isPlaceMember(get(/databases/$(database)/documents/containers/$(resource.data.containerId)).data.placeId)
+        );
+      allow update: if
+        isPlaceEditor(getItemPlaceId(resource.data)) &&
+        (
+          getItemPlaceId(resource.data) == getItemPlaceId(request.resource.data) ||
+          isPlaceEditor(getItemPlaceId(request.resource.data))
+        );
+      allow delete: if
+        isPlaceEditor(getItemPlaceId(resource.data));
     }
 
     // 5. Rules for Activity Logs
     match /activity/{activityId} {
       // Users can only read their own activity
       allow read: if isAuthenticated() &&
-        resource.data.userId == request.auth.uid;
+        (
+          (resource.data.placeId != null && isPlaceMember(resource.data.placeId)) ||
+          (resource.data.placeId == null && resource.data.userId == request.auth.uid)
+        );
 
       // Users can create activity logs for their own actions
       allow create: if isAuthenticated() &&
-        request.resource.data.userId == request.auth.uid;
+        request.resource.data.userId == request.auth.uid &&
+        (
+          (request.resource.data.placeId != null && isPlaceMember(request.resource.data.placeId)) ||
+          (request.resource.data.placeId == null)
+        );
 
       // No updates or deletes allowed - activity logs are immutable
       allow update, delete: if false;

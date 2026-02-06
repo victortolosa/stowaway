@@ -1,19 +1,23 @@
 import { useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuthStore } from '@/store/auth'
 import { usePlaces } from '@/hooks/queries/usePlaces'
 import { useAllContainers } from '@/hooks/queries/useAllContainers'
 // We use useAllItems for client-side filtering/sorting and counts
 import { useAllItems } from '@/hooks/queries/useAllItems'
-import { Plus, ChevronRight, User, MapPin, Box, Package } from 'lucide-react'
+import { Plus, ChevronRight, User, Users, MapPin, Box, Package } from 'lucide-react'
 import { LoadingState, Card, EmptyState, IconOrEmoji, CreatePlaceModal, MultiStepCreateContainerModal, MultiStepCreateItemModal } from '@/components'
 import { ItemCard } from '@/components/ItemCard'
 import { useOnClickOutside } from '@/hooks/useOnClickOutside'
 
 import { getPlaceIcon, getContainerIcon, DEFAULT_PLACE_COLOR, DEFAULT_CONTAINER_COLOR, DEFAULT_ITEM_COLOR } from '@/utils/colorUtils'
 import { sortItems } from '@/utils/sortUtils'
+import { Button } from '@/components/ui'
+import { isPlaceShared } from '@/utils/placeUtils'
 
 export function Dashboard() {
   const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
 
   const { data: places = [], isLoading: isPlacesLoading } = usePlaces()
   const { data: containers = [], isLoading: isContainersLoading } = useAllContainers()
@@ -22,6 +26,7 @@ export function Dashboard() {
   const isLoading = isPlacesLoading || isContainersLoading || isAllItemsLoading
 
   const [visibleItemsCount, setVisibleItemsCount] = useState(8)
+  const [placesFilter, setPlacesFilter] = useState<'all' | 'shared'>('all')
 
   // Add menu state
   const [showAddMenu, setShowAddMenu] = useState(false)
@@ -40,6 +45,9 @@ export function Dashboard() {
   const itemsToDisplay = allItems
 
   const sortedPlaces = sortItems([...places], 'recently-modified')
+  const displayedPlaces = placesFilter === 'shared'
+    ? sortedPlaces.filter((place) => isPlaceShared(place, user?.uid))
+    : sortedPlaces
   const sortedContainers = sortItems([...containers], 'recently-modified').slice(0, 16)
   const allRecentItems = sortItems([...itemsToDisplay], 'recently-added')
   const recentItems = allRecentItems.slice(0, visibleItemsCount)
@@ -140,25 +148,51 @@ export function Dashboard() {
         <div className="flex flex-col gap-12">
           {/* Places Section */}
           <div className="flex flex-col gap-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <h2 className="font-display text-xl md:text-2xl font-bold text-text-primary tracking-tight">
-                  Places
-                </h2>
-                <button
-                  onClick={() => navigate('/places')}
-                  className="p-1 hover:bg-bg-page/50 rounded-full text-text-quaternary hover:text-accent-aqua transition-all"
-                >
-                  <ChevronRight size={22} strokeWidth={2.5} />
-                </button>
-              </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <h2 className="font-display text-xl md:text-2xl font-bold text-text-primary tracking-tight">
+                Places
+              </h2>
+              <button
+                onClick={() => navigate('/places')}
+                className="p-1 hover:bg-bg-page/50 rounded-full text-text-quaternary hover:text-accent-aqua transition-all"
+              >
+                <ChevronRight size={22} strokeWidth={2.5} />
+              </button>
             </div>
+            {places.length > 0 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant={placesFilter === 'all' ? 'secondary' : 'ghost'}
+                  onClick={() => setPlacesFilter('all')}
+                  className="h-7 px-3 text-[11px]"
+                  aria-pressed={placesFilter === 'all'}
+                >
+                  All
+                </Button>
+                <Button
+                  size="sm"
+                  variant={placesFilter === 'shared' ? 'secondary' : 'ghost'}
+                  onClick={() => setPlacesFilter('shared')}
+                  className="h-7 px-3 text-[11px]"
+                  aria-pressed={placesFilter === 'shared'}
+                >
+                  Shared
+                </Button>
+              </div>
+            )}
+          </div>
 
             {places.length === 0 ? (
               <EmptyState
                 message="No places yet"
                 actionLabel="Create your first place"
                 onAction={() => navigate('/places')}
+              />
+            ) : displayedPlaces.length === 0 ? (
+              <EmptyState
+                message="No shared places yet"
               />
             ) : (
               <div
@@ -172,8 +206,8 @@ export function Dashboard() {
               >
                 <div className="flex flex-col gap-3 min-w-max">
                   {(() => {
-                    const row1 = sortedPlaces.filter((_, i) => i % 2 === 0)
-                    const row2 = sortedPlaces.filter((_, i) => i % 2 !== 0)
+                    const row1 = displayedPlaces.filter((_, i) => i % 2 === 0)
+                    const row2 = displayedPlaces.filter((_, i) => i % 2 !== 0)
 
                     return (
                       <>
@@ -185,6 +219,7 @@ export function Dashboard() {
                               placeContainers.some((c) => c.id === item.containerId)
                             ).length
                             const placeColor = place.color || '#14B8A6'
+                            const shared = isPlaceShared(place, user?.uid)
 
                             return (
                               <Card
@@ -202,9 +237,19 @@ export function Dashboard() {
                                     className="flex flex-col justify-center gap-1 min-w-0"
                                     style={{ paddingLeft: '1.25rem', paddingRight: '1.25rem' }}
                                   >
-                                    <h3 className="font-display text-[16px] font-semibold text-text-primary truncate whitespace-nowrap leading-snug">
-                                      {place.name}
-                                    </h3>
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <h3 className="font-display text-[16px] font-semibold text-text-primary truncate whitespace-nowrap leading-snug">
+                                        {place.name}
+                                      </h3>
+                                      {shared && (
+                                        <span
+                                          className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-accent-blue/20 text-accent-blue flex-shrink-0"
+                                          aria-label="Shared"
+                                        >
+                                          <Users size={12} strokeWidth={2.5} />
+                                        </span>
+                                      )}
+                                    </div>
                                     <p className="font-body text-[13px] text-text-secondary truncate whitespace-nowrap">
                                       {placeContainers.length} {placeContainers.length === 1 ? 'container' : 'containers'} · {totalItems} {totalItems === 1 ? 'item' : 'items'}
                                     </p>
@@ -223,6 +268,7 @@ export function Dashboard() {
                               placeContainers.some((c) => c.id === item.containerId)
                             ).length
                             const placeColor = place.color || '#14B8A6'
+                            const shared = isPlaceShared(place, user?.uid)
 
                             return (
                               <Card
@@ -240,9 +286,19 @@ export function Dashboard() {
                                     className="flex flex-col justify-center gap-1 min-w-0"
                                     style={{ paddingLeft: '1.25rem', paddingRight: '1.25rem' }}
                                   >
-                                    <h3 className="font-display text-[16px] font-semibold text-text-primary truncate whitespace-nowrap leading-snug">
-                                      {place.name}
-                                    </h3>
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <h3 className="font-display text-[16px] font-semibold text-text-primary truncate whitespace-nowrap leading-snug">
+                                        {place.name}
+                                      </h3>
+                                      {shared && (
+                                        <span
+                                          className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-accent-blue/20 text-accent-blue flex-shrink-0"
+                                          aria-label="Shared"
+                                        >
+                                          <Users size={12} strokeWidth={2.5} />
+                                        </span>
+                                      )}
+                                    </div>
                                     <p className="font-body text-[13px] text-text-secondary truncate whitespace-nowrap">
                                       {placeContainers.length} {placeContainers.length === 1 ? 'container' : 'containers'} · {totalItems} {totalItems === 1 ? 'item' : 'items'}
                                     </p>

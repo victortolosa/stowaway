@@ -1,24 +1,31 @@
 import { useState } from 'react'
-import { Modal, Button, Card, IconOrEmoji, EmptyState } from './ui'
+import { Modal, Button, Card, IconOrEmoji, EmptyState, Badge } from './ui'
 import { usePlaces } from '@/hooks/queries/usePlaces'
 import { useAllContainers } from '@/hooks/queries/useAllContainers'
 import { CreatePlaceModal } from './CreatePlaceModal'
 import { useQueryClient } from '@tanstack/react-query'
 import { Search, Plus } from 'lucide-react'
 import { getPlaceIcon } from '@/utils/colorUtils'
+import { useAuthStore } from '@/store/auth'
+import { isPlaceShared, canEditPlace } from '@/utils/placeUtils'
 
 export function PlaceSelector({
   isOpen,
   onClose,
   onPlaceSelect,
-  title = 'Select Place'
+  title = 'Select Place',
+  filterMode = 'all',
+  emptyMessage,
 }: {
   isOpen: boolean
   onClose: () => void
   onPlaceSelect: (placeId: string) => void
   title?: string
+  filterMode?: 'all' | 'editable'
+  emptyMessage?: string
 }) {
   const queryClient = useQueryClient()
+  const user = useAuthStore((state) => state.user)
   const { data: places = [], isLoading } = usePlaces()
   const { data: containers = [] } = useAllContainers()
   const [searchQuery, setSearchQuery] = useState('')
@@ -26,7 +33,11 @@ export function PlaceSelector({
 
   // Color and icon now come from database
 
-  const filteredPlaces = places.filter((place) => {
+  const visiblePlaces = filterMode === 'editable'
+    ? places.filter((place) => canEditPlace(place, user?.uid))
+    : places
+
+  const filteredPlaces = visiblePlaces.filter((place) => {
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
     return place.name.toLowerCase().includes(query) || place.type.toLowerCase().includes(query)
@@ -77,12 +88,13 @@ export function PlaceSelector({
           {isLoading ? (
             <div className="text-center py-8 text-text-tertiary">Loading places...</div>
           ) : filteredPlaces.length === 0 ? (
-            <EmptyState message="No places found" />
+            <EmptyState message={emptyMessage || (filterMode === 'editable' ? 'No editable places found' : 'No places found')} />
           ) : (
             <div className="flex flex-col gap-2 max-h-[400px] overflow-y-auto">
               {filteredPlaces.map((place) => {
                 const containerCount = containers.filter(c => c.placeId === place.id).length
                 const placeColor = place.color || '#14B8A6'
+                const shared = isPlaceShared(place, user?.uid)
 
                 return (
                   <Card
@@ -93,9 +105,16 @@ export function PlaceSelector({
                   >
                     <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={placeColor} />
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-body text-[15px] font-semibold text-text-primary">
-                        {place.name}
-                      </h3>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <h3 className="font-body text-[15px] font-semibold text-text-primary truncate">
+                          {place.name}
+                        </h3>
+                        {shared && (
+                          <Badge size="sm" variant="info" className="flex-shrink-0">
+                            Shared
+                          </Badge>
+                        )}
+                      </div>
                       <p className="font-body text-[13px] text-text-secondary capitalize">
                         {place.type} · {containerCount} {containerCount === 1 ? 'container' : 'containers'}
                       </p>

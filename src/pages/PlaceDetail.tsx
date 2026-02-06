@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
-import { CreateContainerModal, CreatePlaceModal, ConfirmDeleteModal, CreateGroupModal } from '@/components'
+import { CreateContainerModal, CreatePlaceModal, ConfirmDeleteModal, CreateGroupModal, SharePlaceModal } from '@/components'
 import { usePlace } from '@/hooks/queries/usePlaces'
 import { usePlaceContainers } from '@/hooks/queries/useContainers'
 import { usePlaceItems } from '@/hooks/queries/useItems'
@@ -14,7 +14,7 @@ import { CONTAINER_KEYS } from '@/hooks/queries/useContainers'
 import { ITEM_KEYS } from '@/hooks/queries/useItems'
 import { GROUP_KEYS } from '@/hooks/queries/useGroups'
 import { MoreVertical, Plus, Search, FolderPlus } from 'lucide-react'
-import { Button, EmptyState, LoadingState, NavigationHeader, Modal, GalleryEditor } from '@/components/ui'
+import { Button, EmptyState, LoadingState, NavigationHeader, Modal, GalleryEditor, ImageGrid } from '@/components/ui'
 import { PlaceHero } from '@/components/features/place/PlaceHero'
 import { ContainerList } from '@/components/features/place/ContainerList'
 import { PlaceItemsList } from '@/components/features/place/PlaceItemsList'
@@ -22,6 +22,7 @@ import { ActivityFeed } from '@/components/ActivityFeed'
 import { useSearchFilter } from '@/hooks/useSearchFilter'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 import { getPlaceAggregatedActivity } from '@/services/firebaseService'
+import { isPlaceShared } from '@/utils/placeUtils'
 
 
 export function PlaceDetail() {
@@ -44,7 +45,7 @@ export function PlaceDetail() {
             // Invalidate all container queries to ensure Dashboard (useAllContainers) is updated
             queryClient.invalidateQueries({ queryKey: CONTAINER_KEYS.all }),
             queryClient.invalidateQueries({ queryKey: ITEM_KEYS.byPlace(id!) }),
-            queryClient.invalidateQueries({ queryKey: GROUP_KEYS.list(user?.uid || '') })
+            queryClient.invalidateQueries({ queryKey: GROUP_KEYS.all })
         ])
     }
 
@@ -67,6 +68,7 @@ export function PlaceDetail() {
     const [showGallery, setShowGallery] = useState(false)
     const [isCreateSiblingPlaceOpen, setIsCreateSiblingPlaceOpen] = useState(false)
     const [showActivityModal, setShowActivityModal] = useState(false)
+    const [isShareOpen, setIsShareOpen] = useState(false)
 
     const { data: activityData = [], isLoading: isActivityLoading, error: activityError } = useQuery({
         queryKey: ['activity', 'place-aggregated', id],
@@ -114,6 +116,12 @@ export function PlaceDetail() {
     if (!place) {
         return <div>Place not found</div>
     }
+
+    const ownerId = place.ownerId || place.userId
+    const role = place.memberRoles?.[user.uid] || (user.uid === ownerId ? 'owner' : 'viewer')
+    const canEdit = role === 'owner' || role === 'editor'
+    const isOwner = role === 'owner'
+    const isShared = isPlaceShared(place, user.uid)
 
     const totalItems = (items || []).filter((item) =>
         placeContainers.some((c) => c.id === item.containerId)
@@ -184,13 +192,24 @@ export function PlaceDetail() {
                             <div className="absolute right-0 mt-2 w-48 bg-bg-page rounded-card shadow-card py-2 z-10 border border-border-standard">
                                 <button
                                     onClick={() => {
-                                        setIsEditingPlace(true)
+                                        setIsShareOpen(true)
                                         setShowMenu(false)
                                     }}
                                     className="w-full px-4 py-2 text-left font-body text-sm text-text-primary hover:bg-bg-surface"
                                 >
-                                    Edit Place
+                                    Share Place
                                 </button>
+                                {canEdit && (
+                                    <button
+                                        onClick={() => {
+                                            setIsEditingPlace(true)
+                                            setShowMenu(false)
+                                        }}
+                                        className="w-full px-4 py-2 text-left font-body text-sm text-text-primary hover:bg-bg-surface"
+                                    >
+                                        Edit Place
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => {
                                         setShowActivityModal(true)
@@ -200,15 +219,17 @@ export function PlaceDetail() {
                                 >
                                     View Activity
                                 </button>
-                                <button
-                                    onClick={() => {
-                                        setIsDeletePlaceConfirmOpen(true)
-                                        setShowMenu(false)
-                                    }}
-                                    className="w-full px-4 py-2 text-left font-body text-sm text-accent-danger hover:bg-bg-surface"
-                                >
-                                    Delete Place
-                                </button>
+                                {isOwner && (
+                                    <button
+                                        onClick={() => {
+                                            setIsDeletePlaceConfirmOpen(true)
+                                            setShowMenu(false)
+                                        }}
+                                        className="w-full px-4 py-2 text-left font-body text-sm text-accent-danger hover:bg-bg-surface"
+                                    >
+                                        Delete Place
+                                    </button>
+                                )}
                             </div>
                         )}
                     </div>
@@ -221,6 +242,7 @@ export function PlaceDetail() {
                 containerCount={placeContainers.length}
                 itemCount={totalItems}
                 onImageClick={() => setShowGallery(true)}
+                isShared={isShared}
             />
 
             {/* Search Bar */}
@@ -239,7 +261,7 @@ export function PlaceDetail() {
                         </div>
                     </div>
 
-                    {!searchQuery && (
+                    {!searchQuery && canEdit && (
                         <div className="flex gap-3 mb-8">
                             <Button
                                 variant="secondary"
@@ -272,8 +294,8 @@ export function PlaceDetail() {
                     groups={placeGroups}
                     items={items}
                     searchQuery={searchQuery}
-                    onEditGroup={setEditingGroup}
-                    onAddContainer={() => setIsCreateContainerOpen(true)}
+                    onEditGroup={canEdit ? setEditingGroup : undefined}
+                    onAddContainer={canEdit ? () => setIsCreateContainerOpen(true) : undefined}
                 />
 
                 {/* Items Search Results */}
@@ -292,18 +314,20 @@ export function PlaceDetail() {
             </div>
 
             {/* Create Container Modal */}
-            <CreateContainerModal
-                isOpen={isCreateContainerOpen}
-                onClose={() => setIsCreateContainerOpen(false)}
-                onContainerCreated={() => {
-                    refresh()
-                    setIsCreateContainerOpen(false)
-                }}
-                placeId={id}
-            />
+            {canEdit && (
+                <CreateContainerModal
+                    isOpen={isCreateContainerOpen}
+                    onClose={() => setIsCreateContainerOpen(false)}
+                    onContainerCreated={() => {
+                        refresh()
+                        setIsCreateContainerOpen(false)
+                    }}
+                    placeId={id}
+                />
+            )}
 
             {/* Edit Place Modal */}
-            {isEditingPlace && (
+            {canEdit && isEditingPlace && (
                 <CreatePlaceModal
                     isOpen={isEditingPlace}
                     onClose={() => setIsEditingPlace(false)}
@@ -328,7 +352,7 @@ export function PlaceDetail() {
             />
 
             {/* Edit Container Modal */}
-            {editingContainer && (
+            {canEdit && editingContainer && (
                 <CreateContainerModal
                     isOpen={!!editingContainer}
                     onClose={() => setEditingContainer(null)}
@@ -343,26 +367,30 @@ export function PlaceDetail() {
             )}
 
             {/* Delete Place Confirmation */}
-            <ConfirmDeleteModal
-                isOpen={isDeletePlaceConfirmOpen}
-                onClose={() => setIsDeletePlaceConfirmOpen(false)}
-                onConfirm={handleDeletePlace}
-                title="Delete Place"
-                message={`Are you sure you want to delete "${place.name}"? This action cannot be undone and will delete all containers and items within it.`}
-                isDeleting={isDeletingPlace}
-            />
+            {isOwner && (
+                <ConfirmDeleteModal
+                    isOpen={isDeletePlaceConfirmOpen}
+                    onClose={() => setIsDeletePlaceConfirmOpen(false)}
+                    onConfirm={handleDeletePlace}
+                    title="Delete Place"
+                    message={`Are you sure you want to delete "${place.name}"? This action cannot be undone and will delete all containers and items within it.`}
+                    isDeleting={isDeletingPlace}
+                />
+            )}
 
             {/* Create Group Modal */}
-            <CreateGroupModal
-                isOpen={isCreateGroupOpen}
-                onClose={() => setIsCreateGroupOpen(false)}
-                onGroupCreated={refresh}
-                type="container"
-                parentId={id}
-            />
+            {canEdit && (
+                <CreateGroupModal
+                    isOpen={isCreateGroupOpen}
+                    onClose={() => setIsCreateGroupOpen(false)}
+                    onGroupCreated={refresh}
+                    type="container"
+                    parentId={id}
+                />
+            )}
 
             {/* Edit Group Modal */}
-            {editingGroup && (
+            {canEdit && editingGroup && (
                 <CreateGroupModal
                     isOpen={!!editingGroup}
                     onClose={() => setEditingGroup(null)}
@@ -379,7 +407,7 @@ export function PlaceDetail() {
             )}
 
             {/* Delete Group Confirmation */}
-            {deletingGroup && (
+            {canEdit && deletingGroup && (
                 <ConfirmDeleteModal
                     isOpen={!!deletingGroup}
                     onClose={() => setDeletingGroup(null)}
@@ -391,7 +419,7 @@ export function PlaceDetail() {
             )}
 
             {/* Delete Container Confirmation */}
-            {deletingContainer && (
+            {canEdit && deletingContainer && (
                 <ConfirmDeleteModal
                     isOpen={!!deletingContainer}
                     onClose={() => setDeletingContainer(null)}
@@ -410,21 +438,22 @@ export function PlaceDetail() {
                 description={`${place.photos?.length || 0} photos`}
             >
                 <div className="max-h-[60vh] overflow-y-auto p-1">
-                    <GalleryEditor
-                        images={place.photos || []}
-                        onUpdate={async (newImages) => {
-                            // Optimistic update locally?
-                            // Since we use react-query, we should mutate.
-                            // For now, let's just save and refresh.
-                            try {
-                                await updatePlace(place.id, { photos: newImages })
-                                await refresh()
-                            } catch (error) {
-                                console.error('Failed to update photos:', error)
-                                alert('Failed to update gallery')
-                            }
-                        }}
-                    />
+                    {canEdit ? (
+                        <GalleryEditor
+                            images={place.photos || []}
+                            onUpdate={async (newImages) => {
+                                try {
+                                    await updatePlace(place.id, { photos: newImages })
+                                    await refresh()
+                                } catch (error) {
+                                    console.error('Failed to update photos:', error)
+                                    alert('Failed to update gallery')
+                                }
+                            }}
+                        />
+                    ) : (
+                        <ImageGrid images={place.photos || []} />
+                    )}
                 </div>
                 <div className="flex justify-end mt-4">
                     <Button variant="secondary" onClick={() => setShowGallery(false)}>
@@ -454,6 +483,14 @@ export function PlaceDetail() {
                     </Button>
                 </div>
             </Modal>
+
+            {/* Share Modal */}
+            <SharePlaceModal
+                isOpen={isShareOpen}
+                onClose={() => setIsShareOpen(false)}
+                place={place}
+                onUpdated={refresh}
+            />
         </div>
     )
 }

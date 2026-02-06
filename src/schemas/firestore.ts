@@ -16,12 +16,15 @@ const dateOrTimestampSchema = z.union([
 export const PlaceSchema = z.object({
   id: z.string(),
   userId: z.string(),
+  ownerId: z.string().optional(),
   name: z.string(),
   type: z.enum(['home', 'office', 'storage', 'other']),
   photos: z.array(z.string()).optional(),
   groupId: z.string().nullable().optional(),
   color: z.string().optional(),
   icon: z.string().optional(),
+  memberIds: z.array(z.string()).optional(),
+  memberRoles: z.record(z.string(), z.enum(['owner', 'editor', 'viewer'])).optional(),
   createdAt: dateOrTimestampSchema,
   updatedAt: dateOrTimestampSchema,
   lastViewedAt: dateOrTimestampSchema.optional(),
@@ -35,11 +38,12 @@ export const GroupSchema = z.object({
   type: z.enum(['place', 'container', 'item']),
   createdAt: dateOrTimestampSchema,
   updatedAt: dateOrTimestampSchema,
+  placeId: z.string().nullable().optional(),
 })
 
 export const ContainerSchema = z.object({
   id: z.string(),
-  userId: z.string(),
+  userId: z.string().optional(),
   placeId: z.string(),
   name: z.string(),
   qrCodeId: z.string().optional(),
@@ -56,7 +60,7 @@ export const ContainerSchema = z.object({
 
 export const ItemSchema = z.object({
   id: z.string(),
-  userId: z.string(),
+  userId: z.string().optional(),
   containerId: z.string(),
   // placeId is optional for backward compatibility with existing items
   // New items will have placeId set automatically by createItem
@@ -108,6 +112,9 @@ export const ActivityMetadataSchema = z.object({
 export const ActivitySchema = z.object({
   id: z.string(),
   userId: z.string(),
+  actorName: z.string().nullable().optional(),
+  actorEmail: z.string().nullable().optional(),
+  actorPhotoURL: z.string().nullable().optional(),
   action: z.enum([
     'created',
     'updated',
@@ -132,9 +139,19 @@ export const ActivitySchema = z.object({
   createdAt: dateOrTimestampSchema,
 })
 
+export const UserProfileSchema = z.object({
+  uid: z.string(),
+  email: z.string(),
+  displayName: z.string().nullable().optional(),
+  photoURL: z.string().nullable().optional(),
+  createdAt: dateOrTimestampSchema,
+  updatedAt: dateOrTimestampSchema,
+})
+
 // Export types inferred from schemas
 export type ValidatedPlace = z.infer<typeof PlaceSchema>
 export type ValidatedContainer = z.infer<typeof ContainerSchema>
 export type ValidatedItem = z.infer<typeof ItemSchema>
 export type ValidatedGroup = z.infer<typeof GroupSchema>
 export type ValidatedActivity = z.infer<typeof ActivitySchema>
+export type ValidatedUserProfile = z.infer<typeof UserProfileSchema>

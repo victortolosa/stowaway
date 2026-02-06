@@ -79,7 +79,9 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps & { className
                                 )
                                 const hasEntity = matchingItem && !isGenericList
                                 const displayLabel = hasEntity ? matchingItem.label : tab.label
-                                const linkTo = matchingItem?.path || tab.path
+                                const categoryLink = matchingItem?.categoryPath || tab.path
+                                const entityLink = matchingItem?.path || categoryLink
+                                const linkTo = hasEntity ? entityLink : categoryLink
                                 const isActive = tab.category === activeCategory
 
                                 return (
@@ -89,11 +91,12 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps & { className
                                         )}
 
                                         {!hasEntity && !isActive ? (
-                                            <span
-                                                className="px-1.5 py-0.5 rounded-lg text-[13px] font-semibold font-display text-border-light"
+                                            <Link
+                                                to={linkTo}
+                                                className="px-1.5 py-0.5 rounded-lg text-[13px] font-semibold font-display text-border-light hover:text-text-secondary hover:bg-bg-surface transition-colors"
                                             >
                                                 {displayLabel}
-                                            </span>
+                                            </Link>
                                         ) : (
                                             <Link
                                                 to={linkTo}

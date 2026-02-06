@@ -13,6 +13,8 @@ import { Timestamp } from 'firebase/firestore'
 import { cn } from '@/lib/utils'
 import { getPlaceIcon, getContainerIcon, getItemIcon } from '@/utils/colorUtils'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
+import { useAuthStore } from '@/store/auth'
+import { isPlaceShared } from '@/utils/placeUtils'
 
 // Helper to convert Firestore Timestamp to Date
 const toDate = (timestamp: Date | Timestamp): Date => {
@@ -26,6 +28,7 @@ const toDate = (timestamp: Date | Timestamp): Date => {
 
 export function Search() {
   const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
 
   // Set global breadcrumbs
   useBreadcrumbs([{ label: 'Search', categoryPath: '/search' }])
@@ -40,6 +43,7 @@ export function Search() {
   const [filterType, setFilterType] = useState<SearchFilterType>('all')
   const [hasPhoto, setHasPhoto] = useState(false)
   const [hasAudio, setHasAudio] = useState(false)
+  const [sharedOnly, setSharedOnly] = useState(false)
 
   const searchResults = useSearch(query, {
     items: allItems,
@@ -71,11 +75,31 @@ export function Search() {
     .filter((r): r is Extract<SearchDataItem, { type: 'place' }> => r.type === 'place')
     .map(r => r.item)
 
+  const isSharedPlaceId = (placeId?: string) => {
+    if (!placeId) return false
+    const place = allPlaces.find((p) => p.id === placeId)
+    if (!place) return false
+    return isPlaceShared(place, user?.uid)
+  }
 
+  const filteredItems = sharedOnly
+    ? searchedItems.filter((item) => {
+      const container = allContainers.find((c) => c.id === item.containerId)
+      return isSharedPlaceId(container?.placeId)
+    })
+    : searchedItems
 
-  const searchedItemCount = searchedItems.length
-  const searchedContainerCount = searchedContainers.length
-  const searchedPlaceCount = searchedPlaces.length
+  const filteredContainers = sharedOnly
+    ? searchedContainers.filter((container) => isSharedPlaceId(container.placeId))
+    : searchedContainers
+
+  const filteredPlaces = sharedOnly
+    ? searchedPlaces.filter((place) => isPlaceShared(place, user?.uid))
+    : searchedPlaces
+
+  const searchedItemCount = filteredItems.length
+  const searchedContainerCount = filteredContainers.length
+  const searchedPlaceCount = filteredPlaces.length
   const totalResults = searchedItemCount + searchedContainerCount + searchedPlaceCount
 
   const getItemLocation = (itemId: string) => {
@@ -148,6 +172,13 @@ export function Search() {
           >
             Audio
           </FilterChip>
+          <FilterChip
+            active={sharedOnly}
+            onClick={() => setSharedOnly(!sharedOnly)}
+            icon={MapPin}
+          >
+            Shared
+          </FilterChip>
         </div>
 
         {/* Results Info */}
@@ -160,10 +191,10 @@ export function Search() {
         {/* Results List */}
         <div className="space-y-6">
           {/* Items Section */}
-          {searchedItems.length > 0 && (
+          {filteredItems.length > 0 && (
             <div className="space-y-3">
-              <h2 className="font-display text-[18px] font-bold text-text-primary">Items ({searchedItems.length})</h2>
-              {searchedItems.map((item: Item) => (
+              <h2 className="font-display text-[18px] font-bold text-text-primary">Items ({searchedItemCount})</h2>
+              {filteredItems.map((item: Item) => (
                 <Card
                   key={item.id}
                   variant="interactive"
@@ -211,10 +242,10 @@ export function Search() {
           )}
 
           {/* Containers Section */}
-          {searchedContainers.length > 0 && (
+          {filteredContainers.length > 0 && (
             <div className="space-y-3">
               <h2 className="font-display text-[18px] font-bold text-text-primary">Containers ({searchedContainerCount})</h2>
-              {searchedContainers.map((container: Container) => {
+              {filteredContainers.map((container: Container) => {
                 const place = allPlaces.find(p => p.id === container.placeId)
                 const itemCount = allItems.filter(item => item.containerId === container.id).length
                 const containerColor = container.color || '#3B82F6'
@@ -259,12 +290,13 @@ export function Search() {
           )}
 
           {/* Places Section */}
-          {searchedPlaces.length > 0 && (
+          {filteredPlaces.length > 0 && (
             <div className="space-y-3">
               <h2 className="font-display text-[18px] font-bold text-text-primary">Places ({searchedPlaceCount})</h2>
-              {searchedPlaces.map((place: Place) => {
+              {filteredPlaces.map((place: Place) => {
                 const placeContainers = allContainers.filter((c) => c.placeId === place.id)
                 const placeColor = place.color || '#14B8A6'
+                const shared = isPlaceShared(place, user?.uid)
 
                 return (
                   <Card
@@ -275,9 +307,16 @@ export function Search() {
                   >
                     <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={placeColor} />
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-body text-[16px] font-semibold text-text-primary">
-                        {place.name}
-                      </h3>
+                      <div className="flex items-center gap-2 min-w-0">
+                        <h3 className="font-body text-[16px] font-semibold text-text-primary truncate">
+                          {place.name}
+                        </h3>
+                        {shared && (
+                          <Badge size="sm" variant="info" className="flex-shrink-0">
+                            Shared
+                          </Badge>
+                        )}
+                      </div>
                       <p className="font-body text-[13px] text-text-secondary">
                         {placeContainers.length} container{placeContainers.length !== 1 ? 's' : ''}
                       </p>

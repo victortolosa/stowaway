@@ -22,8 +22,8 @@ interface ContainerListProps {
     groups: Group[]
     items: Item[]
     searchQuery: string
-    onEditGroup: (group: Group) => void
-    onAddContainer: () => void
+    onEditGroup?: (group: Group) => void
+    onAddContainer?: () => void
 }
 
 export function ContainerList({
@@ -42,7 +42,7 @@ export function ContainerList({
         return (
             <EmptyState
                 message="No containers in this place yet"
-                actionLabel="Add Your First Container"
+                actionLabel={onAddContainer ? "Add Your First Container" : undefined}
                 onAction={onAddContainer}
             />
         )
@@ -84,12 +84,14 @@ export function ContainerList({
                                                 ({groupContainers.length})
                                             </span>
                                         </div>
-                                        <button
-                                            onClick={() => onEditGroup(group)}
-                                            className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
-                                        >
-                                            <Pencil size={16} strokeWidth={2} />
-                                        </button>
+                                        {onEditGroup && (
+                                            <button
+                                                onClick={() => onEditGroup(group)}
+                                                className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
+                                            >
+                                                <Pencil size={16} strokeWidth={2} />
+                                            </button>
+                                        )}
                                     </div>
 
                                     <div className="pl-4 border-l-2 border-border-standard ml-2">

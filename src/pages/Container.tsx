@@ -15,7 +15,7 @@ import { QRManageModal } from '@/components/QRManageModal'
 import { updateContainer, deleteContainer, deleteItem, deleteGroup } from '@/services/firebaseService'
 import { Item, Group } from '@/types'
 import { Pencil, Trash2, Plus, QrCode, Search, FolderPlus, Activity } from 'lucide-react'
-import { IconOrEmoji, EmptyState, LoadingState, Button, NavigationHeader, ImageCarousel, Modal, GalleryEditor } from '@/components/ui'
+import { IconOrEmoji, EmptyState, LoadingState, Button, NavigationHeader, ImageCarousel, Modal, GalleryEditor, ImageGrid } from '@/components/ui'
 import { ItemCard } from '@/components/ItemCard'
 import { ActivityFeed } from '@/components/ActivityFeed'
 import { useSearchFilter } from '@/hooks/useSearchFilter'
@@ -45,7 +45,7 @@ export function Container() {
       // Also invalidate list queries to ensure Dashboard is updated if we edit container name/photos
       queryClient.invalidateQueries({ queryKey: CONTAINER_KEYS.all }),
       queryClient.invalidateQueries({ queryKey: ITEM_KEYS.byContainer(id!) }),
-      queryClient.invalidateQueries({ queryKey: GROUP_KEYS.list(user?.uid || '') })
+      queryClient.invalidateQueries({ queryKey: GROUP_KEYS.all })
     ])
   }
 
@@ -106,6 +106,10 @@ export function Container() {
     return <div>Container not found</div>
   }
 
+  const ownerId = place?.ownerId || place?.userId
+  const role = ownerId && user ? (place?.memberRoles?.[user.uid] || (user.uid === ownerId ? 'owner' : 'viewer')) : 'viewer'
+  const canEdit = role === 'owner' || role === 'editor'
+
   const handleDeleteContainer = async () => {
     setIsDeletingContainer(true)
     try {
@@ -159,42 +163,46 @@ export function Container() {
               variant="icon"
               size="icon"
               className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
-              onClick={() => setShowQRManageModal(true)}
-            >
-              <QrCode size={18} className="text-text-primary" strokeWidth={2} />
-            </Button>
-            <Button
-              variant="icon"
-              size="icon"
-              className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
               onClick={() => setShowActivityModal(true)}
             >
               <Activity size={18} className="text-text-primary" strokeWidth={2} />
             </Button>
-            <Button
-              variant="icon"
-              size="icon"
-              className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
-              onClick={() => setIsCreateSiblingContainerOpen(true)}
-            >
-              <Plus size={18} className="text-text-primary" strokeWidth={2} />
-            </Button>
-            <Button
-              variant="icon"
-              size="icon"
-              className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
-              onClick={() => setIsEditingContainer(true)}
-            >
-              <Pencil size={18} className="text-text-primary" strokeWidth={2} />
-            </Button>
-            <Button
-              variant="icon"
-              size="icon"
-              className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
-              onClick={() => setIsDeleteContainerConfirmOpen(true)}
-            >
-              <Trash2 size={18} className="text-text-primary" strokeWidth={2} />
-            </Button>
+            {canEdit && (
+              <>
+                <Button
+                  variant="icon"
+                  size="icon"
+                  className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
+                  onClick={() => setShowQRManageModal(true)}
+                >
+                  <QrCode size={18} className="text-text-primary" strokeWidth={2} />
+                </Button>
+                <Button
+                  variant="icon"
+                  size="icon"
+                  className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
+                  onClick={() => setIsCreateSiblingContainerOpen(true)}
+                >
+                  <Plus size={18} className="text-text-primary" strokeWidth={2} />
+                </Button>
+                <Button
+                  variant="icon"
+                  size="icon"
+                  className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
+                  onClick={() => setIsEditingContainer(true)}
+                >
+                  <Pencil size={18} className="text-text-primary" strokeWidth={2} />
+                </Button>
+                <Button
+                  variant="icon"
+                  size="icon"
+                  className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
+                  onClick={() => setIsDeleteContainerConfirmOpen(true)}
+                >
+                  <Trash2 size={18} className="text-text-primary" strokeWidth={2} />
+                </Button>
+              </>
+            )}
           </div>
         }
       />
@@ -249,7 +257,7 @@ export function Container() {
       </div>
 
       {/* Quick Actions */}
-      {!searchQuery && (
+      {!searchQuery && canEdit && (
         <div className="flex gap-3 mb-8">
           <Button
             variant="secondary"
@@ -284,8 +292,8 @@ export function Container() {
           {containerItems.length === 0 ? (
             <EmptyState
               message="No items in this container yet"
-              actionLabel="Add Your First Item"
-              onAction={() => setIsCreateItemOpen(true)}
+              actionLabel={canEdit ? "Add Your First Item" : undefined}
+              onAction={canEdit ? () => setIsCreateItemOpen(true) : undefined}
             />
           ) : (
             <div className="flex flex-col gap-6">
@@ -310,12 +318,14 @@ export function Container() {
                               ({groupItems.length})
                             </span>
                           </div>
-                          <button
-                            onClick={() => setEditingGroup(group)}
-                            className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
-                          >
-                            <Pencil size={16} strokeWidth={2} />
-                          </button>
+                          {canEdit && (
+                            <button
+                              onClick={() => setEditingGroup(group)}
+                              className="p-1 text-text-tertiary hover:text-text-primary transition-colors"
+                            >
+                              <Pencil size={16} strokeWidth={2} />
+                            </button>
+                          )}
                         </div>
 
                         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
@@ -349,18 +359,20 @@ export function Container() {
       </div>
 
       {/* Create Item Modal */}
-      <CreateItemModal
-        isOpen={isCreateItemOpen}
-        onClose={() => setIsCreateItemOpen(false)}
-        onItemCreated={() => {
-          refresh()
-          setIsCreateItemOpen(false)
-        }}
-        containerId={id}
-      />
+      {canEdit && (
+        <CreateItemModal
+          isOpen={isCreateItemOpen}
+          onClose={() => setIsCreateItemOpen(false)}
+          onItemCreated={() => {
+            refresh()
+            setIsCreateItemOpen(false)
+          }}
+          containerId={id}
+        />
+      )}
 
       {/* Edit Container Modal */}
-      {isEditingContainer && (
+      {canEdit && isEditingContainer && (
         <CreateContainerModal
           isOpen={isEditingContainer}
           onClose={() => setIsEditingContainer(false)}
@@ -375,19 +387,21 @@ export function Container() {
       )}
 
       {/* Create Sibling Container Modal */}
-      <CreateContainerModal
-        isOpen={isCreateSiblingContainerOpen}
-        onClose={() => setIsCreateSiblingContainerOpen(false)}
-        onContainerCreated={() => {
-          refresh()
-          setIsCreateSiblingContainerOpen(false)
-        }}
-        placeId={place?.id || ''}
-        preselectedGroupId={container.groupId}
-      />
+      {canEdit && (
+        <CreateContainerModal
+          isOpen={isCreateSiblingContainerOpen}
+          onClose={() => setIsCreateSiblingContainerOpen(false)}
+          onContainerCreated={() => {
+            refresh()
+            setIsCreateSiblingContainerOpen(false)
+          }}
+          placeId={place?.id || ''}
+          preselectedGroupId={container.groupId}
+        />
+      )}
 
       {/* Edit Item Modal */}
-      {editingItem && (
+      {canEdit && editingItem && (
         <CreateItemModal
           isOpen={!!editingItem}
           onClose={() => setEditingItem(null)}
@@ -402,16 +416,18 @@ export function Container() {
       )}
 
       {/* Create Group Modal */}
-      <CreateGroupModal
-        isOpen={isCreateGroupOpen}
-        onClose={() => setIsCreateGroupOpen(false)}
-        onGroupCreated={refresh}
-        type="item"
-        parentId={id}
-      />
+      {canEdit && (
+        <CreateGroupModal
+          isOpen={isCreateGroupOpen}
+          onClose={() => setIsCreateGroupOpen(false)}
+          onGroupCreated={refresh}
+          type="item"
+          parentId={id}
+        />
+      )}
 
       {/* Edit Group Modal */}
-      {editingGroup && (
+      {canEdit && editingGroup && (
         <CreateGroupModal
           isOpen={!!editingGroup}
           onClose={() => setEditingGroup(null)}
@@ -428,7 +444,7 @@ export function Container() {
       )}
 
       {/* Delete Group Confirmation */}
-      {deletingGroup && (
+      {canEdit && deletingGroup && (
         <ConfirmDeleteModal
           isOpen={!!deletingGroup}
           onClose={() => setDeletingGroup(null)}
@@ -440,17 +456,19 @@ export function Container() {
       )}
 
       {/* Delete Container Confirmation */}
-      <ConfirmDeleteModal
-        isOpen={isDeleteContainerConfirmOpen}
-        onClose={() => setIsDeleteContainerConfirmOpen(false)}
-        onConfirm={handleDeleteContainer}
-        title="Delete Container"
-        message={`Are you sure you want to delete "${container.name}"? This action cannot be undone and will delete all items within it.`}
-        isDeleting={isDeletingContainer}
-      />
+      {canEdit && (
+        <ConfirmDeleteModal
+          isOpen={isDeleteContainerConfirmOpen}
+          onClose={() => setIsDeleteContainerConfirmOpen(false)}
+          onConfirm={handleDeleteContainer}
+          title="Delete Container"
+          message={`Are you sure you want to delete "${container.name}"? This action cannot be undone and will delete all items within it.`}
+          isDeleting={isDeletingContainer}
+        />
+      )}
 
       {/* Delete Item Confirmation */}
-      {deletingItem && (
+      {canEdit && deletingItem && (
         <ConfirmDeleteModal
           isOpen={!!deletingItem}
           onClose={() => setDeletingItem(null)}
@@ -462,13 +480,15 @@ export function Container() {
       )}
 
       {/* QR Manage Modal */}
-      <QRManageModal
-        isOpen={showQRManageModal}
-        onClose={() => setShowQRManageModal(false)}
-        container={container}
-        onRefresh={refresh}
-        onViewLabel={handleViewLabel}
-      />
+      {canEdit && (
+        <QRManageModal
+          isOpen={showQRManageModal}
+          onClose={() => setShowQRManageModal(false)}
+          container={container}
+          onRefresh={refresh}
+          onViewLabel={handleViewLabel}
+        />
+      )}
 
       {/* QR Label Modal */}
       {place && (
@@ -488,18 +508,22 @@ export function Container() {
         description={`${container.photos?.length || 0} photos`}
       >
         <div className="max-h-[60vh] overflow-y-auto p-1">
-          <GalleryEditor
-            images={container.photos || []}
-            onUpdate={async (newImages) => {
-              try {
-                await updateContainer(container.id, { photos: newImages })
-                await refresh()
-              } catch (error) {
-                console.error('Failed to update photos:', error)
-                alert('Failed to update gallery')
-              }
-            }}
-          />
+          {canEdit ? (
+            <GalleryEditor
+              images={container.photos || []}
+              onUpdate={async (newImages) => {
+                try {
+                  await updateContainer(container.id, { photos: newImages })
+                  await refresh()
+                } catch (error) {
+                  console.error('Failed to update photos:', error)
+                  alert('Failed to update gallery')
+                }
+              }}
+            />
+          ) : (
+            <ImageGrid images={container.photos || []} />
+          )}
         </div>
         <div className="flex justify-end mt-4">
           <Button variant="secondary" onClick={() => setShowGallery(false)}>

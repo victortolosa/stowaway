@@ -8,6 +8,7 @@ import { deleteField } from 'firebase/firestore'
 import { useAuthStore } from '@/store/auth'
 import { useImageCompression } from '@/hooks'
 import { useGroups } from '@/hooks/queries/useGroups'
+import { useContainer } from '@/hooks/queries/useContainers'
 import { AudioRecorder } from './AudioRecorder'
 import { AudioPlayer } from './AudioPlayer'
 import { trimSilence } from '@/utils/audioUtils'
@@ -51,6 +52,7 @@ export function CreateItemModal({
     const user = useAuthStore((state) => state.user)
     const { data: groups = [] } = useGroups()
     const { data: allItems = [] } = useAllItems()
+    const { data: container } = useContainer(containerId)
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [images, setImages] = useState<(File | string)[]>([])
     const [tags, setTags] = useState<string[]>([])
@@ -210,6 +212,8 @@ export function CreateItemModal({
                 }
             }
 
+            const placeIdForMedia = container?.placeId || initialData?.placeId || ''
+
             // Upload new files
             const filesToUpload = effectivePhotos.filter(img => img instanceof File) as File[]
 
@@ -222,7 +226,9 @@ export function CreateItemModal({
 
                 const ext = compressedPhoto.type.split('/')[1] || 'jpg'
                 const filename = `${Date.now()}_${(crypto && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2))}.${ext}`
-                const photoPath = `items/${user.uid}/${filename}`
+                const photoPath = placeIdForMedia
+                    ? `item-media/${placeIdForMedia}/${filename}`
+                    : `items/${user.uid}/${filename}`
                 const url = await uploadImage(compressedPhoto, photoPath)
                 newPhotos.push(url)
                 uploadedPaths.push(photoPath)
@@ -237,7 +243,9 @@ export function CreateItemModal({
                 const audioFile = new File([audioBlob], filename, {
                     type: audioBlob.type || 'audio/webm',
                 })
-                const audioPath = `items/${user.uid}/audio/${filename}`
+                const audioPath = placeIdForMedia
+                    ? `item-media/${placeIdForMedia}/audio/${filename}`
+                    : `items/${user.uid}/audio/${filename}`
                 audioUrl = await uploadAudio(audioFile, audioPath)
                 uploadedPaths.push(audioPath)
             }

@@ -16,6 +16,7 @@ import {
   Package,
   Box,
 } from 'lucide-react'
+import { useAuthStore } from '@/store/auth'
 
 function getRelativeTime(date: Date): string {
   const now = new Date()
@@ -126,6 +127,8 @@ interface ActivityFeedProps {
 }
 
 export function ActivityFeed({ activities, isLoading, error }: ActivityFeedProps) {
+  const user = useAuthStore((state) => state.user)
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-8">
@@ -163,6 +166,9 @@ export function ActivityFeed({ activities, isLoading, error }: ActivityFeedProps
         const colorClasses = ACTION_COLORS[activity.action]
         const [iconColor, iconBg] = colorClasses.split(' ')
         const EntityIcon = ENTITY_ICONS[activity.entityType]
+        const actorLabel = activity.userId === user?.uid
+          ? 'You'
+          : (activity.actorName || activity.actorEmail || 'Someone')
 
         return (
           <Card key={activity.id} padding="md" className="flex items-start gap-3">
@@ -181,7 +187,7 @@ export function ActivityFeed({ activities, isLoading, error }: ActivityFeedProps
                 {getActionText(activity)}
               </p>
               <p className="font-body text-xs text-text-tertiary mt-1">
-                {getRelativeTime(activity.createdAt)}
+                {actorLabel} · {getRelativeTime(activity.createdAt)}
               </p>
             </div>
           </Card>

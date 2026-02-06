@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { Modal, Button, Input, Switch, ColorPicker } from '@/components/ui'
+import { Modal, Button, Input, Switch, ColorPicker, Badge } from '@/components/ui'
 import { Camera, Trash2, Plus, Check, ArrowLeft } from 'lucide-react'
 import { generateAutoIncrementName } from '@/utils/naming'
 import { useImageCompression } from '@/hooks/useImageCompression'
 import { usePlaces } from '@/hooks/queries/usePlaces'
+import { useAuthStore } from '@/store/auth'
 import {
     createContainer,
     uploadImageWithCleanup,
@@ -11,7 +12,7 @@ import {
 } from '@/services/firebaseService'
 import { getColorPalette, DEFAULT_CONTAINER_COLOR } from '@/utils/colorUtils'
 import { useQueryClient } from '@tanstack/react-query'
-import { auth } from '@/lib/firebase'
+import { isPlaceShared, canEditPlace } from '@/utils/placeUtils'
 
 // ============================================
 // TYPES
@@ -41,7 +42,9 @@ interface PlaceSelectorStepProps {
 }
 
 function PlaceSelectorStep({ onSelect }: PlaceSelectorStepProps) {
+    const user = useAuthStore((state) => state.user)
     const { data: places, isLoading } = usePlaces()
+    const editablePlaces = (places || []).filter((place) => canEditPlace(place, user?.uid))
 
     if (isLoading) {
         return (
@@ -61,6 +64,16 @@ function PlaceSelectorStep({ onSelect }: PlaceSelectorStepProps) {
         )
     }
 
+    if (editablePlaces.length === 0) {
+        return (
+            <div className="text-center py-12">
+                <p className="text-text-secondary mb-4">
+                    No places you can edit. Ask the owner to grant editor access.
+                </p>
+            </div>
+        )
+    }
+
     return (
         <div className="space-y-4">
             <p className="text-text-secondary">
@@ -68,7 +81,9 @@ function PlaceSelectorStep({ onSelect }: PlaceSelectorStepProps) {
             </p>
 
             <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto">
-                {places.map(place => (
+                {editablePlaces.map(place => {
+                    const shared = isPlaceShared(place, user?.uid)
+                    return (
                     <button
                         key={place.id}
                         onClick={() => onSelect(place.id, place.name)}
@@ -81,9 +96,16 @@ function PlaceSelectorStep({ onSelect }: PlaceSelectorStepProps) {
                         >
                             <span>{place.icon || '📍'}</span>
                         </div>
-                        <span className="font-medium text-text-primary">{place.name}</span>
+                        <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-medium text-text-primary truncate">{place.name}</span>
+                            {shared && (
+                                <Badge size="sm" variant="info" className="flex-shrink-0">
+                                    Shared
+                                </Badge>
+                            )}
+                        </div>
                     </button>
-                ))}
+                )})}
             </div>
         </div>
     )
@@ -683,7 +705,7 @@ export function BatchContainerCreationModal({
 
                     // 2. Upload photo
                     const fileName = `${Date.now()}_${crypto.randomUUID()}.jpg`
-                    const storagePath = `containers/${auth.currentUser?.uid}/${fileName}`
+                    const storagePath = `container-media/${selectedPlaceId}/${fileName}`
 
                     const photoUrl = await uploadImageWithCleanup(
                         compressedPhoto,

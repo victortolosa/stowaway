@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
-import { getUserItems, getRecentItems } from '@/services/firebaseService'
+import { getAccessibleItems, getRecentItems } from '@/services/firebaseService'
 import { useAuthStore } from '@/store/auth'
+import { usePlaces } from '@/hooks/queries/usePlaces'
+import { useMemo } from 'react'
 
 export const ALL_ITEMS_KEYS = {
     all: ['items', 'all'] as const,
@@ -10,26 +12,30 @@ export const ALL_ITEMS_KEYS = {
 
 export function useAllItems() {
     const user = useAuthStore((state) => state.user)
+    const { data: places = [], isLoading: isPlacesLoading } = usePlaces()
+    const placeIds = useMemo(() => places.map((place) => place.id).sort(), [places])
 
     return useQuery({
-        queryKey: user?.uid ? ALL_ITEMS_KEYS.list(user.uid) : ['items', 'disabled'],
+        queryKey: user?.uid ? [...ALL_ITEMS_KEYS.list(user.uid), placeIds] : ['items', 'disabled'],
         queryFn: () => {
             if (!user?.uid) throw new Error('User not authenticated')
-            return getUserItems(user.uid)
+            return getAccessibleItems(placeIds)
         },
-        enabled: !!user?.uid,
+        enabled: !!user?.uid && !isPlacesLoading,
     })
 }
 
 export function useRecentItems(limitCount = 20) {
     const user = useAuthStore((state) => state.user)
+    const { data: places = [], isLoading: isPlacesLoading } = usePlaces()
+    const placeIds = useMemo(() => places.map((place) => place.id).sort(), [places])
 
     return useQuery({
-        queryKey: user?.uid ? ALL_ITEMS_KEYS.recent(user.uid) : ['items', 'disabled'],
+        queryKey: user?.uid ? [...ALL_ITEMS_KEYS.recent(user.uid), placeIds] : ['items', 'disabled'],
         queryFn: () => {
             if (!user?.uid) throw new Error('User not authenticated')
             return getRecentItems(user.uid, limitCount)
         },
-        enabled: !!user?.uid,
+        enabled: !!user?.uid && !isPlacesLoading,
     })
 }

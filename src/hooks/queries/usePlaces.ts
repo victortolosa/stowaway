@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { getUserPlaces, getPlace } from '@/services/firebaseService'
+import { getAccessiblePlaces, getPlace } from '@/services/firebaseService'
 import { useAuthStore } from '@/store/auth'
 
 export const PLACE_KEYS = {
@@ -17,7 +17,7 @@ export function usePlaces() {
         queryKey: user?.uid ? PLACE_KEYS.list(user.uid) : ['places', 'disabled'],
         queryFn: () => {
             if (!user?.uid) throw new Error('User not authenticated')
-            return getUserPlaces(user.uid)
+            return getAccessiblePlaces(user.uid)
         },
         enabled: !!user?.uid,
     })

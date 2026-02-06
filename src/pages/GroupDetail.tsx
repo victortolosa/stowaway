@@ -4,7 +4,7 @@ import { useGroup } from '@/hooks/queries/useGroups'
 import { usePlaces } from '@/hooks/queries/usePlaces'
 import { useAllContainers } from '@/hooks/queries/useAllContainers'
 import { useAllItems } from '@/hooks/queries/useAllItems'
-import { ListItem, LoadingState, EmptyState, IconOrEmoji, NavigationHeader, Button } from '@/components/ui'
+import { ListItem, LoadingState, EmptyState, IconOrEmoji, NavigationHeader, Button, Badge } from '@/components/ui'
 import { Plus } from 'lucide-react'
 import { ItemCard } from '@/components/ItemCard'
 import { CreatePlaceModal, CreateContainerModal, CreateItemModal } from '@/components'
@@ -13,11 +13,14 @@ import { PLACE_KEYS } from '@/hooks/queries/usePlaces'
 import { CONTAINER_KEYS } from '@/hooks/queries/useContainers'
 import { ITEM_KEYS } from '@/hooks/queries/useItems'
 import { getPlaceIcon, getContainerIcon } from '@/utils/colorUtils'
+import { useAuthStore } from '@/store/auth'
+import { isPlaceShared, canEditPlace } from '@/utils/placeUtils'
 
 export function GroupDetail() {
     const { id } = useParams<{ id: string }>()
     const navigate = useNavigate()
     const queryClient = useQueryClient()
+    const user = useAuthStore((state) => state.user)
 
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)
 
@@ -45,6 +48,18 @@ export function GroupDetail() {
 
     // Color and icon now come from database
 
+    const groupPlace =
+        group.type === 'container'
+            ? places.find((p) => p.id === group.parentId)
+            : group.type === 'item'
+                ? places.find((p) => p.id === containers.find((c) => c.id === group.parentId)?.placeId)
+                : null
+
+    const canEditGroup =
+        group.type === 'place'
+            ? !!user
+            : !!groupPlace && canEditPlace(groupPlace, user?.uid)
+
     const renderContent = () => {
         if (group.type === 'place') {
             const groupPlaces = places.filter(p => p.groupId === group.id)
@@ -56,6 +71,7 @@ export function GroupDetail() {
                     {groupPlaces.map((place) => {
                         const placeContainers = containers.filter(c => c.placeId === place.id)
                         const placeColor = place.color || '#14B8A6'
+                        const shared = isPlaceShared(place, user?.uid)
                         return (
                             <ListItem
                                 key={place.id}
@@ -64,6 +80,11 @@ export function GroupDetail() {
                                 leftContent={
                                     <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={placeColor} />
                                 }
+                                rightContent={shared ? (
+                                    <Badge size="sm" variant="info">
+                                        Shared
+                                    </Badge>
+                                ) : undefined}
                                 onClick={() => navigate(`/places/${place.id}`)}
                             />
                         )
@@ -143,14 +164,16 @@ export function GroupDetail() {
             <NavigationHeader
                 title={group.name}
                 actions={
-                    <Button
-                        variant="primary"
-                        size="sm"
-                        leftIcon={Plus}
-                        onClick={() => setIsAddModalOpen(true)}
-                    >
-                        Add {group.type.charAt(0).toUpperCase() + group.type.slice(1)}
-                    </Button>
+                    canEditGroup ? (
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            leftIcon={Plus}
+                            onClick={() => setIsAddModalOpen(true)}
+                        >
+                            Add {group.type.charAt(0).toUpperCase() + group.type.slice(1)}
+                        </Button>
+                    ) : undefined
                 }
             />
             <div className="px-4 -mt-2 mb-6">
@@ -162,7 +185,7 @@ export function GroupDetail() {
                 {renderContent()}
             </div>
 
-            {group.type === 'place' && (
+            {group.type === 'place' && canEditGroup && (
                 <CreatePlaceModal
                     isOpen={isAddModalOpen}
                     onClose={() => setIsAddModalOpen(false)}
@@ -174,7 +197,7 @@ export function GroupDetail() {
                 />
             )}
 
-            {group.type === 'container' && (
+            {group.type === 'container' && canEditGroup && (
                 <CreateContainerModal
                     isOpen={isAddModalOpen}
                     onClose={() => setIsAddModalOpen(false)}
@@ -182,12 +205,12 @@ export function GroupDetail() {
                         queryClient.invalidateQueries({ queryKey: CONTAINER_KEYS.all })
                         setIsAddModalOpen(false)
                     }}
-                    placeId={containers.find(c => c.groupId === group.id)?.placeId || ''}
+                    placeId={group.parentId || ''}
                     preselectedGroupId={group.id}
                 />
             )}
 
-            {group.type === 'item' && (
+            {group.type === 'item' && canEditGroup && (
                 <CreateItemModal
                     isOpen={isAddModalOpen}
                     onClose={() => setIsAddModalOpen(false)}
@@ -195,7 +218,7 @@ export function GroupDetail() {
                         queryClient.invalidateQueries({ queryKey: ITEM_KEYS.all })
                         setIsAddModalOpen(false)
                     }}
-                    containerId={items.find(i => i.groupId === group.id)?.containerId || ''}
+                    containerId={group.parentId || ''}
                     preselectedGroupId={group.id}
                 />
             )}

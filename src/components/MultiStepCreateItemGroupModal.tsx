@@ -61,6 +61,7 @@ export function MultiStepCreateItemGroupModal({
         onClose={handleClose}
         onPlaceSelect={handlePlaceSelect}
         title="Create Item Group - Select Place"
+        filterMode="editable"
       />
     )
   }

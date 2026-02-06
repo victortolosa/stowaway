@@ -1,11 +1,14 @@
 import { useState } from 'react'
 import { Modal, Button, Card, IconOrEmoji, EmptyState } from './ui'
 import { useAllContainers } from '@/hooks/queries/useAllContainers'
+import { usePlaces } from '@/hooks/queries/usePlaces'
 import { useAllItems } from '@/hooks/queries/useAllItems'
 import { CreateContainerModal } from './CreateContainerModal'
 import { useQueryClient } from '@tanstack/react-query'
 import { Search, Plus } from 'lucide-react'
 import { getContainerIcon } from '@/utils/colorUtils'
+import { useAuthStore } from '@/store/auth'
+import { canEditPlace } from '@/utils/placeUtils'
 
 export function ContainerSelector({
   isOpen,
@@ -23,12 +26,16 @@ export function ContainerSelector({
   placeName: string
 }) {
   const queryClient = useQueryClient()
+  const user = useAuthStore((state) => state.user)
   const { data: allContainers = [], isLoading } = useAllContainers()
   const { data: items = [] } = useAllItems()
+  const { data: places = [] } = usePlaces()
   const [searchQuery, setSearchQuery] = useState('')
   const [isCreateContainerOpen, setIsCreateContainerOpen] = useState(false)
 
   const containers = allContainers.filter(c => c.placeId === placeId)
+  const selectedPlace = places.find((p) => p.id === placeId)
+  const canEdit = selectedPlace ? canEditPlace(selectedPlace, user?.uid) : false
 
   const filteredContainers = containers.filter((container) => {
     if (!searchQuery) return true
@@ -65,15 +72,17 @@ export function ContainerSelector({
           </div>
 
           {/* Create New Container Button */}
-          <Button
-            variant="secondary"
-            size="sm"
-            leftIcon={Plus}
-            onClick={() => setIsCreateContainerOpen(true)}
-            fullWidth
-          >
-            Create New Container in {placeName}
-          </Button>
+          {canEdit && (
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={Plus}
+              onClick={() => setIsCreateContainerOpen(true)}
+              fullWidth
+            >
+              Create New Container in {placeName}
+            </Button>
+          )}
 
           {/* Search */}
           <div className="bg-white rounded-xl h-[48px] px-4 flex items-center gap-3 border border-border-standard">
@@ -145,12 +154,14 @@ export function ContainerSelector({
         </div>
       </Modal>
 
-      <CreateContainerModal
-        isOpen={isCreateContainerOpen}
-        onClose={() => setIsCreateContainerOpen(false)}
-        onContainerCreated={handleContainerCreated}
-        placeId={placeId}
-      />
+      {canEdit && (
+        <CreateContainerModal
+          isOpen={isCreateContainerOpen}
+          onClose={() => setIsCreateContainerOpen(false)}
+          onContainerCreated={handleContainerCreated}
+          placeId={placeId}
+        />
+      )}
     </>
   )
 }

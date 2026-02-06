@@ -1,0 +1,68 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getPlace(placeId) {
+      return firestore.get(/databases/(default)/documents/places/$(placeId));
+    }
+
+    function isPlaceOwner(placeId) {
+      return isAuthenticated() && (
+        getPlace(placeId).data.ownerId == request.auth.uid ||
+        getPlace(placeId).data.userId == request.auth.uid
+      );
+    }
+
+    function isPlaceMember(placeId) {
+      return isAuthenticated() && (
+        isPlaceOwner(placeId) ||
+        (
+          getPlace(placeId).data.memberIds != null &&
+          request.auth.uid in getPlace(placeId).data.memberIds
+        )
+      );
+    }
+
+    function placeRole(placeId) {
+      return getPlace(placeId).data.memberRoles != null
+        ? getPlace(placeId).data.memberRoles[request.auth.uid]
+        : null;
+    }
+
+    function isPlaceEditor(placeId) {
+      return isPlaceOwner(placeId) || placeRole(placeId) == 'editor';
+    }
+
+    // Place-aware media paths (new)
+    match /place-media/{placeId}/{allPaths=**} {
+      allow read: if isPlaceMember(placeId);
+      allow write: if isPlaceEditor(placeId);
+    }
+
+    match /container-media/{placeId}/{allPaths=**} {
+      allow read: if isPlaceMember(placeId);
+      allow write: if isPlaceEditor(placeId);
+    }
+
+    match /item-media/{placeId}/{allPaths=**} {
+      allow read: if isPlaceMember(placeId);
+      allow write: if isPlaceEditor(placeId);
+    }
+
+    // Legacy owner-scoped paths (kept for backward compatibility)
+    match /places/{userId}/{allPaths=**} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    match /containers/{userId}/{allPaths=**} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    match /items/{userId}/{allPaths=**} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+  }
+}

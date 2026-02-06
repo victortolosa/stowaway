@@ -1,6 +1,7 @@
 import {
   collection,
   addDoc,
+  setDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -19,10 +20,10 @@ import {
   deleteObject,
 } from 'firebase/storage'
 import { db, storage, auth } from '@/lib/firebase'
-import { Place, Container, Item, Group, Activity, ActivityAction, ActivityEntityType, ActivityMetadata } from '@/types'
+import { Place, PlaceRole, Container, Item, Group, Activity, ActivityAction, ActivityEntityType, ActivityMetadata, UserProfile } from '@/types'
 import { offlineStorage } from '@/lib/offlineStorage'
 import { sanitizeUndefined, getChangedFields } from '@/utils/data'
-import { PlaceSchema, ContainerSchema, ItemSchema, GroupSchema, ActivitySchema } from '@/schemas/firestore'
+import { PlaceSchema, ContainerSchema, ItemSchema, GroupSchema, ActivitySchema, UserProfileSchema } from '@/schemas/firestore'
 
 const getCurrentUserId = (): string => {
   const uid = auth.currentUser?.uid;
@@ -31,6 +32,87 @@ const getCurrentUserId = (): string => {
   }
   return uid;
 };
+
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+export const getPlaceOwnerId = (place: Place) => place.ownerId || place.userId;
+
+const ensurePlaceMemberState = (place: Place) => {
+  const ownerId = getPlaceOwnerId(place);
+  const memberIds = place.memberIds && place.memberIds.length > 0 ? place.memberIds : [ownerId];
+  const memberRoles = {
+    ...(place.memberRoles || {}),
+    [ownerId]: 'owner' as PlaceRole,
+  };
+  return { ownerId, memberIds: Array.from(new Set(memberIds)), memberRoles };
+};
+
+const chunkArray = <T>(items: T[], size: number) => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+};
+
+/**
+ * USER PROFILE OPERATIONS
+ */
+export async function upsertUserProfile(profile: {
+  uid: string
+  email: string
+  displayName?: string | null
+  photoURL?: string | null
+}) {
+  const userRef = doc(db, 'users', profile.uid)
+  const existing = await getDoc(userRef)
+  const now = Timestamp.now()
+  const data = {
+    uid: profile.uid,
+    email: normalizeEmail(profile.email),
+    displayName: profile.displayName ?? null,
+    photoURL: profile.photoURL ?? null,
+    updatedAt: now,
+    createdAt: existing.exists() ? (existing.data().createdAt || now) : now,
+  }
+  await setDoc(userRef, data, { merge: true })
+}
+
+export async function getUserProfile(uid: string): Promise<UserProfile | undefined> {
+  const docRef = doc(db, 'users', uid)
+  const docSnap = await getDoc(docRef)
+  if (docSnap.exists()) {
+    const raw = { uid: docSnap.id, ...docSnap.data() }
+    return UserProfileSchema.parse(raw)
+  }
+  return undefined
+}
+
+export async function getUserByEmail(email: string): Promise<UserProfile | undefined> {
+  const normalized = normalizeEmail(email)
+  const q = query(collection(db, 'users'), where('email', '==', normalized))
+  const snapshot = await getDocs(q)
+  const docSnap = snapshot.docs[0]
+  if (!docSnap) return undefined
+  const raw = { uid: docSnap.id, ...docSnap.data() }
+  return UserProfileSchema.parse(raw)
+}
+
+export async function getUserProfilesByIds(uids: string[]): Promise<UserProfile[]> {
+  if (uids.length === 0) return []
+  const chunks = chunkArray(uids, 10)
+  const results = await Promise.all(
+    chunks.map(async (chunk) => {
+      const q = query(collection(db, 'users'), where('uid', 'in', chunk))
+      const snapshot = await getDocs(q)
+      return snapshot.docs.map((docSnap) => {
+        const raw = { uid: docSnap.id, ...docSnap.data() }
+        return UserProfileSchema.parse(raw)
+      })
+    })
+  )
+  return results.flat()
+}
 
 /**
  * PLACES OPERATIONS
@@ -51,9 +133,15 @@ export async function createPlace(place: Omit<Place, 'id' | 'userId' | 'createdA
     if (!userId) throw new Error("User must be logged in to create a place");
 
     const sanitizedPlace = sanitizeUndefined(place)
+    const ownerId = userId
+    const memberIds = [ownerId]
+    const memberRoles = { [ownerId]: 'owner' as PlaceRole }
     const docRef = await addDoc(collection(db, 'places'), {
       ...sanitizedPlace,
       userId,
+      ownerId,
+      memberIds,
+      memberRoles,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     })
@@ -77,16 +165,35 @@ export async function createPlace(place: Omit<Place, 'id' | 'userId' | 'createdA
 
 export async function getUserPlaces(userId: string): Promise<Place[]> {
   try {
-    const q = query(collection(db, 'places'), where('userId', '==', userId))
-    const snapshot = await getDocs(q)
-    return snapshot.docs.map((doc) => {
-      const raw = { id: doc.id, ...doc.data() }
-      return PlaceSchema.parse(raw)
+    const results: Place[] = []
+    const placeMap = new Map<string, Place>()
+
+    const memberQuery = query(collection(db, 'places'), where('memberIds', 'array-contains', userId))
+    const memberSnapshot = await getDocs(memberQuery)
+    memberSnapshot.docs.forEach((docSnap) => {
+      const raw = { id: docSnap.id, ...docSnap.data() }
+      const place = PlaceSchema.parse(raw)
+      placeMap.set(place.id, place)
     })
+
+    const ownerQuery = query(collection(db, 'places'), where('userId', '==', userId))
+    const ownerSnapshot = await getDocs(ownerQuery)
+    ownerSnapshot.docs.forEach((docSnap) => {
+      const raw = { id: docSnap.id, ...docSnap.data() }
+      const place = PlaceSchema.parse(raw)
+      placeMap.set(place.id, place)
+    })
+
+    placeMap.forEach((place) => results.push(place))
+    return results
   } catch (error) {
     console.error('Error fetching places:', error)
     throw error
   }
+}
+
+export async function getAccessiblePlaces(userId: string): Promise<Place[]> {
+  return getUserPlaces(userId)
 }
 
 export async function updatePlace(placeId: string, updates: Partial<Place>) {
@@ -126,6 +233,38 @@ export async function updatePlace(placeId: string, updates: Partial<Place>) {
     console.error('Error updating place:', error)
     throw error
   }
+}
+
+export async function addPlaceMember(placeId: string, memberUid: string, role: PlaceRole) {
+  const place = await getPlace(placeId)
+  if (!place) throw new Error('Place not found')
+  const { ownerId, memberIds, memberRoles } = ensurePlaceMemberState(place)
+  const nextMemberIds = Array.from(new Set([...memberIds, memberUid]))
+  const nextMemberRoles = { ...memberRoles, [memberUid]: role, [ownerId]: 'owner' as PlaceRole }
+  await updatePlace(placeId, { memberIds: nextMemberIds, memberRoles: nextMemberRoles })
+}
+
+export async function updatePlaceMemberRole(placeId: string, memberUid: string, role: PlaceRole) {
+  const place = await getPlace(placeId)
+  if (!place) throw new Error('Place not found')
+  const { ownerId, memberIds, memberRoles } = ensurePlaceMemberState(place)
+  if (memberUid === ownerId) return
+  if (!memberIds.includes(memberUid)) {
+    throw new Error('Member not found in this place')
+  }
+  const nextMemberRoles = { ...memberRoles, [memberUid]: role, [ownerId]: 'owner' as PlaceRole }
+  await updatePlace(placeId, { memberRoles: nextMemberRoles })
+}
+
+export async function removePlaceMember(placeId: string, memberUid: string) {
+  const place = await getPlace(placeId)
+  if (!place) throw new Error('Place not found')
+  const { ownerId, memberIds, memberRoles } = ensurePlaceMemberState(place)
+  if (memberUid === ownerId) return
+  const nextMemberIds = memberIds.filter((id) => id !== memberUid)
+  const nextMemberRoles = { ...memberRoles }
+  delete nextMemberRoles[memberUid]
+  await updatePlace(placeId, { memberIds: nextMemberIds, memberRoles: nextMemberRoles })
 }
 
 export async function deletePlace(placeId: string) {
@@ -247,16 +386,29 @@ export async function getPlaceContainers(placeId: string): Promise<Container[]> 
 
 export async function getUserContainers(userId: string): Promise<Container[]> {
   try {
-    const q = query(collection(db, 'containers'), where('userId', '==', userId))
-    const snapshot = await getDocs(q)
-    return snapshot.docs.map((doc) => {
-      const raw = { id: doc.id, ...doc.data() }
-      return ContainerSchema.parse(raw)
-    })
+    const places = await getAccessiblePlaces(userId)
+    const placeIds = places.map((place) => place.id)
+    return getAccessibleContainers(placeIds)
   } catch (error) {
     console.error('Error fetching user containers:', error)
     throw error
   }
+}
+
+export async function getAccessibleContainers(placeIds: string[]): Promise<Container[]> {
+  if (placeIds.length === 0) return []
+  const chunks = chunkArray(placeIds, 10)
+  const results = await Promise.all(
+    chunks.map(async (chunk) => {
+      const q = query(collection(db, 'containers'), where('placeId', 'in', chunk))
+      const snapshot = await getDocs(q)
+      return snapshot.docs.map((doc) => {
+        const raw = { id: doc.id, ...doc.data() }
+        return ContainerSchema.parse(raw)
+      })
+    })
+  )
+  return results.flat()
 }
 
 export async function updateContainer(containerId: string, updates: Partial<Container>) {
@@ -276,12 +428,6 @@ export async function updateContainer(containerId: string, updates: Partial<Cont
       // If photos cleared, perform logic whether to clear photoUrl?
       // For now let's assume if explicit empty array, we might want to clear it.
       // But let's be safe and only update if specifically requested.
-    }
-
-    // Ensure userId is present (fixes data consistency issues for older/bugged containers)
-    const userId = getCurrentUserId();
-    if (userId) {
-      sanitizedUpdates.userId = userId;
     }
 
     await updateDoc(containerRef, {
@@ -499,12 +645,9 @@ export async function getPlaceItems(placeId: string): Promise<Item[]> {
 
 export async function getUserItems(userId: string): Promise<Item[]> {
   try {
-    const q = query(collection(db, 'items'), where('userId', '==', userId))
-    const snapshot = await getDocs(q)
-    return snapshot.docs.map((doc) => {
-      const raw = { id: doc.id, ...doc.data() }
-      return ItemSchema.parse(raw)
-    })
+    const places = await getAccessiblePlaces(userId)
+    const placeIds = places.map((place) => place.id)
+    return getAccessibleItems(placeIds)
   } catch (error) {
     console.error('Error fetching user items:', error)
     throw error
@@ -513,21 +656,28 @@ export async function getUserItems(userId: string): Promise<Item[]> {
 
 export async function getRecentItems(userId: string, limitCount = 20): Promise<Item[]> {
   try {
-    const q = query(
-      collection(db, 'items'),
-      where('userId', '==', userId),
-      orderBy('createdAt', 'desc'),
-      limit(limitCount)
-    )
-    const snapshot = await getDocs(q)
-    return snapshot.docs.map((doc) => {
-      const raw = { id: doc.id, ...doc.data() }
-      return ItemSchema.parse(raw)
-    })
+    const places = await getAccessiblePlaces(userId)
+    const placeIds = places.map((place) => place.id)
+    const allItems = await getAccessibleItems(placeIds)
+    return allItems
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, limitCount)
   } catch (error) {
     console.error('Error fetching recent items:', error)
     throw error
   }
+}
+
+export async function getAccessibleItems(placeIds: string[]): Promise<Item[]> {
+  if (placeIds.length === 0) return []
+  const results = await Promise.all(placeIds.map((placeId) => getPlaceItems(placeId)))
+  const allItems = results.flat()
+  // Defensive dedupe in case items are returned multiple times across place queries.
+  const itemMap = new Map<string, Item>()
+  allItems.forEach((item) => {
+    if (!itemMap.has(item.id)) itemMap.set(item.id, item)
+  })
+  return Array.from(itemMap.values())
 }
 
 export async function updateItem(itemId: string, updates: Partial<Item>) {
@@ -539,6 +689,14 @@ export async function updateItem(itemId: string, updates: Partial<Item>) {
     if (!oldItem) throw new Error("Item not found");
 
     const sanitizedUpdates = sanitizeUndefined(updates)
+    let resolvedPlaceId = oldItem.placeId
+    if (!oldItem.placeId) {
+      const container = await getContainer(oldItem.containerId)
+      if (container) {
+        sanitizedUpdates.placeId = container.placeId
+        resolvedPlaceId = container.placeId
+      }
+    }
     await updateDoc(itemRef, {
       ...sanitizedUpdates,
       updatedAt: Timestamp.now(),
@@ -550,7 +708,7 @@ export async function updateItem(itemId: string, updates: Partial<Item>) {
 
     if (updates.name && updates.name !== oldItem.name) {
       await logActivity('renamed', 'item', itemId, currentName, {
-        placeId: oldItem.placeId,
+        placeId: resolvedPlaceId,
         containerId: oldItem.containerId,
       }, {
         oldValue: oldItem.name,
@@ -559,7 +717,7 @@ export async function updateItem(itemId: string, updates: Partial<Item>) {
       });
     } else if (changedFields.length > 0) {
       await logActivity('updated', 'item', itemId, currentName, {
-        placeId: oldItem.placeId,
+        placeId: resolvedPlaceId,
         containerId: oldItem.containerId,
       }, {
         changedFields,
@@ -578,19 +736,20 @@ export async function deleteItem(itemId: string) {
     if (!item) throw new Error("Item not found");
 
     const container = await getContainer(item.containerId);
+    const resolvedPlaceId = item.placeId || container?.placeId;
 
     await deleteDoc(doc(db, 'items', itemId))
 
     // Log activity on the item itself
     await logActivity('deleted', 'item', itemId, item.name, {
-      placeId: item.placeId,
+      placeId: resolvedPlaceId,
       containerId: item.containerId,
     });
 
     // Log activity on the parent container (item was removed from it)
     if (container) {
       await logActivity('removed_from', 'container', item.containerId, container.name, {
-        placeId: item.placeId,
+        placeId: resolvedPlaceId,
         containerId: item.containerId,
       }, {
         childEntityType: 'item',
@@ -617,7 +776,7 @@ export async function moveItem(itemId: string, newContainerId: string) {
     if (!newContainer) throw new Error("Destination container not found");
 
     const oldContainerId = item.containerId;
-    const oldPlaceId = item.placeId;
+    const oldPlaceId = item.placeId || oldContainer?.placeId;
 
     // Update the item's containerId (and placeId if container is in different place)
     await updateDoc(doc(db, 'items', itemId), {
@@ -748,7 +907,24 @@ export async function createGroup(group: Omit<Group, 'id' | 'userId' | 'createdA
     const userId = getCurrentUserId();
     if (!userId) throw new Error("User must be logged in to create a group");
 
-    const sanitizedGroup = sanitizeUndefined(group)
+    let resolvedPlaceId: string | null | undefined = group.placeId
+    if (resolvedPlaceId === undefined) {
+      if (group.type === 'place') {
+        resolvedPlaceId = null
+      } else if (group.type === 'container') {
+        resolvedPlaceId = group.parentId || null
+      } else if (group.type === 'item') {
+        if (!group.parentId) throw new Error('Parent container is required for item groups')
+        const container = await getContainer(group.parentId)
+        if (!container) throw new Error('Container not found')
+        resolvedPlaceId = container.placeId
+      }
+    }
+
+    const sanitizedGroup = sanitizeUndefined({
+      ...group,
+      placeId: resolvedPlaceId ?? null,
+    })
     const docRef = await addDoc(collection(db, 'groups'), {
       ...sanitizedGroup,
       userId,
@@ -764,16 +940,46 @@ export async function createGroup(group: Omit<Group, 'id' | 'userId' | 'createdA
 
 export async function getUserGroups(userId: string): Promise<Group[]> {
   try {
-    const q = query(collection(db, 'groups'), where('userId', '==', userId))
-    const snapshot = await getDocs(q)
-    return snapshot.docs.map((doc) => {
-      const raw = { id: doc.id, ...doc.data() }
-      return GroupSchema.parse(raw)
-    })
+    const places = await getAccessiblePlaces(userId)
+    const placeIds = places.map((place) => place.id)
+    return getAccessibleGroups(userId, placeIds)
   } catch (error) {
     console.error('Error fetching user groups:', error)
     throw error
   }
+}
+
+export async function getAccessibleGroups(userId: string, placeIds: string[]): Promise<Group[]> {
+  const groupMap = new Map<string, Group>()
+
+  if (placeIds.length > 0) {
+    const chunks = chunkArray(placeIds, 10)
+    const results = await Promise.all(
+      chunks.map(async (chunk) => {
+        const q = query(collection(db, 'groups'), where('placeId', 'in', chunk))
+        const snapshot = await getDocs(q)
+        return snapshot.docs.map((docSnap) => {
+          const raw = { id: docSnap.id, ...docSnap.data() }
+          return GroupSchema.parse(raw)
+        })
+      })
+    )
+    results.flat().forEach((group) => groupMap.set(group.id, group))
+  }
+
+  const placeGroupsQuery = query(
+    collection(db, 'groups'),
+    where('userId', '==', userId),
+    where('placeId', '==', null)
+  )
+  const placeGroupsSnapshot = await getDocs(placeGroupsQuery)
+  placeGroupsSnapshot.docs.forEach((docSnap) => {
+    const raw = { id: docSnap.id, ...docSnap.data() }
+    const group = GroupSchema.parse(raw)
+    groupMap.set(group.id, group)
+  })
+
+  return Array.from(groupMap.values())
 }
 
 export async function updateGroup(groupId: string, updates: Partial<Group>) {
@@ -1052,9 +1258,13 @@ export async function logActivity(
 ): Promise<void> {
   try {
     const userId = getCurrentUserId();
+    const actor = auth.currentUser;
 
     await addDoc(collection(db, 'activity'), {
       userId,
+      actorName: actor?.displayName || null,
+      actorEmail: actor?.email || null,
+      actorPhotoURL: actor?.photoURL || null,
       action,
       entityType,
       entityId,
@@ -1121,6 +1331,66 @@ export async function getUserRecentActivity(
   } catch (error) {
     console.error('Error fetching user activity:', error);
     throw error;
+  }
+}
+
+/**
+ * Get recent activity across all accessible places (shared-aware feed)
+ */
+export async function getAccessibleRecentActivity(
+  userId: string,
+  limitCount = 50
+): Promise<Activity[]> {
+  try {
+    const places = await getAccessiblePlaces(userId)
+    const placeIds = places.map((place) => place.id)
+
+    if (placeIds.length === 0) {
+      return getUserRecentActivity(userId, limitCount)
+    }
+
+    const chunks = chunkArray(placeIds, 10)
+    const results = await Promise.all(
+      chunks.map(async (chunk) => {
+        const q = query(
+          collection(db, 'activity'),
+          where('placeId', 'in', chunk),
+          orderBy('createdAt', 'desc'),
+          limit(limitCount)
+        )
+        const snapshot = await getDocs(q)
+        return snapshot.docs.map((doc) => {
+          const raw = { id: doc.id, ...doc.data() }
+          return ActivitySchema.parse(raw)
+        })
+      })
+    )
+
+    const combined = results.flat()
+    const deduped = new Map<string, Activity>()
+    combined.forEach((activity) => deduped.set(activity.id, activity))
+
+    // Include any legacy activity that lacks placeId but belongs to this user
+    const legacyQuery = query(
+      collection(db, 'activity'),
+      where('userId', '==', userId),
+      where('placeId', '==', null),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    )
+    const legacySnapshot = await getDocs(legacyQuery)
+    legacySnapshot.docs.forEach((doc) => {
+      const raw = { id: doc.id, ...doc.data() }
+      const activity = ActivitySchema.parse(raw)
+      deduped.set(activity.id, activity)
+    })
+
+    return Array.from(deduped.values())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, limitCount)
+  } catch (error) {
+    console.error('Error fetching accessible activity:', error)
+    throw error
   }
 }
 
@@ -1270,7 +1540,12 @@ export async function trackEntityView(
       const item = await getItem(entityId);
       if (!item) return;
       entityName = item.name;
-      hierarchy = { placeId: item.placeId, containerId: item.containerId };
+      let placeId = item.placeId;
+      if (!placeId) {
+        const container = await getContainer(item.containerId);
+        placeId = container?.placeId;
+      }
+      hierarchy = { placeId, containerId: item.containerId };
     }
 
     await logActivity('viewed', entityType, entityId, entityName, hierarchy);

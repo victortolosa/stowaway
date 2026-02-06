@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
-import { Modal, Button, Input } from '@/components/ui'
+import { Modal, Button, Input, Badge } from '@/components/ui'
 import { TagInput } from '@/components/ui/TagInput'
 import { Camera, Trash2, Plus, Check, ArrowLeft, Search } from 'lucide-react'
 import { generateAutoIncrementName } from '@/utils/naming'
@@ -7,6 +7,7 @@ import { useImageCompression } from '@/hooks/useImageCompression'
 import { usePlaces } from '@/hooks/queries/usePlaces'
 import { usePlaceContainers } from '@/hooks/queries/useContainers'
 import { useAllItems } from '@/hooks/queries/useAllItems'
+import { useAuthStore } from '@/store/auth'
 import {
     createItem,
     uploadImage,
@@ -15,6 +16,7 @@ import { DEFAULT_ITEM_COLOR } from '@/utils/colorUtils'
 import { getContainerIcon, isEmoji } from '@/utils/colorUtils'
 import { useQueryClient } from '@tanstack/react-query'
 import { auth } from '@/lib/firebase'
+import { isPlaceShared, canEditPlace } from '@/utils/placeUtils'
 
 // ============================================
 // TYPES
@@ -44,15 +46,18 @@ interface PlaceSelectorStepProps {
 }
 
 function PlaceSelectorStep({ onSelect }: PlaceSelectorStepProps) {
+    const user = useAuthStore((state) => state.user)
     const { data: places, isLoading } = usePlaces()
     const [search, setSearch] = useState('')
 
+    const editablePlaces = (places || []).filter((place) => canEditPlace(place, user?.uid))
+
     const filteredPlaces = useMemo(() => {
-        if (!places) return []
-        if (!search.trim()) return places
+        if (!editablePlaces) return []
+        if (!search.trim()) return editablePlaces
         const q = search.toLowerCase()
-        return places.filter(p => p.name.toLowerCase().includes(q))
-    }, [places, search])
+        return editablePlaces.filter(p => p.name.toLowerCase().includes(q))
+    }, [editablePlaces, search])
 
     if (isLoading) {
         return (
@@ -67,6 +72,16 @@ function PlaceSelectorStep({ onSelect }: PlaceSelectorStepProps) {
             <div className="text-center py-12">
                 <p className="text-text-secondary mb-4">
                     You need to create a place first before adding items.
+                </p>
+            </div>
+        )
+    }
+
+    if (editablePlaces.length === 0) {
+        return (
+            <div className="text-center py-12">
+                <p className="text-text-secondary mb-4">
+                    No places you can edit. Ask the owner to grant editor access.
                 </p>
             </div>
         )
@@ -89,22 +104,32 @@ function PlaceSelectorStep({ onSelect }: PlaceSelectorStepProps) {
             </div>
 
             <div className="grid grid-cols-1 gap-2 max-h-[300px] overflow-y-auto">
-                {filteredPlaces.map(place => (
-                    <button
-                        key={place.id}
-                        onClick={() => onSelect(place.id, place.name)}
-                        className="flex items-center gap-3 p-4 rounded-xl border border-border-light
+                {filteredPlaces.map(place => {
+                    const shared = isPlaceShared(place, user?.uid)
+                    return (
+                        <button
+                            key={place.id}
+                            onClick={() => onSelect(place.id, place.name)}
+                            className="flex items-center gap-3 p-4 rounded-xl border border-border-light
                        hover:border-accent-aqua hover:bg-accent-aqua/5 transition text-left"
-                    >
-                        <div
-                            className="w-10 h-10 rounded-lg flex items-center justify-center"
-                            style={{ backgroundColor: (place.color || '#3B82F6') + '20' }}
                         >
-                            <span>{place.icon || '📍'}</span>
-                        </div>
-                        <span className="font-medium text-text-primary">{place.name}</span>
-                    </button>
-                ))}
+                            <div
+                                className="w-10 h-10 rounded-lg flex items-center justify-center"
+                                style={{ backgroundColor: (place.color || '#3B82F6') + '20' }}
+                            >
+                                <span>{place.icon || '📍'}</span>
+                            </div>
+                            <div className="flex items-center gap-2 min-w-0">
+                                <span className="font-medium text-text-primary truncate">{place.name}</span>
+                                {shared && (
+                                    <Badge size="sm" variant="info" className="flex-shrink-0">
+                                        Shared
+                                    </Badge>
+                                )}
+                            </div>
+                        </button>
+                    )
+                })}
                 {filteredPlaces.length === 0 && (
                     <p className="text-center text-text-tertiary py-6">No places match your search</p>
                 )}
@@ -721,7 +746,9 @@ export function BatchItemCreationModal({
                     })
 
                     const fileName = `${Date.now()}_${crypto.randomUUID()}.jpg`
-                    const storagePath = `items/${auth.currentUser?.uid}/${fileName}`
+                    const storagePath = selectedPlaceId
+                        ? `item-media/${selectedPlaceId}/${fileName}`
+                        : `items/${auth.currentUser?.uid}/${fileName}`
 
                     const photoUrl = await uploadImage(compressedPhoto, storagePath)
                     if (photoUrl) {

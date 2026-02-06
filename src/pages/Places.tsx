@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useAuthStore } from '@/store/auth'
 import { usePlaces, PLACE_KEYS } from '@/hooks/queries/usePlaces'
 import { useGroups } from '@/hooks/queries/useGroups'
@@ -8,12 +8,73 @@ import { CreatePlaceModal, ConfirmDeleteModal, CreateGroupModal } from '@/compon
 import { useNavigate } from 'react-router-dom'
 import { deletePlace, deleteGroup } from '@/services/firebaseService'
 import { Place, Group } from '@/types'
-import { Trash2, Search, FolderPlus, Plus, Pencil } from 'lucide-react'
+import { Search, FolderPlus, Plus, Pencil, MoreVertical, Users } from 'lucide-react'
 import { ListItem, EmptyState, LoadingState, Button, IconOrEmoji } from '@/components/ui'
 import { getPlaceIcon } from '@/utils/colorUtils'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 import { SortOption, sortItems } from '@/utils/sortUtils'
 import { SortDropdown } from '@/components/ui'
+import { isPlaceShared, canEditPlace, getPlaceRole } from '@/utils/placeUtils'
+import { useOnClickOutside } from '@/hooks/useOnClickOutside'
+
+interface PlaceCardActionsMenuProps {
+  canEdit: boolean
+  canDelete: boolean
+  onEdit: () => void
+  onDelete: () => void
+}
+
+function PlaceCardActionsMenu({ canEdit, canDelete, onEdit, onDelete }: PlaceCardActionsMenuProps) {
+  const [isOpen, setIsOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useOnClickOutside(menuRef, useCallback(() => setIsOpen(false), []))
+
+  if (!canEdit && !canDelete) return null
+
+  return (
+    <div
+      ref={menuRef}
+      className="relative"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <button
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="p-2 text-text-tertiary hover:text-text-primary transition-colors"
+        aria-label="Open place actions"
+      >
+        <MoreVertical size={20} strokeWidth={2} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 mt-1 w-40 bg-bg-page rounded-card shadow-card py-2 z-30 border border-border-standard">
+          {canEdit && (
+            <button
+              onClick={() => {
+                setIsOpen(false)
+                onEdit()
+              }}
+              className="w-full px-4 py-2 text-left font-body text-sm text-text-primary hover:bg-bg-surface"
+            >
+              Edit Place
+            </button>
+          )}
+          {canDelete && (
+            <button
+              onClick={() => {
+                setIsOpen(false)
+                onDelete()
+              }}
+              className="w-full px-4 py-2 text-left font-body text-sm text-accent-danger hover:bg-bg-surface"
+            >
+              Delete Place
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function Places() {
   const user = useAuthStore((state) => state.user)
@@ -101,6 +162,8 @@ export function Places() {
   )
 
   const placeGroups = (groups || []).filter((g) => g && g.type === 'place' && g.parentId === null)
+  const placeGroupIds = new Set(placeGroups.map((g) => g.id))
+  const ungroupedPlaces = filteredPlaces.filter((place) => !place.groupId || !placeGroupIds.has(place.groupId))
 
   return (
     <div className="flex flex-col pb-48">
@@ -202,36 +265,34 @@ export function Places() {
                             {groupPlaces.map((place) => {
                               const placeContainers = containers.filter((c) => c.placeId === place.id)
                               const placeColor = place.color || '#14B8A6'
+                              const shared = isPlaceShared(place, user?.uid)
+                              const canEdit = canEditPlace(place, user?.uid)
+                              const canDelete = getPlaceRole(place, user?.uid) === 'owner'
 
                               return (
                                 <ListItem
                                   key={place.id}
                                   title={place.name}
                                   subtitle={`${placeContainers.length} container${placeContainers.length !== 1 ? 's' : ''}`}
+                                  showChevron={false}
                                   leftContent={
                                     <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={placeColor} />
                                   }
+                              rightContent={shared ? (
+                                    <span
+                                      className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-accent-blue/20 text-accent-blue flex-shrink-0"
+                                      aria-label="Shared"
+                                    >
+                                      <Users size={12} strokeWidth={2.5} />
+                                    </span>
+                                  ) : undefined}
                                   actions={
-                                    <div className="flex items-center">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          setEditingPlace(place)
-                                        }}
-                                        className="p-3 text-text-tertiary hover:text-text-primary transition-colors z-10"
-                                      >
-                                        <Pencil size={20} strokeWidth={2} />
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          setDeletingPlace(place)
-                                        }}
-                                        className="p-3 text-text-tertiary hover:text-accent-danger transition-colors z-10"
-                                      >
-                                        <Trash2 size={20} strokeWidth={2} />
-                                      </button>
-                                    </div>
+                                    <PlaceCardActionsMenu
+                                      canEdit={canEdit}
+                                      canDelete={canDelete}
+                                      onEdit={() => setEditingPlace(place)}
+                                      onDelete={() => setDeletingPlace(place)}
+                                    />
                                   }
                                   onClick={() => navigate(`/places/${place.id}`)}
                                 />
@@ -246,44 +307,44 @@ export function Places() {
               )}
 
             {/* Ungrouped Places */}
-            {filteredPlaces.filter(p => !p.groupId).length > 0 && (
+            {ungroupedPlaces.length > 0 && (
               <div className="flex flex-col gap-3">
-                <h3 className="font-display text-[16px] font-semibold text-text-secondary px-1">
-                  Ungrouped
-                </h3>
-                {filteredPlaces.filter(p => !p.groupId).map((place) => {
+                {placeGroups.length > 0 && (
+                  <h3 className="font-display text-[16px] font-semibold text-text-secondary px-1">
+                    Ungrouped
+                  </h3>
+                )}
+                {ungroupedPlaces.map((place) => {
                   const placeContainers = containers.filter((c) => c.placeId === place.id)
                   const placeColor = place.color || '#14B8A6'
+                  const shared = isPlaceShared(place, user?.uid)
+                  const canEdit = canEditPlace(place, user?.uid)
+                  const canDelete = getPlaceRole(place, user?.uid) === 'owner'
 
                   return (
                     <ListItem
                       key={place.id}
                       title={place.name}
                       subtitle={`${placeContainers.length} container${placeContainers.length !== 1 ? 's' : ''}`}
+                      showChevron={false}
                       leftContent={
                         <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={placeColor} />
                       }
+                      rightContent={shared ? (
+                        <span
+                          className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-accent-blue/20 text-accent-blue flex-shrink-0"
+                          aria-label="Shared"
+                        >
+                          <Users size={12} strokeWidth={2.5} />
+                        </span>
+                      ) : undefined}
                       actions={
-                        <div className="flex items-center">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setEditingPlace(place)
-                            }}
-                            className="p-3 text-text-tertiary hover:text-text-primary transition-colors z-10"
-                          >
-                            <Pencil size={20} strokeWidth={2} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              setDeletingPlace(place)
-                            }}
-                            className="p-3 text-text-tertiary hover:text-accent-danger transition-colors z-10"
-                          >
-                            <Trash2 size={20} strokeWidth={2} />
-                          </button>
-                        </div>
+                        <PlaceCardActionsMenu
+                          canEdit={canEdit}
+                          canDelete={canDelete}
+                          onEdit={() => setEditingPlace(place)}
+                          onDelete={() => setDeletingPlace(place)}
+                        />
                       }
                       onClick={() => navigate(`/places/${place.id}`)}
                     />

@@ -46,6 +46,7 @@ export function MultiStepCreateContainerModal({
         onClose={handleClose}
         onPlaceSelect={handlePlaceSelect}
         title="Create Container - Select Place"
+        filterMode="editable"
       />
     )
   }

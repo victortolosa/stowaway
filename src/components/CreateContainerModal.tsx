@@ -116,7 +116,7 @@ export function CreateContainerModal({
 
                 const ext = compressedPhoto.type.split('/')[1] || 'jpg'
                 const filename = `${Date.now()}_${(crypto && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2))}.${ext}`
-                const path = `containers/${user.uid}/${filename}`
+                const path = `container-media/${placeId}/${filename}`
 
                 const url = await uploadImageWithCleanup(compressedPhoto, path, async () => { })
                 newPhotos.push(url)

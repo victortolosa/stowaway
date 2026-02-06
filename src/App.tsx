@@ -5,6 +5,7 @@ import { queryClient } from '@/lib/react-query'
 import { onAuthStateChanged } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/auth'
+import { upsertUserProfile } from '@/services/firebaseService'
 import { ProtectedRoute, Layout, RootErrorBoundary } from '@/components'
 import './styles/globals.css'
 
@@ -27,6 +28,7 @@ const Activity = lazy(() => import('@/pages/Activity').then(m => ({ default: m.A
 
 function App() {
   const { setUser, setLoading } = useAuthStore()
+  const user = useAuthStore((state) => state.user)
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -36,6 +38,18 @@ function App() {
 
     return unsubscribe
   }, [setUser, setLoading])
+
+  useEffect(() => {
+    if (!user || !user.email) return
+    upsertUserProfile({
+      uid: user.uid,
+      email: user.email,
+      displayName: user.displayName,
+      photoURL: user.photoURL,
+    }).catch((error) => {
+      console.error('Failed to upsert user profile:', error)
+    })
+  }, [user])
 
   return (
     <RootErrorBoundary>

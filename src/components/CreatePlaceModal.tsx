@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { createPlace, updatePlace, uploadImageWithCleanup, deleteStorageFile } from '@/services/firebaseService'
+import { createPlace, updatePlace, uploadImageWithCleanup, deleteStorageFile, deletePlace } from '@/services/firebaseService'
 import { useAuthStore } from '@/store/auth'
 import { Place } from '@/types'
 import { Modal, Button, Input, Select, FormField, MultiImageUploader, ProgressBar, ColorPicker } from '@/components/ui'
@@ -77,6 +77,8 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
 
         setIsSubmitting(true)
         const uploadedPaths: string[] = []
+        let placeId: string | undefined
+        let createdPlaceId: string | undefined
 
         try {
             const newPhotos: string[] = []
@@ -87,6 +89,21 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                 if (typeof img === 'string') {
                     existingPhotos.push(img)
                 }
+            }
+
+            // Create place first if needed so we can scope media by place ID
+            if (editMode && initialData) {
+                placeId = initialData.id
+            } else {
+                placeId = await createPlace({
+                    name: data.name,
+                    type: data.type,
+                    groupId: data.groupId || null,
+                    photos: [],
+                    color: selectedColor,
+                    // Icon will be set to default via getPlaceIcon() when displayed
+                })
+                createdPlaceId = placeId
             }
 
             // Upload new files
@@ -102,7 +119,7 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
 
                 const ext = compressedPhoto.type.split('/')[1] || 'jpg'
                 const filename = `${Date.now()}_${(crypto && crypto.randomUUID ? crypto.randomUUID() : String(Math.random()).slice(2))}.${ext}`
-                const path = `places/${user.uid}/${filename}`
+                const path = `place-media/${placeId}/${filename}`
 
                 // We use uploadImageWithCleanup logic manually here effectively
                 // But since we are doing multiple, we will catch errors at the top level and clean up all
@@ -112,8 +129,6 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
             }
 
             const finalPhotos = [...existingPhotos, ...newPhotos]
-
-            let placeId: string | undefined
 
             if (editMode && initialData) {
                 await updatePlace(initialData.id, {
@@ -125,14 +140,9 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                     icon: initialData.icon,
                 })
                 placeId = initialData.id
-            } else {
-                placeId = await createPlace({
-                    name: data.name,
-                    type: data.type,
-                    groupId: data.groupId || null,
+            } else if (placeId && finalPhotos.length > 0) {
+                await updatePlace(placeId, {
                     photos: finalPhotos,
-                    color: selectedColor,
-                    // Icon will be set to default via getPlaceIcon() when displayed
                 })
             }
 
@@ -149,6 +159,13 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                 }
             } catch (cleanupErr) {
                 console.error('Failed to cleanup uploaded files:', cleanupErr)
+            }
+            try {
+                if (!editMode && createdPlaceId) {
+                    await deletePlace(createdPlaceId)
+                }
+            } catch (cleanupErr) {
+                console.error('Failed to cleanup place after save failure:', cleanupErr)
             }
             alert('Failed to save place. Please try again.')
         } finally {

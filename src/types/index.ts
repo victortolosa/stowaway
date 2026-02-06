@@ -1,6 +1,7 @@
 export interface Place {
   id: string
   userId: string
+  ownerId?: string
   name: string
   type: 'home' | 'office' | 'storage' | 'other'
   createdAt: Date
@@ -10,7 +11,12 @@ export interface Place {
   photos?: string[]
   color?: string
   icon?: string
+  memberIds?: string[]
+  memberRoles?: PlaceMemberRoles
 }
+
+export type PlaceRole = 'owner' | 'editor' | 'viewer'
+export type PlaceMemberRoles = Record<string, PlaceRole>
 
 export interface Group {
   id: string
@@ -20,11 +26,12 @@ export interface Group {
   type: 'place' | 'container' | 'item'
   createdAt: Date
   updatedAt: Date
+  placeId?: string | null
 }
 
 export interface Container {
   id: string
-  userId: string
+  userId?: string
   placeId: string
   name: string
   qrCodeId?: string
@@ -41,7 +48,7 @@ export interface Container {
 
 export interface Item {
   id: string
-  userId: string
+  userId?: string
   containerId: string
   placeId?: string // Optional for backward compatibility with existing items
   name: string
@@ -62,6 +69,15 @@ export interface SearchResult {
   item: Item
   container: Container
   place: Place
+}
+
+export interface UserProfile {
+  uid: string
+  email: string
+  displayName?: string | null
+  photoURL?: string | null
+  createdAt: Date
+  updatedAt: Date
 }
 
 /**
@@ -116,6 +132,9 @@ export interface ActivityMetadata {
 export interface Activity {
   id: string
   userId: string
+  actorName?: string | null
+  actorEmail?: string | null
+  actorPhotoURL?: string | null
 
   // What happened
   action: ActivityAction
