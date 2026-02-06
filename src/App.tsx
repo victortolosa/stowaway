@@ -23,6 +23,7 @@ const Profile = lazy(() => import('@/pages/Profile').then(m => ({ default: m.Pro
 const Scan = lazy(() => import('@/pages/Scan').then(m => ({ default: m.Scan })))
 const Tools = lazy(() => import('@/pages/Tools').then(m => ({ default: m.Tools })))
 const GroupDetail = lazy(() => import('@/pages/GroupDetail').then(m => ({ default: m.GroupDetail })))
+const Activity = lazy(() => import('@/pages/Activity').then(m => ({ default: m.Activity })))
 
 function App() {
   const { setUser, setLoading } = useAuthStore()
@@ -70,6 +71,7 @@ function App() {
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/tools" element={<Tools />} />
                 <Route path="/groups/:id" element={<GroupDetail />} />
+                <Route path="/activity" element={<Activity />} />
               </Route>
             </Routes>
           </Suspense>

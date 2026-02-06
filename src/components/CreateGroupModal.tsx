@@ -6,10 +6,11 @@ import { createGroup, updateGroup, updatePlace, updateContainer, updateItem } fr
 import { useAuthStore } from '@/store/auth'
 import { Group } from '@/types'
 import { Modal, Button, Input, FormField } from '@/components/ui'
-import { Check, Package, MapPin, Search, Trash2 } from 'lucide-react'
+import { Check, Search, Trash2 } from 'lucide-react'
 import { usePlaces } from '@/hooks/queries/usePlaces'
 import { useAllContainers } from '@/hooks/queries/useAllContainers'
 import { useAllItems } from '@/hooks/queries/useAllItems'
+import { getPlaceIcon, getContainerIcon, getItemIcon } from '@/utils/colorUtils'
 
 const groupSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -154,16 +155,16 @@ export function CreateGroupModal({
         }
     }
 
-    const getItemIcon = () => {
+    const getIcon = () => {
         switch (type) {
-            case 'place': return MapPin
-            case 'container': return Package
-            case 'item': return Package
-            default: return Package
+            case 'place': return getPlaceIcon()
+            case 'container': return getContainerIcon()
+            case 'item': return getItemIcon()
+            default: return getItemIcon()
         }
     }
 
-    const ItemIcon = getItemIcon()
+    const ItemIcon = getIcon()
 
     return (
         <Modal

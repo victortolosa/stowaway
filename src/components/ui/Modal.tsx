@@ -9,7 +9,7 @@ export interface ModalProps {
   title: string
   description?: string
   children: ReactNode
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'full'
   className?: string
 }
 
@@ -17,6 +17,7 @@ const sizeClasses = {
   sm: 'max-w-sm',
   md: 'max-w-md',
   lg: 'max-w-lg',
+  full: 'max-w-full w-full h-full max-h-full',
 }
 
 export function Modal({
@@ -28,14 +29,19 @@ export function Modal({
   size = 'md',
   className,
 }: ModalProps) {
+  const isFullScreen = size === 'full'
+
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" />
         <Dialog.Content
           className={cn(
-            'fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-32px)] bg-bg-page rounded-card shadow-lg p-6 z-50 max-h-[90vh] overflow-y-auto',
-            sizeClasses[size],
+            'fixed bg-bg-page shadow-lg p-6 z-50',
+            isFullScreen
+              ? 'inset-0 w-full h-full overflow-y-auto'
+              : 'top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[calc(100%-32px)] rounded-card max-h-[90vh] overflow-y-auto',
+            !isFullScreen && sizeClasses[size],
             className
           )}
         >

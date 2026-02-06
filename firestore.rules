@@ -36,10 +36,10 @@ service cloud.firestore {
 
     // 4. Rules for Items
     match /items/{itemId} {
-      allow create: if isOwner(request.resource.data.userId) 
+      allow create: if isOwner(request.resource.data.userId)
         // Optional: Add specific validation for photos/voiceNoteUrl here if needed
         // && (
-        //   !('photos' in request.resource.data) || 
+        //   !('photos' in request.resource.data) ||
         //   request.resource.data.photos.size() == 0 ||
         //   isValidUrlOrPlaceholder(request.resource.data.photos[0])
         // )
@@ -47,7 +47,21 @@ service cloud.firestore {
       allow read, update, delete: if isOwner(resource.data.userId);
     }
 
-    // 5. Catch-all rule (Maintaining your existing "Getting Started" rules)
+    // 5. Rules for Activity Logs
+    match /activity/{activityId} {
+      // Users can only read their own activity
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+
+      // Users can create activity logs for their own actions
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+
+      // No updates or deletes allowed - activity logs are immutable
+      allow update, delete: if false;
+    }
+
+    // 6. Catch-all rule (Maintaining your existing "Getting Started" rules)
     // This is useful for development but should be locked down eventually.
     match /{document=**} {
       allow read, write: if request.time < timestamp.date(2026, 3, 1);

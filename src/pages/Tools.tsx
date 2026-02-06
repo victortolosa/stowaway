@@ -1,11 +1,19 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Card } from '@/components/ui'
-import { Printer } from 'lucide-react'
+import { Printer, Boxes, Package } from 'lucide-react'
 import { BatchPrintModal } from '@/components/BatchPrintModal'
+import { BatchContainerCreationModal } from '@/components/BatchContainerCreationModal'
+import { BatchItemCreationModal } from '@/components/BatchItemCreationModal'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 
 export function Tools() {
+  const navigate = useNavigate()
   const [showBatchPrint, setShowBatchPrint] = useState(false)
+  const [showBatchCreate, setShowBatchCreate] = useState(false)
+  const [showBatchCreateItems, setShowBatchCreateItems] = useState(false)
+  const [initialSelectedContainerIds, setInitialSelectedContainerIds] = useState<string[]>([])
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null)
 
   // Set global breadcrumbs
   useBreadcrumbs([{ label: 'Tools', categoryPath: '/tools' }])
@@ -19,7 +27,22 @@ export function Tools() {
       color: '#14B8A6',
       onClick: () => setShowBatchPrint(true)
     },
-    // More tools can be added here in the future
+    {
+      id: 'batch-create',
+      title: 'Batch Create Containers',
+      description: 'Quickly create multiple containers',
+      icon: Boxes,
+      color: '#8B5CF6',
+      onClick: () => setShowBatchCreate(true)
+    },
+    {
+      id: 'batch-create-items',
+      title: 'Batch Create Items',
+      description: 'Quickly create multiple items in a container',
+      icon: Package,
+      color: '#F59E0B',
+      onClick: () => setShowBatchCreateItems(true)
+    },
   ]
 
   return (
@@ -69,7 +92,48 @@ export function Tools() {
       {showBatchPrint && (
         <BatchPrintModal
           isOpen={showBatchPrint}
-          onClose={() => setShowBatchPrint(false)}
+          onClose={() => {
+            setShowBatchPrint(false)
+            setInitialSelectedContainerIds([])
+            setSelectedPlaceId(null)
+          }}
+          initialSelectedContainerIds={initialSelectedContainerIds}
+          onComplete={() => {
+            // Navigate to place view after QR codes are generated
+            if (selectedPlaceId) {
+              navigate(`/places/${selectedPlaceId}`)
+            }
+          }}
+        />
+      )}
+
+      {showBatchCreate && (
+        <BatchContainerCreationModal
+          isOpen={showBatchCreate}
+          onClose={() => {
+            setShowBatchCreate(false)
+            setSelectedPlaceId(null)
+          }}
+          onBatchCreated={(containerIds, placeId) => {
+            // Close batch create modal
+            setShowBatchCreate(false)
+            // Store place ID for navigation after QR printing
+            setSelectedPlaceId(placeId)
+            // Open batch print modal with newly created containers
+            setInitialSelectedContainerIds(containerIds)
+            setShowBatchPrint(true)
+          }}
+        />
+      )}
+
+      {showBatchCreateItems && (
+        <BatchItemCreationModal
+          isOpen={showBatchCreateItems}
+          onClose={() => setShowBatchCreateItems(false)}
+          onBatchCreated={(_itemIds, containerId) => {
+            setShowBatchCreateItems(false)
+            navigate(`/containers/${containerId}`)
+          }}
         />
       )}
     </div>

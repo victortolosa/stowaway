@@ -6,7 +6,7 @@ import { usePlace } from '@/hooks/queries/usePlaces'
 import { usePlaceContainers } from '@/hooks/queries/useContainers'
 import { usePlaceItems } from '@/hooks/queries/useItems'
 import { useGroups } from '@/hooks/queries/useGroups'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { deleteContainer, deletePlace, deleteGroup, updatePlace } from '@/services/firebaseService'
 import { Container, Group } from '@/types'
 import { PLACE_KEYS } from '@/hooks/queries/usePlaces'
@@ -18,8 +18,10 @@ import { Button, EmptyState, LoadingState, NavigationHeader, Modal, GalleryEdito
 import { PlaceHero } from '@/components/features/place/PlaceHero'
 import { ContainerList } from '@/components/features/place/ContainerList'
 import { PlaceItemsList } from '@/components/features/place/PlaceItemsList'
+import { ActivityFeed } from '@/components/ActivityFeed'
 import { useSearchFilter } from '@/hooks/useSearchFilter'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
+import { getPlaceAggregatedActivity } from '@/services/firebaseService'
 
 
 export function PlaceDetail() {
@@ -64,6 +66,15 @@ export function PlaceDetail() {
     const [isDeletingGroup, setIsDeletingGroup] = useState(false)
     const [showGallery, setShowGallery] = useState(false)
     const [isCreateSiblingPlaceOpen, setIsCreateSiblingPlaceOpen] = useState(false)
+    const [showActivityModal, setShowActivityModal] = useState(false)
+
+    const { data: activityData = [], isLoading: isActivityLoading, error: activityError } = useQuery({
+        queryKey: ['activity', 'place-aggregated', id],
+        queryFn: () => getPlaceAggregatedActivity(id!),
+        enabled: showActivityModal && !!id,
+        staleTime: 1000 * 60,
+        retry: false,
+    })
 
     const placeContainers = containers // Already filtered by hook
     const placeGroups = (groups || []).filter((g) => g.parentId === id && g.type === 'container')
@@ -179,6 +190,15 @@ export function PlaceDetail() {
                                     className="w-full px-4 py-2 text-left font-body text-sm text-text-primary hover:bg-bg-surface"
                                 >
                                     Edit Place
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowActivityModal(true)
+                                        setShowMenu(false)
+                                    }}
+                                    className="w-full px-4 py-2 text-left font-body text-sm text-text-primary hover:bg-bg-surface"
+                                >
+                                    View Activity
                                 </button>
                                 <button
                                     onClick={() => {
@@ -393,8 +413,8 @@ export function PlaceDetail() {
                     <GalleryEditor
                         images={place.photos || []}
                         onUpdate={async (newImages) => {
-                            // Optimistic update locally? 
-                            // Since we use react-query, we should mutate. 
+                            // Optimistic update locally?
+                            // Since we use react-query, we should mutate.
                             // For now, let's just save and refresh.
                             try {
                                 await updatePlace(place.id, { photos: newImages })
@@ -408,6 +428,28 @@ export function PlaceDetail() {
                 </div>
                 <div className="flex justify-end mt-4">
                     <Button variant="secondary" onClick={() => setShowGallery(false)}>
+                        Close
+                    </Button>
+                </div>
+            </Modal>
+
+            {/* Activity Modal */}
+            <Modal
+                isOpen={showActivityModal}
+                onClose={() => setShowActivityModal(false)}
+                title="Activity"
+                description="All activity in this place"
+                size="lg"
+            >
+                <div className="max-h-[60vh] overflow-y-auto">
+                    <ActivityFeed
+                        activities={activityData}
+                        isLoading={isActivityLoading}
+                        error={activityError as Error | null}
+                    />
+                </div>
+                <div className="flex justify-end mt-4">
+                    <Button variant="secondary" onClick={() => setShowActivityModal(false)}>
                         Close
                     </Button>
                 </div>

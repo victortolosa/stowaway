@@ -9,7 +9,7 @@ import { LoadingState, Card, EmptyState, IconOrEmoji, CreatePlaceModal, MultiSte
 import { ItemCard } from '@/components/ItemCard'
 import { useOnClickOutside } from '@/hooks/useOnClickOutside'
 
-import { getPlaceIcon, getContainerIcon } from '@/utils/colorUtils'
+import { getPlaceIcon, getContainerIcon, DEFAULT_PLACE_COLOR, DEFAULT_CONTAINER_COLOR, DEFAULT_ITEM_COLOR } from '@/utils/colorUtils'
 import { sortItems } from '@/utils/sortUtils'
 
 export function Dashboard() {
@@ -71,7 +71,7 @@ export function Dashboard() {
 
   return (
     <>
-      <div className="flex flex-col gap-10 pb-48 w-full max-w-full">
+      <div className="flex flex-col gap-10 pb-8 w-full max-w-full">
         {/* Top Section with Logo and Add Item */}
         <div className="flex flex-col gap-6">
           <div className="flex justify-between items-center">
@@ -100,7 +100,7 @@ export function Dashboard() {
                       }}
                       className="w-full px-4 py-3 flex items-center gap-3 hover:bg-bg-page transition-colors text-left"
                     >
-                      <MapPin size={18} className="text-accent-aqua" />
+                      <MapPin size={18} style={{ color: DEFAULT_PLACE_COLOR }} />
                       <span className="font-body text-[15px] text-text-primary">Add Place</span>
                     </button>
                     <button
@@ -110,7 +110,7 @@ export function Dashboard() {
                       }}
                       className="w-full px-4 py-3 flex items-center gap-3 hover:bg-bg-page transition-colors text-left border-t border-border-standard"
                     >
-                      <Box size={18} className="text-accent-aqua" />
+                      <Package size={18} style={{ color: DEFAULT_CONTAINER_COLOR }} />
                       <span className="font-body text-[15px] text-text-primary">Add Container</span>
                     </button>
                     <button
@@ -120,7 +120,7 @@ export function Dashboard() {
                       }}
                       className="w-full px-4 py-3 flex items-center gap-3 hover:bg-bg-page transition-colors text-left border-t border-border-standard"
                     >
-                      <Package size={18} className="text-accent-aqua" />
+                      <Box size={18} style={{ color: DEFAULT_ITEM_COLOR }} />
                       <span className="font-body text-[15px] text-text-primary">Add Item</span>
                     </button>
                   </div>

@@ -5,7 +5,7 @@ import { useContainer } from '@/hooks/queries/useContainers'
 import { useContainerItems } from '@/hooks/queries/useItems'
 import { usePlace } from '@/hooks/queries/usePlaces'
 import { useGroups } from '@/hooks/queries/useGroups'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { CONTAINER_KEYS } from '@/hooks/queries/useContainers'
 import { ITEM_KEYS } from '@/hooks/queries/useItems'
 import { GROUP_KEYS } from '@/hooks/queries/useGroups'
@@ -14,12 +14,14 @@ import { QRLabelModal } from '@/components/QRLabelModal'
 import { QRManageModal } from '@/components/QRManageModal'
 import { updateContainer, deleteContainer, deleteItem, deleteGroup } from '@/services/firebaseService'
 import { Item, Group } from '@/types'
-import { Pencil, Trash2, Plus, QrCode, Search, FolderPlus } from 'lucide-react'
+import { Pencil, Trash2, Plus, QrCode, Search, FolderPlus, Activity } from 'lucide-react'
 import { IconOrEmoji, EmptyState, LoadingState, Button, NavigationHeader, ImageCarousel, Modal, GalleryEditor } from '@/components/ui'
 import { ItemCard } from '@/components/ItemCard'
+import { ActivityFeed } from '@/components/ActivityFeed'
 import { useSearchFilter } from '@/hooks/useSearchFilter'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 import { getContainerIcon, DEFAULT_CONTAINER_COLOR } from '@/utils/colorUtils'
+import { getContainerAggregatedActivity } from '@/services/firebaseService'
 
 export function Container() {
   const { id } = useParams<{ id: string }>()
@@ -66,6 +68,15 @@ export function Container() {
   const [isDeletingGroup, setIsDeletingGroup] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [isCreateSiblingContainerOpen, setIsCreateSiblingContainerOpen] = useState(false)
+  const [showActivityModal, setShowActivityModal] = useState(false)
+
+  const { data: activityData = [], isLoading: isActivityLoading, error: activityError } = useQuery({
+    queryKey: ['activity', 'container-aggregated', id],
+    queryFn: () => getContainerAggregatedActivity(id!),
+    enabled: showActivityModal && !!id,
+    staleTime: 1000 * 60,
+    retry: false,
+  })
 
   const containerItems = items // Already filtered by hook
   const containerGroups = (groups || []).filter((g) => g.parentId === id && g.type === 'item')
@@ -151,6 +162,14 @@ export function Container() {
               onClick={() => setShowQRManageModal(true)}
             >
               <QrCode size={18} className="text-text-primary" strokeWidth={2} />
+            </Button>
+            <Button
+              variant="icon"
+              size="icon"
+              className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
+              onClick={() => setShowActivityModal(true)}
+            >
+              <Activity size={18} className="text-text-primary" strokeWidth={2} />
             </Button>
             <Button
               variant="icon"
@@ -484,6 +503,28 @@ export function Container() {
         </div>
         <div className="flex justify-end mt-4">
           <Button variant="secondary" onClick={() => setShowGallery(false)}>
+            Close
+          </Button>
+        </div>
+      </Modal>
+
+      {/* Activity Modal */}
+      <Modal
+        isOpen={showActivityModal}
+        onClose={() => setShowActivityModal(false)}
+        title="Activity"
+        description="All activity in this container"
+        size="lg"
+      >
+        <div className="max-h-[60vh] overflow-y-auto">
+          <ActivityFeed
+            activities={activityData}
+            isLoading={isActivityLoading}
+            error={activityError as Error | null}
+          />
+        </div>
+        <div className="flex justify-end mt-4">
+          <Button variant="secondary" onClick={() => setShowActivityModal(false)}>
             Close
           </Button>
         </div>

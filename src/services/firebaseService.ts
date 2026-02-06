@@ -19,10 +19,10 @@ import {
   deleteObject,
 } from 'firebase/storage'
 import { db, storage, auth } from '@/lib/firebase'
-import { Place, Container, Item, Group } from '@/types'
+import { Place, Container, Item, Group, Activity, ActivityAction, ActivityEntityType, ActivityMetadata } from '@/types'
 import { offlineStorage } from '@/lib/offlineStorage'
-import { sanitizeUndefined } from '@/utils/data'
-import { PlaceSchema, ContainerSchema, ItemSchema, GroupSchema } from '@/schemas/firestore'
+import { sanitizeUndefined, getChangedFields } from '@/utils/data'
+import { PlaceSchema, ContainerSchema, ItemSchema, GroupSchema, ActivitySchema } from '@/schemas/firestore'
 
 const getCurrentUserId = (): string => {
   const uid = auth.currentUser?.uid;
@@ -46,8 +46,6 @@ export async function getPlace(id: string): Promise<Place | undefined> {
 }
 
 export async function createPlace(place: Omit<Place, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) {
-  console.log('FirebaseService: Attempting to create place in project:', db.app.options.projectId)
-  console.log('Place Data:', place)
   try {
     const userId = getCurrentUserId();
     if (!userId) throw new Error("User must be logged in to create a place");
@@ -59,11 +57,15 @@ export async function createPlace(place: Omit<Place, 'id' | 'userId' | 'createdA
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     })
-    console.log('FirebaseService: Place created successfully with ID:', docRef.id)
 
     // Link pending uploads to this new document
     await linkPendingUploads(docRef.id, 'places', {
       photos: place.photos
+    });
+
+    // Log activity
+    await logActivity('created', 'place', docRef.id, place.name, {
+      placeId: docRef.id,
     });
 
     return docRef.id
@@ -90,11 +92,36 @@ export async function getUserPlaces(userId: string): Promise<Place[]> {
 export async function updatePlace(placeId: string, updates: Partial<Place>) {
   try {
     const placeRef = doc(db, 'places', placeId)
+
+    // Get old data for activity log
+    const oldPlace = await getPlace(placeId);
+    if (!oldPlace) throw new Error("Place not found");
+
     const sanitizedUpdates = sanitizeUndefined(updates)
     await updateDoc(placeRef, {
       ...sanitizedUpdates,
       updatedAt: Timestamp.now(),
     })
+
+    // Log activity
+    const changedFields = getChangedFields(updates, oldPlace);
+    const currentName = updates.name || oldPlace.name;
+
+    if (updates.name && updates.name !== oldPlace.name) {
+      await logActivity('renamed', 'place', placeId, currentName, {
+        placeId: placeId,
+      }, {
+        oldValue: oldPlace.name,
+        newValue: updates.name,
+        changedFields,
+      });
+    } else if (changedFields.length > 0) {
+      await logActivity('updated', 'place', placeId, currentName, {
+        placeId: placeId,
+      }, {
+        changedFields,
+      });
+    }
   } catch (error) {
     console.error('Error updating place:', error)
     throw error
@@ -103,7 +130,17 @@ export async function updatePlace(placeId: string, updates: Partial<Place>) {
 
 export async function deletePlace(placeId: string) {
   try {
+    // Get name before deletion for activity log
+    const place = await getPlace(placeId);
+
     await deleteDoc(doc(db, 'places', placeId))
+
+    // Log activity
+    if (place) {
+      await logActivity('deleted', 'place', placeId, place.name, {
+        placeId: placeId,
+      });
+    }
   } catch (error) {
     console.error('Error deleting place:', error)
     throw error
@@ -137,6 +174,9 @@ export async function createContainer(container: Omit<Container, 'id' | 'userId'
     const userId = getCurrentUserId();
     if (!userId) throw new Error("User must be logged in to create a container");
 
+    const place = await getPlace(container.placeId);
+    if (!place) throw new Error("Place not found");
+
     const sanitizedContainer = sanitizeUndefined(container)
 
     // Build the container data object
@@ -160,6 +200,21 @@ export async function createContainer(container: Omit<Container, 'id' | 'userId'
     await linkPendingUploads(docRef.id, 'containers', {
       photoUrl: container.photoUrl,
       photos: container.photos
+    });
+
+    // Log activity on the container itself
+    await logActivity('created', 'container', docRef.id, container.name, {
+      placeId: container.placeId,
+      containerId: docRef.id,
+    });
+
+    // Log activity on the parent place (container was added to it)
+    await logActivity('added_to', 'place', container.placeId, place.name, {
+      placeId: container.placeId,
+    }, {
+      childEntityType: 'container',
+      childEntityId: docRef.id,
+      childEntityName: container.name,
     });
 
     return docRef.id
@@ -207,13 +262,18 @@ export async function getUserContainers(userId: string): Promise<Container[]> {
 export async function updateContainer(containerId: string, updates: Partial<Container>) {
   try {
     const containerRef = doc(db, 'containers', containerId)
+
+    // Get old data for activity log
+    const oldContainer = await getContainer(containerId);
+    if (!oldContainer) throw new Error("Container not found");
+
     const sanitizedUpdates = sanitizeUndefined(updates)
 
     // Backward compatibility: sync first photo to photoUrl if photos are updated
     if (updates.photos && updates.photos.length > 0) {
       sanitizedUpdates.photoUrl = updates.photos[0]
     } else if (updates.photos && updates.photos.length === 0) {
-      // If photos cleared, perform logic whether to clear photoUrl? 
+      // If photos cleared, perform logic whether to clear photoUrl?
       // For now let's assume if explicit empty array, we might want to clear it.
       // But let's be safe and only update if specifically requested.
     }
@@ -228,6 +288,28 @@ export async function updateContainer(containerId: string, updates: Partial<Cont
       ...sanitizedUpdates,
       updatedAt: Timestamp.now(),
     })
+
+    // Log activity
+    const changedFields = getChangedFields(updates, oldContainer);
+    const currentName = updates.name || oldContainer.name;
+
+    if (updates.name && updates.name !== oldContainer.name) {
+      await logActivity('renamed', 'container', containerId, currentName, {
+        placeId: oldContainer.placeId,
+        containerId: containerId,
+      }, {
+        oldValue: oldContainer.name,
+        newValue: updates.name,
+        changedFields,
+      });
+    } else if (changedFields.length > 0) {
+      await logActivity('updated', 'container', containerId, currentName, {
+        placeId: oldContainer.placeId,
+        containerId: containerId,
+      }, {
+        changedFields,
+      });
+    }
   } catch (error) {
     console.error('Error updating container:', error)
     throw error
@@ -236,7 +318,30 @@ export async function updateContainer(containerId: string, updates: Partial<Cont
 
 export async function deleteContainer(containerId: string) {
   try {
+    // Get container and place info before deletion
+    const container = await getContainer(containerId);
+    if (!container) throw new Error("Container not found");
+
+    const place = await getPlace(container.placeId);
+
     await deleteDoc(doc(db, 'containers', containerId))
+
+    // Log activity on the container itself
+    await logActivity('deleted', 'container', containerId, container.name, {
+      placeId: container.placeId,
+      containerId: containerId,
+    });
+
+    // Log activity on the parent place (container was removed from it)
+    if (place) {
+      await logActivity('removed_from', 'place', container.placeId, place.name, {
+        placeId: container.placeId,
+      }, {
+        childEntityType: 'container',
+        childEntityId: containerId,
+        childEntityName: container.name,
+      });
+    }
   } catch (error) {
     console.error('Error deleting container:', error)
     throw error
@@ -304,6 +409,22 @@ export async function createItem(item: Omit<Item, 'id' | 'userId' | 'placeId' | 
     await linkPendingUploads(docRef.id, 'items', {
       photos: item.photos,
       voiceNoteUrl: item.voiceNoteUrl
+    });
+
+    // Log activity on the item itself
+    await logActivity('created', 'item', docRef.id, item.name, {
+      placeId: container.placeId,
+      containerId: item.containerId,
+    });
+
+    // Log activity on the parent container (item was added to it)
+    await logActivity('added_to', 'container', item.containerId, container.name, {
+      placeId: container.placeId,
+      containerId: item.containerId,
+    }, {
+      childEntityType: 'item',
+      childEntityId: docRef.id,
+      childEntityName: item.name,
     });
 
     return docRef.id
@@ -412,11 +533,38 @@ export async function getRecentItems(userId: string, limitCount = 20): Promise<I
 export async function updateItem(itemId: string, updates: Partial<Item>) {
   try {
     const itemRef = doc(db, 'items', itemId)
+
+    // Get old data for activity log
+    const oldItem = await getItem(itemId);
+    if (!oldItem) throw new Error("Item not found");
+
     const sanitizedUpdates = sanitizeUndefined(updates)
     await updateDoc(itemRef, {
       ...sanitizedUpdates,
       updatedAt: Timestamp.now(),
     })
+
+    // Log activity
+    const changedFields = getChangedFields(updates, oldItem);
+    const currentName = updates.name || oldItem.name;
+
+    if (updates.name && updates.name !== oldItem.name) {
+      await logActivity('renamed', 'item', itemId, currentName, {
+        placeId: oldItem.placeId,
+        containerId: oldItem.containerId,
+      }, {
+        oldValue: oldItem.name,
+        newValue: updates.name,
+        changedFields,
+      });
+    } else if (changedFields.length > 0) {
+      await logActivity('updated', 'item', itemId, currentName, {
+        placeId: oldItem.placeId,
+        containerId: oldItem.containerId,
+      }, {
+        changedFields,
+      });
+    }
   } catch (error) {
     console.error('Error updating item:', error)
     throw error
@@ -425,10 +573,160 @@ export async function updateItem(itemId: string, updates: Partial<Item>) {
 
 export async function deleteItem(itemId: string) {
   try {
+    // Get item and container info before deletion
+    const item = await getItem(itemId);
+    if (!item) throw new Error("Item not found");
+
+    const container = await getContainer(item.containerId);
+
     await deleteDoc(doc(db, 'items', itemId))
+
+    // Log activity on the item itself
+    await logActivity('deleted', 'item', itemId, item.name, {
+      placeId: item.placeId,
+      containerId: item.containerId,
+    });
+
+    // Log activity on the parent container (item was removed from it)
+    if (container) {
+      await logActivity('removed_from', 'container', item.containerId, container.name, {
+        placeId: item.placeId,
+        containerId: item.containerId,
+      }, {
+        childEntityType: 'item',
+        childEntityId: itemId,
+        childEntityName: item.name,
+      });
+    }
   } catch (error) {
     console.error('Error deleting item:', error)
     throw error
+  }
+}
+
+/**
+ * Move an item to a different container (with activity logging)
+ */
+export async function moveItem(itemId: string, newContainerId: string) {
+  try {
+    const item = await getItem(itemId);
+    if (!item) throw new Error("Item not found");
+
+    const oldContainer = await getContainer(item.containerId);
+    const newContainer = await getContainer(newContainerId);
+    if (!newContainer) throw new Error("Destination container not found");
+
+    const oldContainerId = item.containerId;
+    const oldPlaceId = item.placeId;
+
+    // Update the item's containerId (and placeId if container is in different place)
+    await updateDoc(doc(db, 'items', itemId), {
+      containerId: newContainerId,
+      placeId: newContainer.placeId,
+      updatedAt: Timestamp.now(),
+    });
+
+    // Log 'moved' activity on the item
+    await logActivity('moved', 'item', itemId, item.name, {
+      placeId: newContainer.placeId,
+      containerId: newContainerId,
+    }, {
+      fromContainerId: oldContainerId,
+      fromContainerName: oldContainer?.name,
+      toContainerId: newContainerId,
+      toContainerName: newContainer.name,
+    });
+
+    // Log 'removed_from' on the old container
+    if (oldContainer) {
+      await logActivity('removed_from', 'container', oldContainerId, oldContainer.name, {
+        placeId: oldPlaceId,
+        containerId: oldContainerId,
+      }, {
+        childEntityType: 'item',
+        childEntityId: itemId,
+        childEntityName: item.name,
+      });
+    }
+
+    // Log 'added_to' on the new container
+    await logActivity('added_to', 'container', newContainerId, newContainer.name, {
+      placeId: newContainer.placeId,
+      containerId: newContainerId,
+    }, {
+      childEntityType: 'item',
+      childEntityId: itemId,
+      childEntityName: item.name,
+    });
+  } catch (error) {
+    console.error('Error moving item:', error);
+    throw error;
+  }
+}
+
+/**
+ * Move a container to a different place (with activity logging)
+ * Also updates placeId on all items within the container
+ */
+export async function moveContainer(containerId: string, newPlaceId: string) {
+  try {
+    const container = await getContainer(containerId);
+    if (!container) throw new Error("Container not found");
+
+    const oldPlace = await getPlace(container.placeId);
+    const newPlace = await getPlace(newPlaceId);
+    if (!newPlace) throw new Error("Destination place not found");
+
+    const oldPlaceId = container.placeId;
+
+    // Update the container's placeId
+    await updateDoc(doc(db, 'containers', containerId), {
+      placeId: newPlaceId,
+      updatedAt: Timestamp.now(),
+    });
+
+    // Also update all items in this container to the new placeId
+    const items = await getContainerItems(containerId);
+    for (const item of items) {
+      await updateDoc(doc(db, 'items', item.id), {
+        placeId: newPlaceId,
+        updatedAt: Timestamp.now(),
+      });
+    }
+
+    // Log 'moved' activity on the container
+    await logActivity('moved', 'container', containerId, container.name, {
+      placeId: newPlaceId,
+      containerId: containerId,
+    }, {
+      fromPlaceId: oldPlaceId,
+      fromPlaceName: oldPlace?.name,
+      toPlaceId: newPlaceId,
+      toPlaceName: newPlace.name,
+    });
+
+    // Log 'removed_from' on the old place
+    if (oldPlace) {
+      await logActivity('removed_from', 'place', oldPlaceId, oldPlace.name, {
+        placeId: oldPlaceId,
+      }, {
+        childEntityType: 'container',
+        childEntityId: containerId,
+        childEntityName: container.name,
+      });
+    }
+
+    // Log 'added_to' on the new place
+    await logActivity('added_to', 'place', newPlaceId, newPlace.name, {
+      placeId: newPlaceId,
+    }, {
+      childEntityType: 'container',
+      childEntityId: containerId,
+      childEntityName: container.name,
+    });
+  } catch (error) {
+    console.error('Error moving container:', error);
+    throw error;
   }
 }
 
@@ -725,5 +1023,306 @@ export async function uploadImageWithCleanup(
       }
     }
     throw error
+  }
+}
+
+/**
+ * ACTIVITY LOG OPERATIONS
+ */
+
+// Hierarchy type for activity logging
+interface ActivityHierarchy {
+  placeId?: string      // Required for place, container, and item activities
+  containerId?: string  // Required for container and item activities
+}
+
+/**
+ * Helper function to log activity (called internally by CRUD operations)
+ * placeId and containerId enable hierarchical aggregation queries
+ *
+ * This function is non-blocking - activity logging failures don't break main operations
+ */
+export async function logActivity(
+  action: ActivityAction,
+  entityType: ActivityEntityType,
+  entityId: string,
+  entityName: string,
+  hierarchy: ActivityHierarchy,
+  metadata?: ActivityMetadata
+): Promise<void> {
+  try {
+    const userId = getCurrentUserId();
+
+    await addDoc(collection(db, 'activity'), {
+      userId,
+      action,
+      entityType,
+      entityId,
+      entityName,
+      placeId: hierarchy.placeId || null,
+      containerId: hierarchy.containerId || null,
+      metadata: metadata || null,
+      createdAt: Timestamp.now(),
+    });
+  } catch (error) {
+    // Log but don't throw - activity logging shouldn't break main operations
+    console.error('Error logging activity:', error);
+  }
+}
+
+/**
+ * Get activity for a specific entity (for detail pages)
+ */
+export async function getEntityActivity(
+  entityType: ActivityEntityType,
+  entityId: string,
+  limitCount = 20
+): Promise<Activity[]> {
+  try {
+    const q = query(
+      collection(db, 'activity'),
+      where('entityType', '==', entityType),
+      where('entityId', '==', entityId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => {
+      const raw = { id: doc.id, ...doc.data() };
+      return ActivitySchema.parse(raw);
+    });
+  } catch (error) {
+    console.error('Error fetching entity activity:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get recent activity for a user (dashboard feed - "All Activity" view)
+ */
+export async function getUserRecentActivity(
+  userId: string,
+  limitCount = 50
+): Promise<Activity[]> {
+  try {
+    const q = query(
+      collection(db, 'activity'),
+      where('userId', '==', userId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => {
+      const raw = { id: doc.id, ...doc.data() };
+      return ActivitySchema.parse(raw);
+    });
+  } catch (error) {
+    console.error('Error fetching user activity:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get activity by entity type (e.g., all item activities)
+ */
+export async function getActivityByType(
+  userId: string,
+  entityType: ActivityEntityType,
+  limitCount = 50
+): Promise<Activity[]> {
+  try {
+    const q = query(
+      collection(db, 'activity'),
+      where('userId', '==', userId),
+      where('entityType', '==', entityType),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => {
+      const raw = { id: doc.id, ...doc.data() };
+      return ActivitySchema.parse(raw);
+    });
+  } catch (error) {
+    console.error('Error fetching activity by type:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get ALL activity within a place (place + its containers + their items)
+ * Used on Place detail pages for aggregated activity view
+ */
+export async function getPlaceAggregatedActivity(
+  placeId: string,
+  limitCount = 50
+): Promise<Activity[]> {
+  try {
+    const q = query(
+      collection(db, 'activity'),
+      where('placeId', '==', placeId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => {
+      const raw = { id: doc.id, ...doc.data() };
+      return ActivitySchema.parse(raw);
+    });
+  } catch (error) {
+    console.error('Error fetching place aggregated activity:', error);
+    throw error;
+  }
+}
+
+/**
+ * Get ALL activity within a container (container + its items)
+ * Used on Container detail pages for aggregated activity view
+ */
+export async function getContainerAggregatedActivity(
+  containerId: string,
+  limitCount = 50
+): Promise<Activity[]> {
+  try {
+    const q = query(
+      collection(db, 'activity'),
+      where('containerId', '==', containerId),
+      orderBy('createdAt', 'desc'),
+      limit(limitCount)
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => {
+      const raw = { id: doc.id, ...doc.data() };
+      return ActivitySchema.parse(raw);
+    });
+  } catch (error) {
+    console.error('Error fetching container aggregated activity:', error);
+    throw error;
+  }
+}
+
+/**
+ * TRACKING OPERATIONS
+ */
+
+/**
+ * Track when a container QR code is scanned
+ */
+export async function trackContainerScan(containerId: string) {
+  try {
+    const container = await getContainer(containerId);
+    if (!container) throw new Error("Container not found");
+
+    // Update lastAccessed
+    await updateDoc(doc(db, 'containers', containerId), {
+      lastAccessed: Timestamp.now(),
+    });
+
+    // Log scan activity
+    await logActivity('scanned', 'container', containerId, container.name, {
+      placeId: container.placeId,
+      containerId: containerId,
+    });
+  } catch (error) {
+    console.error('Error tracking container scan:', error);
+    throw error;
+  }
+}
+
+/**
+ * Track when an entity is viewed (call from detail page useEffect)
+ * Includes throttling to avoid spamming the activity log
+ */
+export async function trackEntityView(
+  entityType: ActivityEntityType,
+  entityId: string,
+  options?: { throttleMinutes?: number }
+) {
+  try {
+    const throttleMinutes = options?.throttleMinutes ?? 5;
+
+    // Check if we recently logged a view to avoid spam
+    if (throttleMinutes > 0) {
+      const recentView = await getRecentViewActivity(entityType, entityId, throttleMinutes);
+      if (recentView) return;
+    }
+
+    // Get entity details for hierarchy
+    let hierarchy: { placeId?: string; containerId?: string } = {};
+    let entityName = '';
+
+    if (entityType === 'place') {
+      const place = await getPlace(entityId);
+      if (!place) return;
+      entityName = place.name;
+      hierarchy = { placeId: entityId };
+    } else if (entityType === 'container') {
+      const container = await getContainer(entityId);
+      if (!container) return;
+      entityName = container.name;
+      hierarchy = { placeId: container.placeId, containerId: entityId };
+    } else if (entityType === 'item') {
+      const item = await getItem(entityId);
+      if (!item) return;
+      entityName = item.name;
+      hierarchy = { placeId: item.placeId, containerId: item.containerId };
+    }
+
+    await logActivity('viewed', entityType, entityId, entityName, hierarchy);
+  } catch (error) {
+    // Silent fail - view tracking shouldn't break the app
+    console.error('Error tracking view:', error);
+  }
+}
+
+/**
+ * Helper to check for recent view activity (for throttling)
+ */
+async function getRecentViewActivity(
+  entityType: ActivityEntityType,
+  entityId: string,
+  withinMinutes: number
+): Promise<boolean> {
+  const userId = getCurrentUserId();
+  if (!userId) return false;
+
+  const cutoff = new Date();
+  cutoff.setMinutes(cutoff.getMinutes() - withinMinutes);
+
+  const q = query(
+    collection(db, 'activity'),
+    where('userId', '==', userId),
+    where('entityType', '==', entityType),
+    where('entityId', '==', entityId),
+    where('action', '==', 'viewed'),
+    where('createdAt', '>=', Timestamp.fromDate(cutoff)),
+    limit(1)
+  );
+
+  const snapshot = await getDocs(q);
+  return !snapshot.empty;
+}
+
+/**
+ * Update lastViewedAt field directly on an entity (for "recently viewed" sorting)
+ */
+export async function updateLastViewed(
+  entityType: ActivityEntityType,
+  entityId: string
+) {
+  try {
+    const collectionName = entityType === 'place' ? 'places' :
+                           entityType === 'container' ? 'containers' : 'items';
+
+    await updateDoc(doc(db, collectionName, entityId), {
+      lastViewedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error updating lastViewedAt:', error);
   }
 }

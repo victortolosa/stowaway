@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import { getUserGroups } from '@/services/firebaseService'
+import { getUserGroups, getGroup } from '@/services/firebaseService'
 import { useAuthStore } from '@/store/auth'
 
 export const GROUP_KEYS = {
@@ -26,7 +26,6 @@ export function useGroup(id: string | undefined) {
         queryKey: id ? GROUP_KEYS.detail(id) : ['groups', 'disabled'],
         queryFn: async () => {
             if (!id) throw new Error('Group ID is required')
-            const { getGroup } = await import('@/services/firebaseService')
             const group = await getGroup(id)
             if (!group) throw new Error('Group not found')
             return group

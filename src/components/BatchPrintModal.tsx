@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { usePlaces } from '@/hooks/queries/usePlaces'
@@ -9,6 +9,8 @@ import { generateQRCodeDataURL } from '@/utils/qrCode'
 interface BatchPrintModalProps {
   isOpen: boolean
   onClose: () => void
+  initialSelectedContainerIds?: string[]
+  onComplete?: () => void
 }
 
 interface SelectedContainer {
@@ -17,11 +19,27 @@ interface SelectedContainer {
   quantity: number
 }
 
-export function BatchPrintModal({ isOpen, onClose }: BatchPrintModalProps) {
+export function BatchPrintModal({ isOpen, onClose, initialSelectedContainerIds = [], onComplete }: BatchPrintModalProps) {
   const { data: containers = [] } = useAllContainers()
   const { data: places = [] } = usePlaces()
   const [selectedContainers, setSelectedContainers] = useState<SelectedContainer[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
+
+  // Initialize selected containers when modal opens with initial IDs
+  useEffect(() => {
+    if (isOpen && initialSelectedContainerIds.length > 0 && containers.length > 0) {
+      const initialSelected = initialSelectedContainerIds
+        .map(id => {
+          const container = containers.find(c => c.id === id)
+          return container ? { id: container.id, name: container.name, quantity: 1 } : null
+        })
+        .filter((c): c is SelectedContainer => c !== null)
+
+      if (initialSelected.length > 0) {
+        setSelectedContainers(initialSelected)
+      }
+    }
+  }, [isOpen, initialSelectedContainerIds, containers])
 
   const toggleContainer = (containerId: string, containerName: string) => {
     setSelectedContainers(prev => {
@@ -151,9 +169,109 @@ export function BatchPrintModal({ isOpen, onClose }: BatchPrintModalProps) {
         URL.revokeObjectURL(url)
       }, 'image/png')
 
+      // Call completion callback before closing
+      if (onComplete) {
+        onComplete()
+      }
       onClose()
     } catch (error) {
       console.error('Failed to generate batch QR codes:', error)
+      alert('Failed to generate QR codes. Please try again.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handlePrintIndividually = async () => {
+    if (selectedContainers.length === 0) return
+
+    setIsGenerating(true)
+    try {
+      // Generate individual QR codes
+      for (const container of selectedContainers) {
+        for (let i = 0; i < container.quantity; i++) {
+          // Generate QR code
+          const dataUrl = await generateQRCodeDataURL(container.id, { width: 400 })
+
+          // Create canvas for this QR code
+          const qrSize = 400
+          const padding = 40
+          const labelHeight = 80
+          const canvas = document.createElement('canvas')
+          canvas.width = qrSize + (padding * 2)
+          canvas.height = qrSize + labelHeight + (padding * 2)
+
+          const ctx = canvas.getContext('2d')
+          if (!ctx) throw new Error('Failed to get canvas context')
+
+          // White background
+          ctx.fillStyle = '#FFFFFF'
+          ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+          // Load and draw QR code
+          const img = new Image()
+          await new Promise((resolve, reject) => {
+            img.onload = resolve
+            img.onerror = reject
+            img.src = dataUrl
+          })
+
+          ctx.drawImage(img, padding, padding, qrSize, qrSize)
+
+          // Draw container name
+          ctx.fillStyle = '#000000'
+          ctx.font = 'bold 24px Arial'
+          ctx.textAlign = 'center'
+          ctx.fillText(
+            container.name,
+            canvas.width / 2,
+            padding + qrSize + 35
+          )
+
+          // Draw copy number if quantity > 1
+          if (container.quantity > 1) {
+            ctx.font = '18px Arial'
+            ctx.fillStyle = '#666666'
+            ctx.fillText(
+              `Copy ${i + 1} of ${container.quantity}`,
+              canvas.width / 2,
+              padding + qrSize + 60
+            )
+          }
+
+          // Convert to blob and download
+          await new Promise<void>((resolve) => {
+            canvas.toBlob((blob) => {
+              if (!blob) {
+                resolve()
+                return
+              }
+
+              const fileName = container.quantity > 1
+                ? `${container.name}_${i + 1}_qr.png`
+                : `${container.name}_qr.png`
+
+              const url = URL.createObjectURL(blob)
+              const link = document.createElement('a')
+              link.download = fileName
+              link.href = url
+              link.click()
+              URL.revokeObjectURL(url)
+
+              // Small delay between downloads to avoid browser blocking
+              setTimeout(resolve, 100)
+            }, 'image/png')
+          })
+        }
+      }
+
+      // Call completion callback before closing
+      if (onComplete) {
+        onComplete()
+      }
+      onClose()
+    } catch (error) {
+      console.error('Failed to generate individual QR codes:', error)
       alert('Failed to generate QR codes. Please try again.')
     } finally {
       setIsGenerating(false)
@@ -256,17 +374,30 @@ export function BatchPrintModal({ isOpen, onClose }: BatchPrintModalProps) {
           </div>
         </div>
 
-        {/* Generate button */}
-        <Button
-          variant="primary"
-          size="lg"
-          onClick={handleGenerateBatchPNG}
-          disabled={selectedContainers.length === 0 || isGenerating}
-          className="w-full"
-        >
-          <Download className="w-5 h-5 mr-2" />
-          {isGenerating ? 'Generating...' : `Generate ${selectedContainers.reduce((sum, c) => sum + c.quantity, 0)} QR Codes`}
-        </Button>
+        {/* Generate buttons */}
+        <div className="flex flex-col gap-3">
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={handleGenerateBatchPNG}
+            disabled={selectedContainers.length === 0 || isGenerating}
+            className="w-full"
+          >
+            <Download className="w-5 h-5 mr-2" />
+            {isGenerating ? 'Generating...' : `Single PNG (${selectedContainers.reduce((sum, c) => sum + c.quantity, 0)} QR Codes)`}
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={handlePrintIndividually}
+            disabled={selectedContainers.length === 0 || isGenerating}
+            className="w-full"
+          >
+            <Download className="w-5 h-5 mr-2" />
+            {isGenerating ? 'Generating...' : `Individual Files (${selectedContainers.reduce((sum, c) => sum + c.quantity, 0)} Downloads)`}
+          </Button>
+        </div>
       </div>
     </Modal>
   )

@@ -5,10 +5,10 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { createPlace, updatePlace, uploadImageWithCleanup, deleteStorageFile } from '@/services/firebaseService'
 import { useAuthStore } from '@/store/auth'
 import { Place } from '@/types'
-import { Modal, Button, Input, Select, FormField, MultiImageUploader, ProgressBar } from '@/components/ui'
+import { Modal, Button, Input, Select, FormField, MultiImageUploader, ProgressBar, ColorPicker } from '@/components/ui'
 import { useImageCompression } from '@/hooks'
 import { useGroups } from '@/hooks/queries/useGroups'
-import { getRandomColor } from '@/utils/colorUtils'
+import { getColorPalette, DEFAULT_PLACE_COLOR } from '@/utils/colorUtils'
 
 const placeSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -32,6 +32,7 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
     const { data: groups = [] } = useGroups()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [images, setImages] = useState<(File | string)[]>([])
+    const [selectedColor, setSelectedColor] = useState<string>(DEFAULT_PLACE_COLOR)
 
     // Derived state for compression progress (simple average for now if multiple)
     const { compress, isCompressing, progress } = useImageCompression()
@@ -59,6 +60,7 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                 groupId: initialData.groupId || '',
             })
             setImages(initialData.photos || [])
+            setSelectedColor(initialData.color || DEFAULT_PLACE_COLOR)
         } else if (isOpen && !editMode) {
             reset({
                 type: 'home',
@@ -66,6 +68,7 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                 groupId: preselectedGroupId || '',
             })
             setImages([])
+            setSelectedColor(DEFAULT_PLACE_COLOR)
         }
     }, [isOpen, editMode, initialData, reset, preselectedGroupId])
 
@@ -117,8 +120,8 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                     ...data,
                     groupId: data.groupId || null,
                     photos: finalPhotos,
-                    // Preserve existing color and icon when editing
-                    color: initialData.color,
+                    color: selectedColor,
+                    // Preserve existing icon when editing
                     icon: initialData.icon,
                 })
                 placeId = initialData.id
@@ -128,8 +131,8 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                     type: data.type,
                     groupId: data.groupId || null,
                     photos: finalPhotos,
-                    color: getRandomColor('place'),
-                    icon: 'Home',
+                    color: selectedColor,
+                    // Icon will be set to default via getPlaceIcon() when displayed
                 })
             }
 
@@ -211,6 +214,15 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                     </Select>
                 </FormField>
 
+                <FormField label="Color">
+                    <ColorPicker
+                        colors={getColorPalette('place')}
+                        selectedColor={selectedColor}
+                        onColorSelect={setSelectedColor}
+                        defaultColor={DEFAULT_PLACE_COLOR}
+                    />
+                </FormField>
+
                 <FormField label="Photos (Optional)">
                     <MultiImageUploader
                         value={images}
@@ -235,6 +247,6 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                     </Button>
                 </div>
             </form>
-        </Modal>
+        </Modal >
     )
 }

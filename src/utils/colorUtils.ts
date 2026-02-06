@@ -1,4 +1,4 @@
-import { Home, Package } from 'lucide-react'
+import { Home, Box, Package } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 // Color palettes for different object types
@@ -11,7 +11,7 @@ const COLOR_PALETTES = {
 // Default colors for each object type (first color in palette)
 export const DEFAULT_PLACE_COLOR = '#14B8A6' // teal
 export const DEFAULT_CONTAINER_COLOR = '#3B82F6' // blue
-export const DEFAULT_ITEM_COLOR = '#3B82F6' // blue
+export const DEFAULT_ITEM_COLOR = '#6B7280' // neutral gray
 
 /**
  * Get the color palette for a specific object type
@@ -46,7 +46,7 @@ export function getContainerIcon(): LucideIcon {
  * Get the default icon for items
  */
 export function getItemIcon(): LucideIcon {
-    return Package
+    return Box
 }
 
 /**

@@ -1,4 +1,5 @@
 import { Outlet, useLocation } from 'react-router-dom'
+import { useEffect } from 'react'
 import { BottomTabBar } from './BottomTabBar'
 import { ReloadPrompt } from './ReloadPrompt'
 import { OfflineIndicator } from './OfflineIndicator'
@@ -21,6 +22,11 @@ function GlobalBreadcrumbs() {
 
 export function Layout() {
     const location = useLocation()
+
+    // Scroll to top on route change
+    useEffect(() => {
+        window.scrollTo(0, 0)
+    }, [location.pathname])
 
     // Hide tab bar on specific routes
     const showTabBar = !['/login', '/signup', '/scan'].includes(location.pathname)

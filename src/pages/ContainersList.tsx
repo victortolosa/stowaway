@@ -94,29 +94,31 @@ export function ContainersList() {
 
       {/* Action Buttons */}
       {!searchQuery && (
-        <div className="flex gap-3 mb-8">
-          <Button
-            variant="primary"
-            size="sm"
-            fullWidth
-            leftIcon={Plus}
-            onClick={() => setIsMultiStepCreateOpen(true)}
-          >
-            New Container
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            fullWidth
-            leftIcon={FolderPlus}
-            onClick={() => setIsSelectContainersGroupOpen(true)}
-          >
-            New Group
-          </Button>
-          <div className="flex justify-end px-1">
+        <>
+          <div className="flex gap-3 mb-4">
+            <Button
+              variant="primary"
+              size="sm"
+              fullWidth
+              leftIcon={Plus}
+              onClick={() => setIsMultiStepCreateOpen(true)}
+            >
+              New Container
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              fullWidth
+              leftIcon={FolderPlus}
+              onClick={() => setIsSelectContainersGroupOpen(true)}
+            >
+              New Group
+            </Button>
+          </div>
+          <div className="flex justify-end mb-8">
             <SortDropdown value={sortBy} onChange={setSortBy} />
           </div>
-        </div>
+        </>
       )}
 
       {/* Content Section */}

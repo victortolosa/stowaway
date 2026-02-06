@@ -5,7 +5,7 @@ import { useAuthStore } from '@/store/auth'
 import { usePlaces } from '@/hooks/queries/usePlaces'
 import { useAllContainers } from '@/hooks/queries/useAllContainers'
 import { useAllItems } from '@/hooks/queries/useAllItems'
-import { User, LogOut, MapPin, Package, Box, WifiOff } from 'lucide-react'
+import { User, LogOut, MapPin, Package, Box, WifiOff, Activity, ChevronRight } from 'lucide-react'
 import { Card } from '@/components/ui'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 
@@ -95,6 +95,16 @@ export function Profile() {
         </Card>
 
         <div className="space-y-3">
+          <Card
+            variant="interactive"
+            onClick={() => navigate('/activity')}
+            className="flex items-center gap-3"
+          >
+            <Activity size={20} className="text-accent-aqua" />
+            <span className="font-body text-base text-text-primary font-medium flex-1">Activity Log</span>
+            <ChevronRight size={18} className="text-text-tertiary" />
+          </Card>
+
           <Card
             variant="interactive"
             onClick={handleLogout}

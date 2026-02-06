@@ -7,13 +7,16 @@ import { useContainer } from '@/hooks/queries/useContainers'
 import { useAllContainers } from '@/hooks/queries/useAllContainers'
 import { usePlace, usePlaces } from '@/hooks/queries/usePlaces'
 import { useGroups } from '@/hooks/queries/useGroups'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { ITEM_KEYS } from '@/hooks/queries/useItems'
 import { CONTAINER_KEYS } from '@/hooks/queries/useContainers'
-import { deleteItem, updateItem } from '@/services/firebaseService'
-import { Trash2, Pencil, Plus } from 'lucide-react'
-import { Button, Badge, LoadingState, NavigationHeader, ImageCarousel, Modal, GalleryEditor, EmojiPicker, Select, FormField, Input } from '@/components/ui'
+import { deleteItem, updateItem, createContainer, createGroup } from '@/services/firebaseService'
+import { Trash2, Pencil, Plus, Activity } from 'lucide-react'
+import { Button, Badge, LoadingState, NavigationHeader, ImageCarousel, Modal, GalleryEditor, EmojiPicker, Select, FormField, Input, IconOrEmoji } from '@/components/ui'
+import { ActivityFeed } from '@/components/ActivityFeed'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
+import { getEntityActivity } from '@/services/firebaseService'
+import { getItemIcon, DEFAULT_ITEM_COLOR, DEFAULT_CONTAINER_COLOR } from '@/utils/colorUtils'
 
 export function Item() {
   const { id } = useParams<{ id: string }>()
@@ -59,6 +62,15 @@ export function Item() {
   const [newContainerName, setNewContainerName] = useState('')
   const [newContainerPlaceId, setNewContainerPlaceId] = useState('')
   const [isUpdatingIcon, setIsUpdatingIcon] = useState(false)
+  const [showActivityModal, setShowActivityModal] = useState(false)
+
+  const { data: activityData = [], isLoading: isActivityLoading, error: activityError } = useQuery({
+    queryKey: ['activity', 'entity', 'item', id],
+    queryFn: () => getEntityActivity('item', id!),
+    enabled: showActivityModal && !!id,
+    staleTime: 1000 * 60,
+    retry: false,
+  })
 
   // Get item groups for current container
   const itemGroups = groups.filter(g => g.type === 'item' && g.parentId === item?.containerId)
@@ -106,6 +118,14 @@ export function Item() {
               variant="icon"
               size="icon"
               className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
+              onClick={() => setShowActivityModal(true)}
+            >
+              <Activity size={18} className="text-text-primary" strokeWidth={2} />
+            </Button>
+            <Button
+              variant="icon"
+              size="icon"
+              className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
               onClick={() => setIsCreateSiblingItemOpen(true)}
             >
               <Plus size={18} className="text-text-primary" strokeWidth={2} />
@@ -131,7 +151,7 @@ export function Item() {
       />
 
       {/* Hero Image */}
-      <div className="relative h-[280px] bg-bg-elevated rounded-2xl overflow-hidden mx-4 shadow-sm border border-border-light">
+      <div className={`relative ${item.photos && item.photos.length > 0 ? 'h-[280px]' : 'h-[160px]'} bg-bg-elevated rounded-2xl overflow-hidden mx-4 shadow-sm border border-border-light`}>
         {item.photos && item.photos.length > 0 ? (
           <ImageCarousel
             images={item.photos}
@@ -145,7 +165,12 @@ export function Item() {
             onClick={() => setShowEmojiPicker(true)}
           >
             <div className="flex flex-col items-center gap-3">
-              <span className="text-6xl">{item.icon || '🦆'}</span>
+              <IconOrEmoji
+                iconValue={item.icon}
+                defaultIcon={getItemIcon()}
+                color={item.color || DEFAULT_ITEM_COLOR}
+                size="lg"
+              />
               <span className="font-body text-sm text-text-tertiary">Tap to change icon</span>
             </div>
           </div>
@@ -160,9 +185,17 @@ export function Item() {
             {item.name}
           </h1>
 
+          {/* Quantity Display */}
+          {item.quantity !== undefined && item.quantity !== null && (
+            <div className="flex items-center gap-2 pt-1">
+              <span className="font-body text-sm text-text-tertiary">Quantity:</span>
+              <span className="font-display text-lg font-semibold text-text-primary">{item.quantity}</span>
+            </div>
+          )}
+
           {/* Tags */}
           {item.tags && item.tags.length > 0 && (
-            <div className="flex flex-wrap gap-2 pt-1 px-4">
+            <div className="flex flex-wrap gap-2 pt-1">
               {item.tags.map((tag) => (
                 <Badge key={tag} variant="primary" size="md">
                   {tag}
@@ -297,24 +330,51 @@ export function Item() {
         title="Change Item Icon"
         description="Select a new icon for this item"
       >
-        <EmojiPicker
-          selectedEmoji={item.icon}
-          onEmojiSelect={async (emoji) => {
-            if (isUpdatingIcon) return
-            setIsUpdatingIcon(true)
-            try {
-              await updateItem(item.id, { icon: emoji || '🦆' })
-              await refresh()
-              setShowEmojiPicker(false)
-            } catch (error) {
-              console.error('Failed to update icon:', error)
-              alert('Failed to update icon')
-            } finally {
-              setIsUpdatingIcon(false)
-            }
-          }}
-          onClose={() => !isUpdatingIcon && setShowEmojiPicker(false)}
-        />
+        <div className="space-y-4">
+          <EmojiPicker
+            selectedEmoji={item.icon}
+            onEmojiSelect={async (emoji) => {
+              if (isUpdatingIcon) return
+              setIsUpdatingIcon(true)
+              try {
+                await updateItem(item.id, { icon: emoji })
+                await refresh()
+                setShowEmojiPicker(false)
+              } catch (error) {
+                console.error('Failed to update icon:', error)
+                alert('Failed to update icon')
+              } finally {
+                setIsUpdatingIcon(false)
+              }
+            }}
+          />
+
+          {item.icon && (
+            <div className="pt-3 border-t border-border-light">
+              <Button
+                variant="secondary"
+                onClick={async () => {
+                  if (isUpdatingIcon) return
+                  setIsUpdatingIcon(true)
+                  try {
+                    await updateItem(item.id, { icon: '' })
+                    await refresh()
+                    setShowEmojiPicker(false)
+                  } catch (error) {
+                    console.error('Failed to reset icon:', error)
+                    alert('Failed to reset icon')
+                  } finally {
+                    setIsUpdatingIcon(false)
+                  }
+                }}
+                className="w-full"
+                disabled={isUpdatingIcon}
+              >
+                Reset to Default Icon
+              </Button>
+            </div>
+          )}
+        </div>
       </Modal>
 
       {/* Move to Container Modal */}
@@ -415,13 +475,11 @@ export function Item() {
                       setIsMoving(false)
                       return
                     }
-                    const { createContainer } = await import('@/services/firebaseService')
-                    const { getRandomColor } = await import('@/utils/colorUtils')
                     const newContainerId = await createContainer({
                       name: newContainerName,
                       placeId: newContainerPlaceId,
-                      color: getRandomColor('container'),
-                      icon: 'Package',
+                      color: DEFAULT_CONTAINER_COLOR,
+                      // Icon will be set to default via getContainerIcon() when displayed
                       lastAccessed: new Date(),
                     })
                     // Move item to new container
@@ -452,6 +510,28 @@ export function Item() {
               {isMoving ? 'Saving...' : isCreatingNewContainer ? 'Create & Move' : 'Move Item'}
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Activity Modal */}
+      <Modal
+        isOpen={showActivityModal}
+        onClose={() => setShowActivityModal(false)}
+        title="Activity"
+        description="Activity for this item"
+        size="lg"
+      >
+        <div className="max-h-[60vh] overflow-y-auto">
+          <ActivityFeed
+            activities={activityData}
+            isLoading={isActivityLoading}
+            error={activityError as Error | null}
+          />
+        </div>
+        <div className="flex justify-end mt-4">
+          <Button variant="secondary" onClick={() => setShowActivityModal(false)}>
+            Close
+          </Button>
         </div>
       </Modal>
 
@@ -531,7 +611,6 @@ export function Item() {
                       setIsMoving(false)
                       return
                     }
-                    const { createGroup } = await import('@/services/firebaseService')
                     const newGroupId = await createGroup({
                       name: newGroupName,
                       type: 'item',

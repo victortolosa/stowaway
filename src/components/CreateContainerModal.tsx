@@ -10,8 +10,8 @@ import { useGroups } from '@/hooks/queries/useGroups'
 // ImageCropper removed
 // import { ImageCropper } from '@/components'
 import { Container } from '@/types'
-import { Modal, Button, Input, FormField, MultiImageUploader, ProgressBar, Select } from '@/components/ui'
-import { getRandomColor } from '@/utils/colorUtils'
+import { Modal, Button, Input, FormField, MultiImageUploader, ProgressBar, Select, ColorPicker } from '@/components/ui'
+import { getColorPalette, DEFAULT_CONTAINER_COLOR } from '@/utils/colorUtils'
 
 const containerSchema = z.object({
     name: z.string().min(1, 'Name is required'),
@@ -47,6 +47,7 @@ export function CreateContainerModal({
     const { data: groups = [] } = useGroups()
     const [isSubmitting, setIsSubmitting] = useState(false)
     const [images, setImages] = useState<(File | string)[]>([])
+    const [selectedColor, setSelectedColor] = useState<string>(DEFAULT_CONTAINER_COLOR)
     // Cropper removed for multi-image flow simplicity
     // const [showCropper, setShowCropper] = useState(false)
     // const [imageToCrop, setImageToCrop] = useState<string | null>(null)
@@ -75,12 +76,14 @@ export function CreateContainerModal({
             })
             // Load existing photos, fall back to single photoUrl if no photos array
             setImages(initialData.photos || (initialData.photoUrl ? [initialData.photoUrl] : []))
+            setSelectedColor(initialData.color || DEFAULT_CONTAINER_COLOR)
         } else if (isOpen && !editMode) {
             reset({
                 name: '',
                 groupId: preselectedGroupId || '',
             })
             setImages([])
+            setSelectedColor(DEFAULT_CONTAINER_COLOR)
         }
     }, [isOpen, editMode, initialData, reset, preselectedGroupId])
 
@@ -130,8 +133,8 @@ export function CreateContainerModal({
                     photos: finalPhotos,
                     // Legacy support is handled in service, but we pass photos array
                     groupId: data.groupId || null,
-                    // Preserve existing color and icon when editing
-                    color: initialData.color,
+                    color: selectedColor,
+                    // Preserve existing icon when editing
                     icon: initialData.icon,
                 })
                 containerId = initialData.id
@@ -142,8 +145,8 @@ export function CreateContainerModal({
                     photos: finalPhotos,
                     lastAccessed: new Date(),
                     groupId: data.groupId || null,
-                    color: getRandomColor('container'),
-                    icon: 'Package',
+                    color: selectedColor,
+                    // Icon will be set to default via getContainerIcon() when displayed
                 })
             }
 
@@ -208,6 +211,15 @@ export function CreateContainerModal({
                                 </option>
                             ))}
                         </Select>
+                    </FormField>
+
+                    <FormField label="Color">
+                        <ColorPicker
+                            colors={getColorPalette('container')}
+                            selectedColor={selectedColor}
+                            onColorSelect={setSelectedColor}
+                            defaultColor={DEFAULT_CONTAINER_COLOR}
+                        />
                     </FormField>
 
                     <FormField label="Photos (Optional)">
