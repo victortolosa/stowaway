@@ -6,10 +6,10 @@ import { useAllItems } from '@/hooks/queries/useAllItems'
 import { useGroups } from '@/hooks/queries/useGroups'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Search, Plus, FolderPlus } from 'lucide-react'
-import { EmptyState, LoadingState, Button } from '@/components/ui'
+import { Plus } from 'lucide-react'
+import { EmptyState, LoadingState, Button, SearchBar } from '@/components/ui'
 import { ItemCard } from '@/components/ItemCard'
-import { MultiStepCreateItemModal, SelectItemsForGroupModal } from '@/components'
+import { MultiStepCreateItemModal } from '@/components'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 import { SortOption, sortItems } from '@/utils/sortUtils'
 import { SortDropdown } from '@/components/ui'
@@ -28,7 +28,6 @@ export function ItemsList() {
   const isLoading = isItemsLoading
   const [searchQuery, setSearchQuery] = useState('')
   const [isMultiStepCreateOpen, setIsMultiStepCreateOpen] = useState(false)
-  const [isSelectItemsGroupOpen, setIsSelectItemsGroupOpen] = useState(false)
   const [sortBy, setSortBy] = useState<SortOption>('recently-modified')
   const navigate = useNavigate()
 
@@ -76,48 +75,34 @@ export function ItemsList() {
         <h1 className="font-display text-2xl font-bold text-text-primary tracking-tight">
           Items
         </h1>
-        <div className="flex-1 max-w-md">
-          <div className="bg-white rounded-xl h-[52px] px-4 flex items-center gap-3 shadow-sm border border-black/5 focus-within:border-accent-aqua focus-within:shadow-md transition-all duration-200">
-            <Search size={22} className="text-accent-aqua" strokeWidth={2.5} />
-            <input
-              type="text"
-              placeholder="Search items..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 font-body text-[16px] text-text-primary placeholder:text-text-tertiary outline-none bg-transparent"
-            />
-          </div>
-        </div>
       </div>
 
       {/* Action Buttons */}
-      {!searchQuery && (
-        <>
-          <div className="flex gap-3 mb-8">
-            <Button
-              variant="primary"
-              size="sm"
-              fullWidth
-              leftIcon={Plus}
-              onClick={() => setIsMultiStepCreateOpen(true)}
-            >
-              New Item
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              fullWidth
-              leftIcon={FolderPlus}
-              onClick={() => setIsSelectItemsGroupOpen(true)}
-            >
-              New Group
-            </Button>
-          </div>
+      <div className="flex flex-col gap-6 mb-8">
+        <SearchBar
+          placeholder="Search items..."
+          value={searchQuery}
+          onChange={setSearchQuery}
+        />
+        <div className="flex justify-between items-center w-full">
+          {!searchQuery ? (
+            <div className="flex gap-3">
+              <Button
+                variant="primary"
+                size="sm"
+                fullWidth
+                leftIcon={Plus}
+                onClick={() => setIsMultiStepCreateOpen(true)}
+              >
+                New Item
+              </Button>
+            </div>
+          ) : <div />}
           <div className="flex justify-end px-1">
             <SortDropdown value={sortBy} onChange={setSortBy} />
           </div>
-        </>
-      )}
+        </div>
+      </div>
 
       {/* Content Section */}
       <div className={!searchQuery ? '' : 'mt-8'}>
@@ -155,7 +140,7 @@ export function ItemsList() {
                         </div>
 
                         <div className="pl-4 border-l-2 border-border-standard ml-2">
-                          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 gap-4">
                             {groupItems.map((item) => (
                               <ItemCard
                                 key={item.id}
@@ -179,7 +164,7 @@ export function ItemsList() {
                 <h3 className="font-display text-[16px] font-semibold text-text-secondary px-1">
                   Ungrouped
                 </h3>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 gap-4">
                   {filteredItems.filter(i => !i.groupId).map((item) => (
                     <ItemCard
                       key={item.id}
@@ -236,15 +221,7 @@ export function ItemsList() {
         }}
       />
 
-      <SelectItemsForGroupModal
-        isOpen={isSelectItemsGroupOpen}
-        onClose={() => setIsSelectItemsGroupOpen(false)}
-        onGroupCreated={() => {
-          setIsSelectItemsGroupOpen(false)
-          queryClient.invalidateQueries({ queryKey: ['groups'] })
-          queryClient.invalidateQueries({ queryKey: ['items'] })
-        }}
-      />
+
     </div>
   )
 }

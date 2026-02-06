@@ -8,8 +8,8 @@ import { CreatePlaceModal, ConfirmDeleteModal, CreateGroupModal } from '@/compon
 import { useNavigate } from 'react-router-dom'
 import { deletePlace, deleteGroup } from '@/services/firebaseService'
 import { Place, Group } from '@/types'
-import { Search, FolderPlus, Plus, Pencil, MoreVertical, Users } from 'lucide-react'
-import { ListItem, EmptyState, LoadingState, Button, IconOrEmoji } from '@/components/ui'
+import { Plus, Pencil, MoreVertical, Users } from 'lucide-react'
+import { ListItem, EmptyState, LoadingState, Button, IconOrEmoji, SearchBar } from '@/components/ui'
 import { getPlaceIcon } from '@/utils/colorUtils'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 import { SortOption, sortItems } from '@/utils/sortUtils'
@@ -92,7 +92,6 @@ export function Places() {
   }
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
-  const [isCreateGroupOpen, setIsCreateGroupOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
   const [editingPlace, setEditingPlace] = useState<Place | null>(null)
@@ -173,47 +172,33 @@ export function Places() {
         <h1 className="font-display text-2xl font-bold text-text-primary tracking-tight">
           Places
         </h1>
-        <div className="flex-1 max-w-md">
-          <div className="bg-bg-surface rounded-xl h-[52px] px-4 flex items-center gap-3 shadow-sm border border-border-standard focus-within:border-accent-aqua focus-within:shadow-md transition-all duration-200">
-            <Search size={22} className="text-accent-aqua" strokeWidth={2.5} />
-            <input
-              type="text"
-              placeholder="Search places..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 font-body text-[16px] text-text-primary placeholder:text-text-tertiary outline-none bg-transparent"
-            />
-          </div>
-        </div>
       </div>
 
       {/* Action Buttons and Sort */}
       <div className="flex flex-col gap-6 mb-8">
-        {!searchQuery && (
-          <div className="flex gap-3">
-            <Button
-              variant="primary"
-              size="sm"
-              fullWidth
-              leftIcon={Plus}
-              onClick={() => setIsCreateModalOpen(true)}
-            >
-              New Place
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              fullWidth
-              leftIcon={FolderPlus}
-              onClick={() => setIsCreateGroupOpen(true)}
-            >
-              New Group
-            </Button>
-          </div>
-        )}
+        <SearchBar
+          placeholder="Search places..."
+          value={searchQuery}
+          onChange={setSearchQuery}
+        />
+        <div className="flex justify-between items-center w-full">
+          {!searchQuery ? (
+            <div className="flex gap-3">
+              <Button
+                variant="primary"
+                size="sm"
+                fullWidth
+                leftIcon={Plus}
+                onClick={() => setIsCreateModalOpen(true)}
+              >
+                New Place
+              </Button>
+            </div>
+          ) : <div />}
 
-        <div className="flex justify-end px-1">
-          <SortDropdown value={sortBy} onChange={setSortBy} />
+          <div className="flex justify-end px-1">
+            <SortDropdown value={sortBy} onChange={setSortBy} />
+          </div>
         </div>
       </div>
 
@@ -427,14 +412,7 @@ export function Places() {
         />
       )}
 
-      {/* Create Group Modal */}
-      <CreateGroupModal
-        isOpen={isCreateGroupOpen}
-        onClose={() => setIsCreateGroupOpen(false)}
-        onGroupCreated={refresh}
-        type="place"
-        parentId={null}
-      />
+
 
       {/* Edit Group Modal */}
       {editingGroup && (

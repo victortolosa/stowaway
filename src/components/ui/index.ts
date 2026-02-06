@@ -1,5 +1,7 @@
 export * from './Button'
 export * from './Input'
+export * from './Toast'
+export * from './SearchBar'
 export * from './Textarea'
 export * from './GalleryEditor'
 export * from './MultiImageUploader'

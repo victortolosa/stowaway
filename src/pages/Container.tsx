@@ -328,7 +328,7 @@ export function Container() {
                           )}
                         </div>
 
-                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 gap-4">
                           {groupItems.map((item) => (
                             <ItemCard
                               key={item.id}
@@ -344,7 +344,7 @@ export function Container() {
               )}
 
               {/* Ungrouped Items */}
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                 {filteredItems.filter(i => !i.groupId).map((item) => (
                   <ItemCard
                     key={item.id}

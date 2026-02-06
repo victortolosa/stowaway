@@ -6,7 +6,7 @@ import { useAllContainers } from '@/hooks/queries/useAllContainers'
 // We use useAllItems for client-side filtering/sorting and counts
 import { useAllItems } from '@/hooks/queries/useAllItems'
 import { Plus, ChevronRight, User, Users, MapPin, Box, Package } from 'lucide-react'
-import { LoadingState, Card, EmptyState, IconOrEmoji, CreatePlaceModal, MultiStepCreateContainerModal, MultiStepCreateItemModal } from '@/components'
+import { LoadingState, Card, EmptyState, IconOrEmoji, CreatePlaceModal, MultiStepCreateContainerModal, MultiStepCreateItemModal, ParallaxRowList } from '@/components'
 import { ItemCard } from '@/components/ItemCard'
 import { useOnClickOutside } from '@/hooks/useOnClickOutside'
 
@@ -25,7 +25,7 @@ export function Dashboard() {
 
   const isLoading = isPlacesLoading || isContainersLoading || isAllItemsLoading
 
-  const [visibleItemsCount, setVisibleItemsCount] = useState(8)
+
   const [placesFilter, setPlacesFilter] = useState<'all' | 'shared'>('all')
 
   // Add menu state
@@ -46,16 +46,12 @@ export function Dashboard() {
 
   const sortedPlaces = sortItems([...places], 'recently-modified')
   const displayedPlaces = placesFilter === 'shared'
-    ? sortedPlaces.filter((place) => isPlaceShared(place, user?.uid))
-    : sortedPlaces
-  const sortedContainers = sortItems([...containers], 'recently-modified').slice(0, 16)
+    ? sortedPlaces.filter((place) => isPlaceShared(place, user?.uid)).slice(0, 20)
+    : sortedPlaces.slice(0, 20)
+  const sortedContainers = sortItems([...containers], 'recently-modified').slice(0, 20)
   const allRecentItems = sortItems([...itemsToDisplay], 'recently-added')
-  const recentItems = allRecentItems.slice(0, visibleItemsCount)
-  const hasMoreItems = allRecentItems.length > visibleItemsCount
-
-  const loadMoreItems = () => {
-    setVisibleItemsCount(prev => prev + 8)
-  }
+  const recentItems = allRecentItems.slice(0, 16)
+  const hasMoreItems = allRecentItems.length > 16
 
   const getItemLocation = (itemId: string) => {
     const item = allItems.find(i => i.id === itemId)
@@ -79,7 +75,7 @@ export function Dashboard() {
 
   return (
     <>
-      <div className="flex flex-col gap-10 pb-8 w-full max-w-full">
+      <div className="flex flex-col gap-14 md:gap-16 pb-8 w-full max-w-full">
         {/* Top Section with Logo and Add Item */}
         <div className="flex flex-col gap-6">
           <div className="flex justify-between items-center">
@@ -145,44 +141,46 @@ export function Dashboard() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-12">
+        <div className="flex flex-col gap-8">
           {/* Places Section */}
           <div className="flex flex-col gap-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <h2 className="font-display text-xl md:text-2xl font-bold text-text-primary tracking-tight">
-                Places
-              </h2>
+            <div className="flex items-center justify-between">
               <button
                 onClick={() => navigate('/places')}
-                className="p-1 hover:bg-bg-page/50 rounded-full text-text-quaternary hover:text-accent-aqua transition-all"
+                className="flex items-center gap-1.5 group"
               >
-                <ChevronRight size={22} strokeWidth={2.5} />
+                <h2 className="font-display text-xl md:text-2xl font-bold text-text-primary tracking-tight group-hover:text-accent-aqua transition-colors">
+                  Places
+                </h2>
+                <div
+                  className="p-1 rounded-full text-text-quaternary group-hover:text-accent-aqua transition-all"
+                >
+                  <ChevronRight size={22} strokeWidth={2.5} />
+                </div>
               </button>
+              {places.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant={placesFilter === 'all' ? 'secondary' : 'ghost'}
+                    onClick={() => setPlacesFilter('all')}
+                    className="h-7 px-3 text-[11px]"
+                    aria-pressed={placesFilter === 'all'}
+                  >
+                    All
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={placesFilter === 'shared' ? 'secondary' : 'ghost'}
+                    onClick={() => setPlacesFilter('shared')}
+                    className="h-7 px-3 text-[11px]"
+                    aria-pressed={placesFilter === 'shared'}
+                  >
+                    Shared
+                  </Button>
+                </div>
+              )}
             </div>
-            {places.length > 0 && (
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  variant={placesFilter === 'all' ? 'secondary' : 'ghost'}
-                  onClick={() => setPlacesFilter('all')}
-                  className="h-7 px-3 text-[11px]"
-                  aria-pressed={placesFilter === 'all'}
-                >
-                  All
-                </Button>
-                <Button
-                  size="sm"
-                  variant={placesFilter === 'shared' ? 'secondary' : 'ghost'}
-                  onClick={() => setPlacesFilter('shared')}
-                  className="h-7 px-3 text-[11px]"
-                  aria-pressed={placesFilter === 'shared'}
-                >
-                  Shared
-                </Button>
-              </div>
-            )}
-          </div>
 
             {places.length === 0 ? (
               <EmptyState
@@ -195,124 +193,62 @@ export function Dashboard() {
                 message="No shared places yet"
               />
             ) : (
-              <div
-                className="overflow-x-auto pb-4 no-scrollbar"
-                style={{
-                  marginLeft: 'calc(-1 * max(1.5rem, var(--safe-area-inset-left, 0px)))',
-                  marginRight: 'calc(-1 * max(1.5rem, var(--safe-area-inset-right, 0px)))',
-                  paddingLeft: 'max(1.5rem, var(--safe-area-inset-left, 0px))',
-                  paddingRight: 'max(1.5rem, var(--safe-area-inset-right, 0px))'
+              <ParallaxRowList
+                items={displayedPlaces}
+                numRows={displayedPlaces.length > 14 ? 3 : 2}
+                onSeeAll={() => navigate('/places')}
+                getItemWidth={(place) => {
+                  // Icon (~40px) + Padding (~20px) + Text (approx 9px/char)
+                  // Clamped between 140 and 400
+                  const width = 60 + (place.name.length * 10)
+                  return Math.min(Math.max(width, 140), 400)
                 }}
-              >
-                <div className="flex flex-col gap-3 min-w-max">
-                  {(() => {
-                    const row1 = displayedPlaces.filter((_, i) => i % 2 === 0)
-                    const row2 = displayedPlaces.filter((_, i) => i % 2 !== 0)
+                renderItem={(place) => {
+                  const placeContainers = containers.filter((c) => c.placeId === place.id)
+                  const totalItems = allItems.filter((item) =>
+                    placeContainers.some((c) => c.id === item.containerId)
+                  ).length
+                  const placeColor = place.color || '#14B8A6'
+                  const shared = isPlaceShared(place, user?.uid)
 
-                    return (
-                      <>
-                        {/* Row 1 */}
-                        <div className="flex gap-4">
-                          {row1.map((place) => {
-                            const placeContainers = containers.filter((c) => c.placeId === place.id)
-                            const totalItems = allItems.filter((item) =>
-                              placeContainers.some((c) => c.id === item.containerId)
-                            ).length
-                            const placeColor = place.color || '#14B8A6'
-                            const shared = isPlaceShared(place, user?.uid)
-
-                            return (
-                              <Card
-                                key={place.id}
-                                variant="interactive"
-                                onClick={() => navigate(`/places/${place.id}`)}
-                                padding="none"
-                                className="min-w-[140px] max-w-[400px] w-auto h-[68px] flex-shrink-0 overflow-hidden"
-                              >
-                                <div className="flex h-full items-stretch">
-                                  <div className="flex items-center justify-center flex-shrink-0 px-3">
-                                    <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={placeColor} size="sm" />
-                                  </div>
-                                  <div
-                                    className="flex flex-col justify-center gap-1 min-w-0"
-                                    style={{ paddingLeft: '1.25rem', paddingRight: '1.25rem' }}
-                                  >
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <h3 className="font-display text-[16px] font-semibold text-text-primary truncate whitespace-nowrap leading-snug">
-                                        {place.name}
-                                      </h3>
-                                      {shared && (
-                                        <span
-                                          className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-accent-blue/20 text-accent-blue flex-shrink-0"
-                                          aria-label="Shared"
-                                        >
-                                          <Users size={12} strokeWidth={2.5} />
-                                        </span>
-                                      )}
-                                    </div>
-                                    <p className="font-body text-[13px] text-text-secondary truncate whitespace-nowrap">
-                                      {placeContainers.length} {placeContainers.length === 1 ? 'container' : 'containers'} · {totalItems} {totalItems === 1 ? 'item' : 'items'}
-                                    </p>
-                                  </div>
-                                </div>
-                              </Card>
-                            )
-                          })}
+                  return (
+                    <Card
+                      key={place.id}
+                      variant="interactive"
+                      onClick={() => navigate(`/places/${place.id}`)}
+                      padding="none"
+                      className="min-w-[140px] max-w-[400px] w-auto h-[68px] flex-shrink-0 overflow-hidden"
+                    >
+                      <div className="flex h-full items-stretch">
+                        <div className="flex items-center justify-center flex-shrink-0 px-3">
+                          <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={placeColor} size="sm" />
                         </div>
-
-                        {/* Row 2 */}
-                        <div className="flex gap-4">
-                          {row2.map((place) => {
-                            const placeContainers = containers.filter((c) => c.placeId === place.id)
-                            const totalItems = allItems.filter((item) =>
-                              placeContainers.some((c) => c.id === item.containerId)
-                            ).length
-                            const placeColor = place.color || '#14B8A6'
-                            const shared = isPlaceShared(place, user?.uid)
-
-                            return (
-                              <Card
-                                key={place.id}
-                                variant="interactive"
-                                onClick={() => navigate(`/places/${place.id}`)}
-                                padding="none"
-                                className="min-w-[140px] max-w-[400px] w-auto h-[68px] flex-shrink-0 overflow-hidden"
+                        <div
+                          className="flex flex-col justify-center gap-1 min-w-0"
+                          style={{ paddingLeft: '0.25rem', paddingRight: '1.25rem' }}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <h3 className="font-display text-[16px] font-semibold text-text-primary truncate whitespace-nowrap leading-snug">
+                              {place.name}
+                            </h3>
+                            {shared && (
+                              <span
+                                className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-accent-blue/20 text-accent-blue flex-shrink-0"
+                                aria-label="Shared"
                               >
-                                <div className="flex h-full items-stretch">
-                                  <div className="flex items-center justify-center flex-shrink-0 px-3">
-                                    <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={placeColor} size="sm" />
-                                  </div>
-                                  <div
-                                    className="flex flex-col justify-center gap-1 min-w-0"
-                                    style={{ paddingLeft: '1.25rem', paddingRight: '1.25rem' }}
-                                  >
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <h3 className="font-display text-[16px] font-semibold text-text-primary truncate whitespace-nowrap leading-snug">
-                                        {place.name}
-                                      </h3>
-                                      {shared && (
-                                        <span
-                                          className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-accent-blue/20 text-accent-blue flex-shrink-0"
-                                          aria-label="Shared"
-                                        >
-                                          <Users size={12} strokeWidth={2.5} />
-                                        </span>
-                                      )}
-                                    </div>
-                                    <p className="font-body text-[13px] text-text-secondary truncate whitespace-nowrap">
-                                      {placeContainers.length} {placeContainers.length === 1 ? 'container' : 'containers'} · {totalItems} {totalItems === 1 ? 'item' : 'items'}
-                                    </p>
-                                  </div>
-                                </div>
-                              </Card>
-                            )
-                          })}
+                                <Users size={12} strokeWidth={2.5} />
+                              </span>
+                            )}
+                          </div>
+                          <p className="font-body text-[13px] text-text-secondary truncate whitespace-nowrap">
+                            {placeContainers.length} {placeContainers.length === 1 ? 'container' : 'containers'} · {totalItems} {totalItems === 1 ? 'item' : 'items'}
+                          </p>
                         </div>
-                      </>
-                    )
-                  })()}
-                </div>
-              </div>
+                      </div>
+                    </Card>
+                  )
+                }}
+              />
             )}
           </div>
 
@@ -320,82 +256,65 @@ export function Dashboard() {
           {containers.length > 0 && (
             <div className="flex flex-col gap-6">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <h2 className="font-display text-xl md:text-2xl font-bold text-text-primary tracking-tight">
+                <button
+                  onClick={() => navigate('/containers')}
+                  className="flex items-center gap-1.5 group"
+                >
+                  <h2 className="font-display text-xl md:text-2xl font-bold text-text-primary tracking-tight group-hover:text-accent-aqua transition-colors">
                     Containers
                   </h2>
-                  <button
-                    onClick={() => navigate('/containers')}
-                    className="p-1 hover:bg-bg-page/50 rounded-full text-text-quaternary hover:text-accent-aqua transition-all"
+                  <div
+                    className="p-1 rounded-full text-text-quaternary group-hover:text-accent-aqua transition-all"
                   >
                     <ChevronRight size={22} strokeWidth={2.5} />
-                  </button>
-                </div>
+                  </div>
+                </button>
               </div>
 
-              <div
-                className="overflow-x-auto pb-4 no-scrollbar"
-                style={{
-                  marginLeft: 'calc(-1 * max(1.5rem, var(--safe-area-inset-left, 0px)))',
-                  marginRight: 'calc(-1 * max(1.5rem, var(--safe-area-inset-right, 0px)))',
-                  paddingLeft: 'max(1.5rem, var(--safe-area-inset-left, 0px))',
-                  paddingRight: 'max(1.5rem, var(--safe-area-inset-right, 0px))'
+              <ParallaxRowList
+                items={sortedContainers}
+                numRows={sortedContainers.length > 14 ? 3 : 2}
+                onSeeAll={() => navigate('/containers')}
+                getItemWidth={(container) => {
+                  const width = 60 + (container.name.length * 10)
+                  return Math.min(Math.max(width, 140), 400)
                 }}
-              >
-                <div className="flex flex-col gap-3 min-w-max">
-                  {(() => {
-                    const row1 = sortedContainers.filter((_, i) => i % 2 === 0)
-                    const row2 = sortedContainers.filter((_, i) => i % 2 !== 0)
+                renderItem={(container) => {
+                  const place = places.find(p => p.id === container.placeId)
+                  const containerItems = allItems.filter(item => item.containerId === container.id)
+                  const containerColor = container.color || '#3B82F6'
 
-                    const renderRow = (rowItems: typeof sortedContainers) => (
-                      <div className="flex gap-4">
-                        {rowItems.map((container) => {
-                          const place = places.find(p => p.id === container.placeId)
-                          const containerItems = allItems.filter(item => item.containerId === container.id)
-                          const containerColor = container.color || '#3B82F6'
+                  return (
+                    <Card
+                      key={container.id}
+                      variant="interactive"
+                      onClick={() => navigate(`/containers/${container.id}`)}
+                      padding="none"
+                      className="min-w-[140px] max-w-[400px] w-auto h-[68px] flex-shrink-0 overflow-hidden"
+                    >
+                      <div className="flex items-stretch h-full">
+                        {/* Icon Badge */}
+                        <div className="flex items-center justify-center flex-shrink-0 px-3">
+                          <IconOrEmoji iconValue={container.icon} defaultIcon={getContainerIcon()} color={containerColor} size="sm" />
+                        </div>
 
-                          return (
-                            <Card
-                              key={container.id}
-                              variant="interactive"
-                              onClick={() => navigate(`/containers/${container.id}`)}
-                              padding="none"
-                              className="min-w-[140px] max-w-[400px] w-auto h-[68px] flex-shrink-0 overflow-hidden"
-                            >
-                              <div className="flex items-stretch h-full">
-                                {/* Icon Badge */}
-                                <div className="flex items-center justify-center flex-shrink-0 px-3">
-                                  <IconOrEmoji iconValue={container.icon} defaultIcon={getContainerIcon()} color={containerColor} size="sm" />
-                                </div>
-
-                                {/* Content */}
-                                <div
-                                  className="flex flex-col justify-center gap-1 min-w-0"
-                                  style={{ paddingLeft: '1.25rem', paddingRight: '1.25rem' }}
-                                >
-                                  <h3 className="font-display text-[15px] font-semibold text-text-primary leading-snug truncate whitespace-nowrap">
-                                    {container.name}
-                                  </h3>
-                                  <p className="font-body text-[12px] text-text-secondary truncate whitespace-nowrap">
-                                    {place?.name} · {containerItems.length} items
-                                  </p>
-                                </div>
-                              </div>
-                            </Card>
-                          )
-                        })}
+                        {/* Content */}
+                        <div
+                          className="flex flex-col justify-center gap-1 min-w-0"
+                          style={{ paddingLeft: '0.25rem', paddingRight: '1.25rem' }}
+                        >
+                          <h3 className="font-display text-[15px] font-semibold text-text-primary leading-snug truncate whitespace-nowrap">
+                            {container.name}
+                          </h3>
+                          <p className="font-body text-[12px] text-text-secondary truncate whitespace-nowrap">
+                            {place?.name} · {containerItems.length} items
+                          </p>
+                        </div>
                       </div>
-                    )
-
-                    return (
-                      <>
-                        {renderRow(row1)}
-                        {row2.length > 0 && renderRow(row2)}
-                      </>
-                    )
-                  })()}
-                </div>
-              </div>
+                    </Card>
+                  )
+                }}
+              />
             </div>
           )
           }
@@ -405,61 +324,45 @@ export function Dashboard() {
             recentItems.length > 0 && (
               <div className="flex flex-col gap-6">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <h2 className="font-display text-xl md:text-2xl font-bold text-text-primary tracking-tight">
+                  <button
+                    onClick={() => navigate('/items')}
+                    className="flex items-center gap-1.5 group"
+                  >
+                    <h2 className="font-display text-xl md:text-2xl font-bold text-text-primary tracking-tight group-hover:text-accent-aqua transition-colors">
                       Items
                     </h2>
-                    <button
-                      onClick={() => navigate('/items')}
-                      className="p-1 hover:bg-bg-page/50 rounded-full text-text-quaternary hover:text-accent-aqua transition-all"
+                    <div
+                      className="p-1 rounded-full text-text-quaternary group-hover:text-accent-aqua transition-all"
                     >
                       <ChevronRight size={22} strokeWidth={2.5} />
-                    </button>
-                  </div>
+                    </div>
+                  </button>
                 </div>
 
                 {/* Horizontal Scroll Container */}
-                <div
-                  className="overflow-x-auto pb-8 no-scrollbar"
-                  style={{
-                    marginLeft: 'calc(-1 * max(1.5rem, var(--safe-area-inset-left, 0px)))',
-                    marginRight: 'calc(-1 * max(1.5rem, var(--safe-area-inset-right, 0px)))',
-                    paddingLeft: 'max(1.5rem, var(--safe-area-inset-left, 0px))',
-                    paddingRight: 'max(1.5rem, var(--safe-area-inset-right, 0px))'
+                <ParallaxRowList
+                  items={recentItems}
+                  numRows={2}
+                  onSeeAll={hasMoreItems ? () => navigate('/items') : undefined}
+                  getItemWidth={(item) => {
+                    // Image (100px) + Padding (32px) + Text
+                    // Use max(name, location)
+                    const location = getItemLocation(item.id) || ''
+                    const textLen = Math.max(item.name.length, location.length * 0.7) // location is smaller text
+                    const width = 132 + (textLen * 9)
+                    return Math.min(Math.max(width, 280), 400)
                   }}
-                >
-                  <div className="flex gap-4 min-w-max">
-                    {recentItems.map((item) => (
-                      <ItemCard
-                        key={item.id}
-                        item={item}
-                        location={getItemLocation(item.id)}
-                        onClick={() => navigate(`/items/${item.id}`)}
-                        className="w-[280px] flex-shrink-0"
-                      />
-                    ))}
-
-                    {/* Show More Button */}
-                    {hasMoreItems && (
-                      <button
-                        onClick={loadMoreItems}
-                        className="w-[280px] flex-shrink-0 bg-bg-surface border border-border-standard rounded-card flex flex-col items-center justify-center gap-3 hover:border-accent-aqua hover:bg-accent-aqua/5 transition-all cursor-pointer min-h-[200px]"
-                      >
-                        <div className="w-12 h-12 rounded-full bg-accent-aqua/10 flex items-center justify-center text-accent-aqua">
-                          <Plus size={24} strokeWidth={2.5} />
-                        </div>
-                        <div className="text-center">
-                          <p className="font-display text-[15px] font-bold text-text-primary">
-                            Show More
-                          </p>
-                          <p className="font-body text-[13px] text-text-tertiary">
-                            {allRecentItems.length - visibleItemsCount} more items
-                          </p>
-                        </div>
-                      </button>
-                    )}
-                  </div>
-                </div>
+                  renderItem={(item) => (
+                    <ItemCard
+                      key={item.id}
+                      item={item}
+                      location={getItemLocation(item.id)}
+                      onClick={() => navigate(`/items/${item.id}`)}
+                      className="min-w-[280px] max-w-[400px] flex-shrink-0"
+                      autoWidth
+                    />
+                  )}
+                />
               </div>
             )
           }

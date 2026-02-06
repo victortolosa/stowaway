@@ -6,9 +6,9 @@ import { useAllItems } from '@/hooks/queries/useAllItems'
 import { useGroups } from '@/hooks/queries/useGroups'
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Search, QrCode, Plus, FolderPlus } from 'lucide-react'
-import { Card, EmptyState, LoadingState, Button, IconOrEmoji } from '@/components/ui'
-import { MultiStepCreateContainerModal, SelectContainersForGroupModal } from '@/components'
+import { QrCode, Plus } from 'lucide-react'
+import { Card, EmptyState, LoadingState, Button, IconOrEmoji, SearchBar } from '@/components/ui'
+import { MultiStepCreateContainerModal } from '@/components'
 import { Timestamp } from 'firebase/firestore'
 import { getContainerIcon } from '@/utils/colorUtils'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
@@ -34,7 +34,6 @@ export function ContainersList() {
   const isLoading = isContainersLoading
   const [searchQuery, setSearchQuery] = useState('')
   const [isMultiStepCreateOpen, setIsMultiStepCreateOpen] = useState(false)
-  const [isSelectContainersGroupOpen, setIsSelectContainersGroupOpen] = useState(false)
   const [sortBy, setSortBy] = useState<SortOption>('recently-modified')
   const navigate = useNavigate()
 
@@ -78,48 +77,34 @@ export function ContainersList() {
         <h1 className="font-display text-2xl font-bold text-text-primary tracking-tight">
           Containers
         </h1>
-        <div className="flex-1 max-w-md">
-          <div className="bg-white rounded-xl h-[52px] px-4 flex items-center gap-3 shadow-sm border border-black/5 focus-within:border-accent-aqua focus-within:shadow-md transition-all duration-200">
-            <Search size={22} className="text-accent-aqua" strokeWidth={2.5} />
-            <input
-              type="text"
-              placeholder="Search containers..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 font-body text-[16px] text-text-primary placeholder:text-text-tertiary outline-none bg-transparent"
-            />
-          </div>
-        </div>
       </div>
 
       {/* Action Buttons */}
-      {!searchQuery && (
-        <>
-          <div className="flex gap-3 mb-4">
-            <Button
-              variant="primary"
-              size="sm"
-              fullWidth
-              leftIcon={Plus}
-              onClick={() => setIsMultiStepCreateOpen(true)}
-            >
-              New Container
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              fullWidth
-              leftIcon={FolderPlus}
-              onClick={() => setIsSelectContainersGroupOpen(true)}
-            >
-              New Group
-            </Button>
-          </div>
-          <div className="flex justify-end mb-8">
+      <div className="flex flex-col gap-6 mb-8">
+        <SearchBar
+          placeholder="Search containers..."
+          value={searchQuery}
+          onChange={setSearchQuery}
+        />
+        <div className="flex justify-between items-center w-full">
+          {!searchQuery ? (
+            <div className="flex gap-3">
+              <Button
+                variant="primary"
+                size="sm"
+                fullWidth
+                leftIcon={Plus}
+                onClick={() => setIsMultiStepCreateOpen(true)}
+              >
+                New Container
+              </Button>
+            </div>
+          ) : <div />}
+          <div className="flex justify-end px-1">
             <SortDropdown value={sortBy} onChange={setSortBy} />
           </div>
-        </>
-      )}
+        </div>
+      </div>
 
       {/* Content Section */}
       <div className={!searchQuery ? '' : 'mt-8'}>
@@ -300,15 +285,7 @@ export function ContainersList() {
         }}
       />
 
-      <SelectContainersForGroupModal
-        isOpen={isSelectContainersGroupOpen}
-        onClose={() => setIsSelectContainersGroupOpen(false)}
-        onGroupCreated={() => {
-          setIsSelectContainersGroupOpen(false)
-          queryClient.invalidateQueries({ queryKey: ['groups'] })
-          queryClient.invalidateQueries({ queryKey: ['containers'] })
-        }}
-      />
+
     </div>
   )
 }

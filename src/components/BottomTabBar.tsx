@@ -21,7 +21,7 @@ export function BottomTabBar() {
         style={{ paddingBottom: 'max(1.5rem, var(--safe-area-inset-bottom, 0px))' }}
       >
         {/* Tab Bar: tighter height, glassy, blur, border, shadow-floating */}
-        <div className="bg-bg-surface/80 backdrop-blur-xl border border-border-light/40 rounded-full h-[54px] px-2.5 py-1.5 flex items-center justify-between shadow-floating ring-1 ring-black/5 dark:ring-white/5">
+        <div className="bg-bg-surface/80 backdrop-blur-xl border border-border-light/40 rounded-full h-[54px] py-1.5 flex items-center justify-between shadow-floating ring-1 ring-black/5 dark:ring-white/5">
           {tabs.map((tab) => {
             const Icon = tab.icon
             const active = isActive(tab.path)
@@ -32,7 +32,7 @@ export function BottomTabBar() {
                 className="flex-1 h-full flex items-center justify-center relative"
               >
                 <div
-                  className={`flex flex-col items-center justify-center gap-0.5 px-3 py-2 rounded-full transition-colors duration-300 ${active ? 'bg-accent-aqua/15 ring-1 ring-accent-aqua/30' : 'bg-transparent'
+                  className={`flex flex-col items-center justify-center gap-0.5 py-2 rounded-full transition-all duration-300 ${active ? 'px-7 bg-accent-aqua/15 ring-1 ring-accent-aqua/30' : 'px-3 bg-transparent'
                     }`}
                 >
                   <Icon
