@@ -115,7 +115,7 @@ export function Search() {
       <div className="max-w-mobile mx-auto pt-2">
         {/* Search Header */}
         <div className="flex items-center gap-3 mb-5">
-          <div className="flex-1 bg-white rounded-xl h-[52px] px-4 flex items-center gap-3 shadow-sm border border-black/5 focus-within:border-accent-aqua focus-within:shadow-md transition-all duration-200">
+          <div className="flex-1 bg-bg-surface rounded-xl h-[52px] px-4 flex items-center gap-3 shadow-sm border border-border-standard focus-within:border-accent-aqua focus-within:shadow-md transition-all duration-200">
             <SearchIcon size={22} className="text-accent-aqua" strokeWidth={2.5} />
             <input
               type="text"
@@ -157,7 +157,7 @@ export function Search() {
           >
             Places
           </FilterChip>
-          <div className="w-[1px] h-8 bg-zinc-200 mx-1 flex-shrink-0" />
+          <div className="w-[1px] h-8 bg-border-standard mx-1 flex-shrink-0" />
           <FilterChip
             active={hasPhoto}
             onClick={() => setHasPhoto(!hasPhoto)}
@@ -356,8 +356,8 @@ function FilterChip({
       className={cn(
         "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[13px] font-medium transition-colors border flex-shrink-0",
         active
-          ? "bg-text-primary text-white border-text-primary"
-          : "bg-white text-text-secondary border-black/10 hover:border-black/20"
+          ? "bg-text-primary text-bg-page border-text-primary"
+          : "bg-bg-surface text-text-secondary border-border-standard hover:border-text-tertiary"
       )}
     >
       {Icon && <Icon size={14} className={active ? "text-white" : "text-text-tertiary"} />}

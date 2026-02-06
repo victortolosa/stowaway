@@ -195,22 +195,7 @@ export function CreatePlaceModal({ isOpen, onClose, onPlaceCreated, editMode = f
                     />
                 </FormField>
 
-                <FormField
-                    label="Type"
-                    htmlFor="type"
-                    error={errors.type?.message}
-                >
-                    <Select
-                        id="type"
-                        error={!!errors.type}
-                        {...register('type')}
-                    >
-                        <option value="home">Home</option>
-                        <option value="office">Office</option>
-                        <option value="storage">Storage Unit</option>
-                        <option value="other">Other</option>
-                    </Select>
-                </FormField>
+                <input type="hidden" {...register('type')} />
 
                 <FormField
                     label="Place Group (Optional)"

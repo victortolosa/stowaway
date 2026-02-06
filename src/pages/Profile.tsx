@@ -7,6 +7,7 @@ import { useAllContainers } from '@/hooks/queries/useAllContainers'
 import { useAllItems } from '@/hooks/queries/useAllItems'
 import { User, LogOut, MapPin, Package, Box, WifiOff, Activity, ChevronRight } from 'lucide-react'
 import { Card } from '@/components/ui'
+import { ThemeToggle } from '@/components/ThemeToggle'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 
 export function Profile() {
@@ -48,6 +49,8 @@ export function Profile() {
             <p className="font-body text-sm text-text-secondary">{user?.email}</p>
           </div>
         </Card>
+
+        <ThemeToggle />
 
         {/* Storage Stats */}
         <Card padding="lg" className="mb-6">

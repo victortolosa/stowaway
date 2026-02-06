@@ -49,6 +49,39 @@
   --radius-full: 9999px;
 }
 
+:root.dark {
+  /* Colors */
+  --color-bg-page: #09090b;      /* Zinc 950 */
+  --color-bg-surface: #18181b;   /* Zinc 900 */
+  --color-bg-surface-alt: #27272a; /* Zinc 800 */
+  --color-bg-elevated: #27272a;  /* Zinc 800 */
+  --color-bg-subtle: #18181b;    /* Zinc 900 */
+
+  --color-text-primary: #fafafa;   /* Zinc 50 */
+  --color-text-secondary: #a1a1aa; /* Zinc 400 */
+  --color-text-tertiary: #52525b;  /* Zinc 600 */
+  --color-text-on-accent: #ffffff;
+
+  --color-border-light: #27272a;    /* Zinc 800 */
+  --color-border-standard: #3f3f46; /* Zinc 700 */
+  --color-border-active: #71717a;   /* Zinc 500 */
+
+  /* Accents - Adjusted for Dark Mode */
+  --color-accent-aqua: #38bdf8;       /* Sky 400 */
+  --color-accent-aqua-light: #0c4a6e; /* Sky 900 */
+  --color-accent-aqua-dark: #7dd3fc;  /* Sky 300 */
+  
+  --color-accent-danger-bg: #451a1a; /* Dark Red Background */
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.5);
+  --shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.5);
+  --shadow-card-hover: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.5);
+  --shadow-floating: 0 20px 25px -5px rgb(0 0 0 / 0.5), 0 8px 10px -6px rgb(0 0 0 / 0.5);
+  
+  color-scheme: dark;
+}
+
 /**
  * PWA Safe Area Insets
  * Required for proper display on devices with notches/rounded corners

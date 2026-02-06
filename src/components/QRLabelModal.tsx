@@ -107,14 +107,14 @@ export function QRLabelModal({
     <Modal isOpen={isOpen} onClose={onClose} title="QR Code Label">
       <div className="flex flex-col items-center gap-6 py-4">
         {/* QR Code Preview */}
-        <div className="bg-white p-4 rounded-xl shadow-sm border border-zinc-200">
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-zinc-200 dark:border-zinc-700">
           <QRCodeDisplay containerId={container.id} size={180} />
         </div>
 
         {/* Container Info */}
         <div className="text-center">
           <h3 className="font-semibold text-lg">{container.name}</h3>
-          <p className="text-sm text-zinc-500">{place.name}</p>
+          <p className="text-sm text-text-secondary">{place.name}</p>
         </div>
 
         {/* Download Options */}

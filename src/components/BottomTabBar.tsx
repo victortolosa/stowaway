@@ -21,7 +21,7 @@ export function BottomTabBar() {
         style={{ paddingBottom: 'max(1.5rem, var(--safe-area-inset-bottom, 0px))' }}
       >
         {/* Tab Bar: tighter height, glassy, blur, border, shadow-floating */}
-        <div className="bg-white/80 backdrop-blur-xl border border-white/40 rounded-full h-[54px] px-2.5 py-1.5 flex items-center justify-between shadow-floating ring-1 ring-black/5">
+        <div className="bg-bg-surface/80 backdrop-blur-xl border border-border-light/40 rounded-full h-[54px] px-2.5 py-1.5 flex items-center justify-between shadow-floating ring-1 ring-black/5 dark:ring-white/5">
           {tabs.map((tab) => {
             const Icon = tab.icon
             const active = isActive(tab.path)
@@ -40,7 +40,7 @@ export function BottomTabBar() {
                     className={active ? 'text-accent-aqua' : 'text-text-tertiary hover:text-text-secondary transition-colors'}
                     strokeWidth={active ? 2.5 : 2}
                   />
-                {/* Removed label for cleaner look, or verify if user wants it. Keeping it hidden if active for minimal style or showing dot. 
+                  {/* Removed label for cleaner look, or verify if user wants it. Keeping it hidden if active for minimal style or showing dot. 
                     Let's keep the label but make it very subtle or remove for "best-in-class" clean look if agreed, 
                     but strictly following "Reskin" usually implies keeping functionality. 
                     I'll keep the label but make it smaller.

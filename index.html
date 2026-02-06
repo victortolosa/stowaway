@@ -10,6 +10,23 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <title>Stowaway - Find Your Stuff</title>
+    <script>
+      (function() {
+        var storageKey = 'vite-ui-theme';
+        var defaultTheme = 'system';
+        var theme = localStorage.getItem(storageKey) || defaultTheme;
+        var root = window.document.documentElement;
+        
+        root.classList.remove('light', 'dark');
+        
+        if (theme === 'system') {
+          var systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+          root.classList.add(systemTheme);
+        } else {
+          root.classList.add(theme);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

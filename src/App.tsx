@@ -7,6 +7,7 @@ import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/auth'
 import { upsertUserProfile } from '@/services/firebaseService'
 import { ProtectedRoute, Layout, RootErrorBoundary } from '@/components'
+import { ThemeProvider } from '@/contexts/ThemeContext'
 import './styles/globals.css'
 
 // Lazy load pages for better code splitting
@@ -54,42 +55,44 @@ function App() {
   return (
     <RootErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <Router>
-          <Suspense fallback={
-            <div className="min-h-screen flex items-center justify-center bg-bg-page">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-aqua"></div>
-            </div>
-          }>
-            <div className="fixed inset-0 min-h-screen w-full bg-bg-page -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-100/20 via-bg-page to-bg-page pointer-events-none" />
-            <Routes>
-              {/* Public routes */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<SignUp />} />
+        <ThemeProvider>
+          <Router>
+            <Suspense fallback={
+              <div className="min-h-screen flex items-center justify-center bg-bg-page">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-accent-aqua"></div>
+              </div>
+            }>
+              <div className="fixed inset-0 min-h-screen w-full bg-bg-page -z-10 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-indigo-100/20 dark:from-indigo-900/10 via-bg-page to-bg-page pointer-events-none" />
+              <Routes>
+                {/* Public routes */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/signup" element={<SignUp />} />
 
-              {/* Protected routes wrapped in Layout */}
-              <Route element={
-                <ProtectedRoute>
-                  <Layout />
-                </ProtectedRoute>
-              }>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/places" element={<Places />} />
-                <Route path="/items" element={<ItemsList />} />
-                <Route path="/containers" element={<ContainersList />} />
-                <Route path="/places/:id" element={<PlaceDetail />} />
-                <Route path="/containers/:id" element={<Container />} />
-                <Route path="/items/:id" element={<Item />} />
-                <Route path="/search" element={<Search />} />
-                <Route path="/scan" element={<Scan />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/tools" element={<Tools />} />
-                <Route path="/groups/:id" element={<GroupDetail />} />
-                <Route path="/activity" element={<Activity />} />
-              </Route>
-            </Routes>
-          </Suspense>
-        </Router>
+                {/* Protected routes wrapped in Layout */}
+                <Route element={
+                  <ProtectedRoute>
+                    <Layout />
+                  </ProtectedRoute>
+                }>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/dashboard" element={<Dashboard />} />
+                  <Route path="/places" element={<Places />} />
+                  <Route path="/items" element={<ItemsList />} />
+                  <Route path="/containers" element={<ContainersList />} />
+                  <Route path="/places/:id" element={<PlaceDetail />} />
+                  <Route path="/containers/:id" element={<Container />} />
+                  <Route path="/items/:id" element={<Item />} />
+                  <Route path="/search" element={<Search />} />
+                  <Route path="/scan" element={<Scan />} />
+                  <Route path="/profile" element={<Profile />} />
+                  <Route path="/tools" element={<Tools />} />
+                  <Route path="/groups/:id" element={<GroupDetail />} />
+                  <Route path="/activity" element={<Activity />} />
+                </Route>
+              </Routes>
+            </Suspense>
+          </Router>
+        </ThemeProvider>
       </QueryClientProvider>
     </RootErrorBoundary>
   )

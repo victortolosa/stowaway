@@ -40,7 +40,7 @@ export function PlaceSelector({
   const filteredPlaces = visiblePlaces.filter((place) => {
     if (!searchQuery) return true
     const query = searchQuery.toLowerCase()
-    return place.name.toLowerCase().includes(query) || place.type.toLowerCase().includes(query)
+    return place.name.toLowerCase().includes(query)
   })
 
   const handlePlaceCreated = async (placeId?: string) => {
@@ -116,7 +116,7 @@ export function PlaceSelector({
                         )}
                       </div>
                       <p className="font-body text-[13px] text-text-secondary capitalize">
-                        {place.type} · {containerCount} {containerCount === 1 ? 'container' : 'containers'}
+                        {containerCount} {containerCount === 1 ? 'container' : 'containers'}
                       </p>
                     </div>
                   </Card>

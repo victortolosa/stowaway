@@ -154,7 +154,7 @@ export function Places() {
       const placeContainers = containers.filter((c) => c.placeId === place.id)
       return (
         place.name.toLowerCase().includes(query) ||
-        place.type.toLowerCase().includes(query) ||
+
         placeContainers.some(c => c.name.toLowerCase().includes(query))
       )
     }),
@@ -174,7 +174,7 @@ export function Places() {
           Places
         </h1>
         <div className="flex-1 max-w-md">
-          <div className="bg-white rounded-xl h-[52px] px-4 flex items-center gap-3 shadow-sm border border-black/5 focus-within:border-accent-aqua focus-within:shadow-md transition-all duration-200">
+          <div className="bg-bg-surface rounded-xl h-[52px] px-4 flex items-center gap-3 shadow-sm border border-border-standard focus-within:border-accent-aqua focus-within:shadow-md transition-all duration-200">
             <Search size={22} className="text-accent-aqua" strokeWidth={2.5} />
             <input
               type="text"
@@ -278,7 +278,7 @@ export function Places() {
                                   leftContent={
                                     <IconOrEmoji iconValue={place.icon} defaultIcon={getPlaceIcon()} color={placeColor} />
                                   }
-                              rightContent={shared ? (
+                                  rightContent={shared ? (
                                     <span
                                       className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-accent-blue/20 text-accent-blue flex-shrink-0"
                                       aria-label="Shared"

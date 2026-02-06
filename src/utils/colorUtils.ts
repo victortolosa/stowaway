@@ -1,4 +1,4 @@
-import { Home, Box, Package } from 'lucide-react'
+import { MapPin, Box, Package } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 // Color palettes for different object types
@@ -32,7 +32,7 @@ export function getRandomColor(type: 'place' | 'container' | 'item'): string {
  * Get the default icon for places
  */
 export function getPlaceIcon(): LucideIcon {
-    return Home
+    return MapPin
 }
 
 /**
