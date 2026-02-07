@@ -22,6 +22,7 @@ export function ParallaxRowList<T extends { id: string }>({
 }: ParallaxRowListProps<T>) {
     const containerRef = useRef<HTMLDivElement>(null)
     const { scrollX } = useScroll({ container: containerRef })
+    const showSeeAllButton = items.length > 0 && !!onSeeAll
 
     // Create rows
     const rows = useMemo(() => {
@@ -76,8 +77,8 @@ export function ParallaxRowList<T extends { id: string }>({
                 paddingRight: 'max(1.5rem, var(--safe-area-inset-right, 0px))'
             }}
         >
-            <div className="flex items-center gap-4 min-w-max">
-                <div className="flex flex-col gap-3">
+            <div className="relative isolate flex items-center gap-4 min-w-max">
+                <div className={`relative z-0 flex flex-col gap-3 ${showSeeAllButton ? 'pr-28' : ''}`}>
                     {rows.map((rowItems, rowIndex) => (
                         <motion.div
                             key={rowIndex}
@@ -94,10 +95,10 @@ export function ParallaxRowList<T extends { id: string }>({
                 </div>
 
                 {/* See All Button - Centered vertically relative to the group */}
-                {items.length > 0 && onSeeAll && (
+                {showSeeAllButton && (
                     <button
                         onClick={onSeeAll}
-                        className="h-[44px] px-6 mr-6 rounded-full bg-bg-surface border border-border-standard hover:border-accent-aqua hover:bg-accent-aqua/5 transition-all flex items-center justify-center group whitespace-nowrap"
+                        className="relative z-20 h-[44px] px-6 mr-6 rounded-full bg-bg-surface border border-border-standard hover:border-accent-aqua hover:bg-accent-aqua/5 transition-all flex items-center justify-center flex-shrink-0 group whitespace-nowrap"
                     >
                         <span className="font-display text-[14px] font-bold text-text-secondary group-hover:text-accent-aqua tracking-wide">
                             {seeAllLabel}
