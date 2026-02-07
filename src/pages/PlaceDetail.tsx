@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
 import { CreateContainerModal, CreatePlaceModal, ConfirmDeleteModal, CreateGroupModal, SharePlaceModal } from '@/components'
@@ -13,7 +13,7 @@ import { PLACE_KEYS } from '@/hooks/queries/usePlaces'
 import { CONTAINER_KEYS } from '@/hooks/queries/useContainers'
 import { ITEM_KEYS } from '@/hooks/queries/useItems'
 import { GROUP_KEYS } from '@/hooks/queries/useGroups'
-import { MoreVertical, Plus, Search, FolderPlus } from 'lucide-react'
+import { Activity, MoreVertical, Plus, Search, FolderPlus } from 'lucide-react'
 import { Button, EmptyState, LoadingState, NavigationHeader, Modal, GalleryEditor, ImageGrid } from '@/components/ui'
 import { PlaceHero } from '@/components/features/place/PlaceHero'
 import { ContainerList } from '@/components/features/place/ContainerList'
@@ -23,6 +23,7 @@ import { useSearchFilter } from '@/hooks/useSearchFilter'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 import { getPlaceAggregatedActivity } from '@/services/firebaseService'
 import { isPlaceShared } from '@/utils/placeUtils'
+import { useOnClickOutside } from '@/hooks/useOnClickOutside'
 
 
 export function PlaceDetail() {
@@ -69,6 +70,9 @@ export function PlaceDetail() {
     const [isCreateSiblingPlaceOpen, setIsCreateSiblingPlaceOpen] = useState(false)
     const [showActivityModal, setShowActivityModal] = useState(false)
     const [isShareOpen, setIsShareOpen] = useState(false)
+    const menuRef = useRef<HTMLDivElement>(null)
+
+    useOnClickOutside(menuRef, useCallback(() => setShowMenu(false), []))
 
     const { data: activityData = [], isLoading: isActivityLoading, error: activityError } = useQuery({
         queryKey: ['activity', 'place-aggregated', id],
@@ -171,7 +175,15 @@ export function PlaceDetail() {
             {/* Header */}
             <NavigationHeader
                 actions={
-                    <div className="relative">
+                    <div className="flex items-center gap-1">
+                        <Button
+                            variant="icon"
+                            size="icon"
+                            className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
+                            onClick={() => setShowActivityModal(true)}
+                        >
+                            <Activity size={20} className="text-text-primary" strokeWidth={2} />
+                        </Button>
                         <Button
                             variant="icon"
                             size="icon"
@@ -180,58 +192,51 @@ export function PlaceDetail() {
                         >
                             <Plus size={20} className="text-text-primary" strokeWidth={2} />
                         </Button>
-                        <Button
-                            variant="icon"
-                            size="icon"
-                            className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
-                            onClick={() => setShowMenu(!showMenu)}
-                        >
-                            <MoreVertical size={20} className="text-text-primary" strokeWidth={2} />
-                        </Button>
-                        {showMenu && (
-                            <div className="absolute right-0 mt-2 w-48 bg-bg-page rounded-card shadow-card py-2 z-10 border border-border-standard">
-                                <button
-                                    onClick={() => {
-                                        setIsShareOpen(true)
-                                        setShowMenu(false)
-                                    }}
-                                    className="w-full px-4 py-2 text-left font-body text-sm text-text-primary hover:bg-bg-surface"
-                                >
-                                    Share Place
-                                </button>
-                                {canEdit && (
+                        <div className="relative" ref={menuRef}>
+                            <Button
+                                variant="icon"
+                                size="icon"
+                                className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
+                                onClick={() => setShowMenu((prev) => !prev)}
+                            >
+                                <MoreVertical size={20} className="text-text-primary" strokeWidth={2} />
+                            </Button>
+                            {showMenu && (
+                                <div className="absolute right-0 mt-2 w-48 bg-bg-page rounded-card shadow-card py-2 z-10 border border-border-standard">
                                     <button
                                         onClick={() => {
-                                            setIsEditingPlace(true)
+                                            setIsShareOpen(true)
                                             setShowMenu(false)
                                         }}
                                         className="w-full px-4 py-2 text-left font-body text-sm text-text-primary hover:bg-bg-surface"
                                     >
-                                        Edit Place
+                                        Share Place
                                     </button>
-                                )}
-                                <button
-                                    onClick={() => {
-                                        setShowActivityModal(true)
-                                        setShowMenu(false)
-                                    }}
-                                    className="w-full px-4 py-2 text-left font-body text-sm text-text-primary hover:bg-bg-surface"
-                                >
-                                    View Activity
-                                </button>
-                                {isOwner && (
-                                    <button
-                                        onClick={() => {
-                                            setIsDeletePlaceConfirmOpen(true)
-                                            setShowMenu(false)
-                                        }}
-                                        className="w-full px-4 py-2 text-left font-body text-sm text-accent-danger hover:bg-bg-surface"
-                                    >
-                                        Delete Place
-                                    </button>
-                                )}
-                            </div>
-                        )}
+                                    {canEdit && (
+                                        <button
+                                            onClick={() => {
+                                                setIsEditingPlace(true)
+                                                setShowMenu(false)
+                                            }}
+                                            className="w-full px-4 py-2 text-left font-body text-sm text-text-primary hover:bg-bg-surface"
+                                        >
+                                            Edit Place
+                                        </button>
+                                    )}
+                                    {isOwner && (
+                                        <button
+                                            onClick={() => {
+                                                setIsDeletePlaceConfirmOpen(true)
+                                                setShowMenu(false)
+                                            }}
+                                            className="w-full px-4 py-2 text-left font-body text-sm text-accent-danger hover:bg-bg-surface"
+                                        >
+                                            Delete Place
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                     </div>
                 }
             />

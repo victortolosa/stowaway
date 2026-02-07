@@ -45,7 +45,7 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps & { className
     return (
         <div className={cn("relative mb-2 w-screen left-1/2 -translate-x-1/2 z-20 bg-bg-surface/60 border-b border-border-light/50 backdrop-blur-md -mt-2")}>
             {/* Left Gradient Fade - Absolute to breakout container edges */}
-            <div className="absolute left-0 top-0 bottom-0 w-[max(1.5rem,var(--safe-area-inset-left,0px))] pointer-events-none bg-gradient-to-r from-bg-page via-bg-page/80 to-transparent z-30" />
+            <div className="absolute left-0 top-0 bottom-0 w-[max(1.5rem,var(--safe-area-inset-left,0px))] pointer-events-none bg-gradient-to-r from-bg-surface/60 via-bg-surface/40 to-transparent z-30" />
 
             <nav
                 ref={scrollContainerRef}
@@ -128,7 +128,7 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps & { className
             </nav>
 
             {/* Right Gradient Fade - Absolute to breakout container edges */}
-            <div className="absolute right-0 top-0 bottom-0 w-[max(1.5rem,var(--safe-area-inset-right,0px))] pointer-events-none bg-gradient-to-l from-bg-page via-bg-page/80 to-transparent z-30" />
+            <div className="absolute right-0 top-0 bottom-0 w-[max(1.5rem,var(--safe-area-inset-right,0px))] pointer-events-none bg-gradient-to-l from-bg-surface/60 via-bg-surface/40 to-transparent z-30" />
         </div>
     )
 }

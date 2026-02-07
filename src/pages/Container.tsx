@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
 import { useContainer } from '@/hooks/queries/useContainers'
@@ -14,7 +14,7 @@ import { QRLabelModal } from '@/components/QRLabelModal'
 import { QRManageModal } from '@/components/QRManageModal'
 import { updateContainer, deleteContainer, deleteItem, deleteGroup } from '@/services/firebaseService'
 import { Item, Group } from '@/types'
-import { Pencil, Trash2, Plus, QrCode, Search, FolderPlus, Activity } from 'lucide-react'
+import { Pencil, Plus, QrCode, Search, FolderPlus, Activity, MoreVertical } from 'lucide-react'
 import { IconOrEmoji, EmptyState, LoadingState, Button, NavigationHeader, ImageCarousel, Modal, GalleryEditor, ImageGrid } from '@/components/ui'
 import { ItemCard } from '@/components/ItemCard'
 import { ActivityFeed } from '@/components/ActivityFeed'
@@ -22,6 +22,7 @@ import { useSearchFilter } from '@/hooks/useSearchFilter'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 import { getContainerIcon, DEFAULT_CONTAINER_COLOR } from '@/utils/colorUtils'
 import { getContainerAggregatedActivity } from '@/services/firebaseService'
+import { useOnClickOutside } from '@/hooks/useOnClickOutside'
 
 export function Container() {
   const { id } = useParams<{ id: string }>()
@@ -69,6 +70,10 @@ export function Container() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isCreateSiblingContainerOpen, setIsCreateSiblingContainerOpen] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useOnClickOutside(menuRef, useCallback(() => setShowMenu(false), []))
 
   const { data: activityData = [], isLoading: isActivityLoading, error: activityError } = useQuery({
     queryKey: ['activity', 'container-aggregated', id],
@@ -185,22 +190,38 @@ export function Container() {
                 >
                   <Plus size={18} className="text-text-primary" strokeWidth={2} />
                 </Button>
-                <Button
-                  variant="icon"
-                  size="icon"
-                  className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
-                  onClick={() => setIsEditingContainer(true)}
-                >
-                  <Pencil size={18} className="text-text-primary" strokeWidth={2} />
-                </Button>
-                <Button
-                  variant="icon"
-                  size="icon"
-                  className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
-                  onClick={() => setIsDeleteContainerConfirmOpen(true)}
-                >
-                  <Trash2 size={18} className="text-text-primary" strokeWidth={2} />
-                </Button>
+                <div className="relative" ref={menuRef}>
+                  <Button
+                    variant="icon"
+                    size="icon"
+                    className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
+                    onClick={() => setShowMenu((prev) => !prev)}
+                  >
+                    <MoreVertical size={18} className="text-text-primary" strokeWidth={2} />
+                  </Button>
+                  {showMenu && (
+                    <div className="absolute right-0 mt-2 w-44 bg-bg-page rounded-card shadow-card py-2 z-10 border border-border-standard">
+                      <button
+                        onClick={() => {
+                          setIsEditingContainer(true)
+                          setShowMenu(false)
+                        }}
+                        className="w-full px-4 py-2 text-left font-body text-sm text-text-primary hover:bg-bg-surface"
+                      >
+                        Edit Container
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsDeleteContainerConfirmOpen(true)
+                          setShowMenu(false)
+                        }}
+                        className="w-full px-4 py-2 text-left font-body text-sm text-accent-danger hover:bg-bg-surface"
+                      >
+                        Delete Container
+                      </button>
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </div>

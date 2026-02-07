@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
 import { CreateItemModal, ConfirmDeleteModal, AudioPlayer } from '@/components'
@@ -11,13 +11,14 @@ import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { ITEM_KEYS } from '@/hooks/queries/useItems'
 import { CONTAINER_KEYS } from '@/hooks/queries/useContainers'
 import { deleteItem, updateItem, createContainer, createGroup } from '@/services/firebaseService'
-import { Trash2, Pencil, Plus, Activity } from 'lucide-react'
+import { Plus, Activity, MoreVertical } from 'lucide-react'
 import { Button, Badge, LoadingState, NavigationHeader, ImageCarousel, Modal, GalleryEditor, ImageGrid, EmojiPicker, Select, FormField, Input, IconOrEmoji } from '@/components/ui'
 import { ActivityFeed } from '@/components/ActivityFeed'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 import { getEntityActivity } from '@/services/firebaseService'
 import { getItemIcon, DEFAULT_ITEM_COLOR, DEFAULT_CONTAINER_COLOR } from '@/utils/colorUtils'
 import { canEditPlace } from '@/utils/placeUtils'
+import { useOnClickOutside } from '@/hooks/useOnClickOutside'
 
 export function Item() {
   const { id } = useParams<{ id: string }>()
@@ -68,6 +69,10 @@ export function Item() {
   const [newContainerPlaceId, setNewContainerPlaceId] = useState('')
   const [isUpdatingIcon, setIsUpdatingIcon] = useState(false)
   const [showActivityModal, setShowActivityModal] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useOnClickOutside(menuRef, useCallback(() => setShowMenu(false), []))
 
   const { data: activityData = [], isLoading: isActivityLoading, error: activityError } = useQuery({
     queryKey: ['activity', 'entity', 'item', id],
@@ -137,22 +142,38 @@ export function Item() {
                 >
                   <Plus size={18} className="text-text-primary" strokeWidth={2} />
                 </Button>
-                <Button
-                  variant="icon"
-                  size="icon"
-                  className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
-                  onClick={() => setIsEditing(true)}
-                >
-                  <Pencil size={18} className="text-text-primary" strokeWidth={2} />
-                </Button>
-                <Button
-                  variant="icon"
-                  size="icon"
-                  className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full text-accent-danger hover:bg-accent-danger/10"
-                  onClick={() => setIsDeleteConfirmOpen(true)}
-                >
-                  <Trash2 size={18} strokeWidth={2} />
-                </Button>
+                <div className="relative" ref={menuRef}>
+                  <Button
+                    variant="icon"
+                    size="icon"
+                    className="w-10 h-10 bg-transparent hover:bg-bg-surface rounded-full"
+                    onClick={() => setShowMenu((prev) => !prev)}
+                  >
+                    <MoreVertical size={18} className="text-text-primary" strokeWidth={2} />
+                  </Button>
+                  {showMenu && (
+                    <div className="absolute right-0 mt-2 w-40 bg-bg-page rounded-card shadow-card py-2 z-10 border border-border-standard">
+                      <button
+                        onClick={() => {
+                          setIsEditing(true)
+                          setShowMenu(false)
+                        }}
+                        className="w-full px-4 py-2 text-left font-body text-sm text-text-primary hover:bg-bg-surface"
+                      >
+                        Edit Item
+                      </button>
+                      <button
+                        onClick={() => {
+                          setIsDeleteConfirmOpen(true)
+                          setShowMenu(false)
+                        }}
+                        className="w-full px-4 py-2 text-left font-body text-sm text-accent-danger hover:bg-bg-surface"
+                      >
+                        Delete Item
+                      </button>
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </div>
