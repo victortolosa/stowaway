@@ -30,13 +30,19 @@ export default defineConfig({
     }),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      includeAssets: [
+        'favicon.ico',
+        'favicon.svg',
+        'favicon-32x32.png',
+        'apple-touch-icon.png',
+        'masked-icon.svg'
+      ],
       manifest: {
         name: 'Stowaway',
         short_name: 'Stowaway',
         description: 'Personal Storage & Inventory Tracking Application',
-        theme_color: '#ffffff',
-        background_color: '#ffffff',
+        theme_color: '#12314a',
+        background_color: '#f8fafc',
         display: 'standalone',
         scope: '/',
         start_url: '/',
@@ -45,13 +51,13 @@ export default defineConfig({
             src: '/pwa-192x192.png',
             sizes: '192x192',
             type: 'image/png',
-            purpose: 'any'
+            purpose: 'any maskable'
           },
           {
             src: '/pwa-512x512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any'
+            purpose: 'any maskable'
           }
         ]
       },

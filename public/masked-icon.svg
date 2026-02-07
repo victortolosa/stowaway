@@ -1,7 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="15%" fill="#001a33"/>
-  <path d="M156 186l100-50 100 50v140l-100 50-100-50z" fill="#ffffff"/>
-  <path d="M256 136l-100 50 100 50 100-50z" fill="#e1f5fe"/>
-  <text x="256" y="320" font-family="Arial" font-size="80" text-anchor="middle" fill="#00c853" font-weight="bold">S</text>
-  <path d="M256 160l20-10-20-30-20 30z" fill="#00c853"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" aria-hidden="true">
+  <path d="M350 146H224C180.922 146 146 180.922 146 224C146 267.078 180.922 302 224 302H288C331.078 302 366 336.922 366 380C366 423.078 331.078 458 288 458H162" fill="none" stroke="#000000" stroke-width="60" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M222 302H294" fill="none" stroke="#000000" stroke-width="60" stroke-linecap="round" />
+  <circle cx="356" cy="150" r="22" fill="#000000" />
 </svg>
