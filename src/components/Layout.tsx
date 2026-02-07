@@ -7,6 +7,7 @@ import { SyncStatus } from './SyncStatus'
 import { Toast } from './ui/Toast'
 import { BreadcrumbProvider, useBreadcrumbs } from '@/contexts/BreadcrumbContext'
 import { Breadcrumbs } from './Breadcrumbs'
+import { OnboardingModal } from './onboarding/OnboardingModal'
 
 function GlobalBreadcrumbs() {
     const { items } = useBreadcrumbs()
@@ -51,6 +52,7 @@ export function Layout() {
                     <ReloadPrompt />
                     <OfflineIndicator />
                     <SyncStatus />
+                    <OnboardingModal />
                     <Toast />
                 </div>
             </div>

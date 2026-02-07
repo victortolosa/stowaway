@@ -151,16 +151,17 @@ export function EmojiPicker({ onEmojiSelect, selectedEmoji, onClose }: EmojiPick
     }, [searchQuery, activeCategory])
 
     return (
-        <div className="bg-white rounded-xl border border-border-light shadow-lg overflow-hidden w-full max-w-sm">
+        <div className="bg-bg-elevated text-text-primary rounded-xl border border-border-standard shadow-floating overflow-hidden w-full max-w-sm">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-3 border-b border-border-light">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border-standard">
                 <h3 className="font-display text-[16px] font-semibold text-text-primary">
                     Choose Icon
                 </h3>
                 {onClose && (
                     <button
                         onClick={onClose}
-                        className="p-1 hover:bg-bg-surface rounded-lg transition-colors"
+                        className="p-1 hover:bg-bg-subtle rounded-lg transition-colors"
+                        aria-label="Close emoji picker"
                     >
                         <X size={18} className="text-text-tertiary" />
                     </button>
@@ -168,7 +169,7 @@ export function EmojiPicker({ onEmojiSelect, selectedEmoji, onClose }: EmojiPick
             </div>
 
             {/* Search Input */}
-            <div className="px-3 py-2 border-b border-border-light">
+            <div className="px-3 py-2 border-b border-border-standard">
                 <div className="relative">
                     <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
                     <input
@@ -176,20 +177,20 @@ export function EmojiPicker({ onEmojiSelect, selectedEmoji, onClose }: EmojiPick
                         placeholder="Search emojis..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-3 py-2 text-[14px] bg-bg-surface rounded-lg border border-border-light focus:outline-none focus:ring-2 focus:ring-accent-aqua/50 focus:border-accent-aqua"
+                        className="w-full pl-9 pr-3 py-2 text-[14px] text-text-primary placeholder:text-text-tertiary bg-bg-surface rounded-lg border border-border-standard focus:outline-none focus:ring-2 focus:ring-accent-aqua/50 focus:border-accent-aqua"
                     />
                 </div>
             </div>
 
             {/* Category Tabs (hidden when searching) */}
             {!searchQuery && (
-                <div className="flex gap-1 px-2 py-2 border-b border-border-light overflow-x-auto no-scrollbar">
+                <div className="flex gap-1 px-2 py-2 border-b border-border-standard overflow-x-auto no-scrollbar">
                     {categories.map((category) => (
                         <button
                             key={category}
                             onClick={() => setActiveCategory(category)}
                             className={`px-3 py-1.5 rounded-lg text-[13px] font-medium whitespace-nowrap transition-colors ${activeCategory === category
-                                ? 'bg-text-primary text-white'
+                                ? 'bg-text-primary text-bg-page'
                                 : 'text-text-secondary hover:bg-bg-surface'
                                 }`}
                         >
@@ -210,10 +211,11 @@ export function EmojiPicker({ onEmojiSelect, selectedEmoji, onClose }: EmojiPick
                                     e.stopPropagation()
                                     onEmojiSelect(emoji)
                                 }}
-                                className={`w-10 h-10 flex items-center justify-center text-2xl rounded-lg transition-all hover:bg-bg-surface ${selectedEmoji === emoji
+                                className={`w-10 h-10 flex items-center justify-center text-2xl rounded-lg transition-all hover:bg-bg-surface focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-aqua/60 ${selectedEmoji === emoji
                                     ? 'bg-accent-aqua/10 ring-2 ring-accent-aqua'
                                     : ''
                                     }`}
+                                aria-label={`Select ${emoji}`}
                             >
                                 {emoji}
                             </button>
@@ -228,7 +230,7 @@ export function EmojiPicker({ onEmojiSelect, selectedEmoji, onClose }: EmojiPick
 
             {/* Footer with Clear button */}
             {selectedEmoji && (
-                <div className="px-4 py-3 border-t border-border-light flex justify-between items-center">
+                <div className="px-4 py-3 border-t border-border-standard flex justify-between items-center">
                     <div className="flex items-center gap-2">
                         <span className="text-2xl">{selectedEmoji}</span>
                         <span className="text-[13px] text-text-secondary">Selected</span>

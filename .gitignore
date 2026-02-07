@@ -16,7 +16,7 @@ coverage/
 .firebase/
 firebase-debug.log
 serviceAccountKey.json
-stowaway-eb942-firebase-adminsdk-fbsvc-f2d30f3054.json
+*-firebase-adminsdk-*.json
 
 # Local SSL certificates
 *.pem

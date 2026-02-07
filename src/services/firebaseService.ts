@@ -24,6 +24,16 @@ import { Place, PlaceRole, Container, Item, Group, Activity, ActivityAction, Act
 import { offlineStorage } from '@/lib/offlineStorage'
 import { sanitizeUndefined, getChangedFields } from '@/utils/data'
 import { PlaceSchema, ContainerSchema, ItemSchema, GroupSchema, ActivitySchema, UserProfileSchema } from '@/schemas/firestore'
+import {
+  generatePlaceKey,
+  storePlaceKey,
+  getPlaceKey,
+  encrypt,
+  encryptFields,
+  decryptFields,
+  encryptMetadata,
+  decryptMetadata,
+} from '@/lib/encryption'
 
 const getCurrentUserId = (): string => {
   const uid = auth.currentUser?.uid;
@@ -122,7 +132,12 @@ export async function getPlace(id: string): Promise<Place | undefined> {
   const docSnap = await getDoc(docRef)
   if (docSnap.exists()) {
     const raw = { id: docSnap.id, ...docSnap.data() }
-    return PlaceSchema.parse(raw)
+    const place = PlaceSchema.parse(raw)
+    const key = await getPlaceKey(id)
+    if (key) {
+      return decryptFields(place, ['name'], key)
+    }
+    return place
   }
   return undefined
 }
@@ -132,10 +147,15 @@ export async function createPlace(place: Omit<Place, 'id' | 'userId' | 'createdA
     const userId = getCurrentUserId();
     if (!userId) throw new Error("User must be logged in to create a place");
 
+    // Generate encryption key for this place
+    const dekBase64 = await generatePlaceKey()
+
     const sanitizedPlace = sanitizeUndefined(place)
     const ownerId = userId
     const memberIds = [ownerId]
     const memberRoles = { [ownerId]: 'owner' as PlaceRole }
+
+    // Create the place doc first to get the ID
     const docRef = await addDoc(collection(db, 'places'), {
       ...sanitizedPlace,
       userId,
@@ -145,6 +165,16 @@ export async function createPlace(place: Omit<Place, 'id' | 'userId' | 'createdA
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     })
+
+    // Store the DEK in the keys subcollection
+    await storePlaceKey(docRef.id, dekBase64)
+
+    // Now encrypt the name field and update the doc
+    const key = await getPlaceKey(docRef.id)
+    if (key) {
+      const encryptedName = await encrypt(place.name, key)
+      await updateDoc(doc(db, 'places', docRef.id), { name: encryptedName })
+    }
 
     // Link pending uploads to this new document
     await linkPendingUploads(docRef.id, 'places', {
@@ -165,7 +195,6 @@ export async function createPlace(place: Omit<Place, 'id' | 'userId' | 'createdA
 
 export async function getUserPlaces(userId: string): Promise<Place[]> {
   try {
-    const results: Place[] = []
     const placeMap = new Map<string, Place>()
 
     const memberQuery = query(collection(db, 'places'), where('memberIds', 'array-contains', userId))
@@ -184,8 +213,18 @@ export async function getUserPlaces(userId: string): Promise<Place[]> {
       placeMap.set(place.id, place)
     })
 
-    placeMap.forEach((place) => results.push(place))
-    return results
+    // Decrypt all places
+    const places = Array.from(placeMap.values())
+    const decrypted = await Promise.all(
+      places.map(async (place) => {
+        const key = await getPlaceKey(place.id)
+        if (key) {
+          return decryptFields(place, ['name'], key)
+        }
+        return place
+      })
+    )
+    return decrypted
   } catch (error) {
     console.error('Error fetching places:', error)
     throw error
@@ -200,17 +239,25 @@ export async function updatePlace(placeId: string, updates: Partial<Place>) {
   try {
     const placeRef = doc(db, 'places', placeId)
 
-    // Get old data for activity log
+    // Get old data for activity log (already decrypted by getPlace)
     const oldPlace = await getPlace(placeId);
     if (!oldPlace) throw new Error("Place not found");
 
     const sanitizedUpdates = sanitizeUndefined(updates)
+
+    // Encrypt fields before write
+    const key = await getPlaceKey(placeId)
+    const updatesToWrite = { ...sanitizedUpdates }
+    if (key && updates.name) {
+      updatesToWrite.name = await encrypt(updates.name, key)
+    }
+
     await updateDoc(placeRef, {
-      ...sanitizedUpdates,
+      ...updatesToWrite,
       updatedAt: Timestamp.now(),
     })
 
-    // Log activity
+    // Log activity (uses plaintext names — encryption happens inside logActivity)
     const changedFields = getChangedFields(updates, oldPlace);
     const currentName = updates.name || oldPlace.name;
 
@@ -303,7 +350,12 @@ export async function getContainer(id: string): Promise<Container | undefined> {
   const docSnap = await getDoc(docRef)
   if (docSnap.exists()) {
     const raw = { id: docSnap.id, ...docSnap.data() }
-    return ContainerSchema.parse(raw)
+    const container = ContainerSchema.parse(raw)
+    const key = await getPlaceKey(container.placeId)
+    if (key) {
+      return decryptFields(container, ['name'], key)
+    }
+    return container
   }
   return undefined
 }
@@ -318,16 +370,23 @@ export async function createContainer(container: Omit<Container, 'id' | 'userId'
 
     const sanitizedContainer = sanitizeUndefined(container)
 
+    // Encrypt name before write
+    const key = await getPlaceKey(container.placeId)
+    let nameToStore = container.name
+    if (key) {
+      nameToStore = await encrypt(container.name, key)
+    }
+
     // Build the container data object
     const containerData: Record<string, unknown> = {
       ...sanitizedContainer,
-      userId, // Ensure userId is attached
+      name: nameToStore,
+      userId,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     }
 
     // Backward compatibility: ensure photoUrl is set if photos are present
-    // Only add photoUrl if it has a value (Firestore doesn't allow undefined)
     const photoUrl = container.photoUrl || (container.photos && container.photos.length > 0 ? container.photos[0] : null)
     if (photoUrl) {
       containerData.photoUrl = photoUrl
@@ -374,10 +433,17 @@ export async function getPlaceContainers(placeId: string): Promise<Container[]> 
       where('placeId', '==', placeId)
     )
     const snapshot = await getDocs(q)
-    return snapshot.docs.map((doc) => {
+    const containers = snapshot.docs.map((doc) => {
       const raw = { id: doc.id, ...doc.data() }
       return ContainerSchema.parse(raw)
     })
+    const key = await getPlaceKey(placeId)
+    if (key) {
+      return Promise.all(
+        containers.map((c) => decryptFields(c, ['name'], key))
+      )
+    }
+    return containers
   } catch (error) {
     console.error('Error fetching containers:', error)
     throw error
@@ -408,14 +474,24 @@ export async function getAccessibleContainers(placeIds: string[]): Promise<Conta
       })
     })
   )
-  return results.flat()
+  const containers = results.flat()
+  // Decrypt all containers
+  return Promise.all(
+    containers.map(async (c) => {
+      const key = await getPlaceKey(c.placeId)
+      if (key) {
+        return decryptFields(c, ['name'], key)
+      }
+      return c
+    })
+  )
 }
 
 export async function updateContainer(containerId: string, updates: Partial<Container>) {
   try {
     const containerRef = doc(db, 'containers', containerId)
 
-    // Get old data for activity log
+    // Get old data for activity log (already decrypted by getContainer)
     const oldContainer = await getContainer(containerId);
     if (!oldContainer) throw new Error("Container not found");
 
@@ -425,17 +501,22 @@ export async function updateContainer(containerId: string, updates: Partial<Cont
     if (updates.photos && updates.photos.length > 0) {
       sanitizedUpdates.photoUrl = updates.photos[0]
     } else if (updates.photos && updates.photos.length === 0) {
-      // If photos cleared, perform logic whether to clear photoUrl?
-      // For now let's assume if explicit empty array, we might want to clear it.
-      // But let's be safe and only update if specifically requested.
+      // noop
+    }
+
+    // Encrypt name before write
+    const updatesToWrite = { ...sanitizedUpdates }
+    const key = await getPlaceKey(oldContainer.placeId)
+    if (key && updates.name) {
+      updatesToWrite.name = await encrypt(updates.name, key)
     }
 
     await updateDoc(containerRef, {
-      ...sanitizedUpdates,
+      ...updatesToWrite,
       updatedAt: Timestamp.now(),
     })
 
-    // Log activity
+    // Log activity (plaintext names — encryption happens in logActivity)
     const changedFields = getChangedFields(updates, oldContainer);
     const currentName = updates.name || oldContainer.name;
 
@@ -528,7 +609,15 @@ export async function getItem(id: string): Promise<Item | undefined> {
   const docSnap = await getDoc(docRef)
   if (docSnap.exists()) {
     const raw = { id: docSnap.id, ...docSnap.data() }
-    return ItemSchema.parse(raw)
+    const item = ItemSchema.parse(raw)
+    const placeId = item.placeId || (await getContainer(item.containerId))?.placeId
+    if (placeId) {
+      const key = await getPlaceKey(placeId)
+      if (key) {
+        return decryptFields(item, ['name', 'description', 'tags'], key)
+      }
+    }
+    return item
   }
   return undefined
 }
@@ -543,8 +632,16 @@ export async function createItem(item: Omit<Item, 'id' | 'userId' | 'placeId' | 
     if (!container) throw new Error("Container not found");
 
     const sanitizedItem = sanitizeUndefined(item)
+
+    // Encrypt fields before write
+    const key = await getPlaceKey(container.placeId)
+    let itemToWrite = { ...sanitizedItem }
+    if (key) {
+      itemToWrite = await encryptFields(itemToWrite, ['name', 'description', 'tags'], key)
+    }
+
     const docRef = await addDoc(collection(db, 'items'), {
-      ...sanitizedItem,
+      ...itemToWrite,
       userId,
       placeId: container.placeId,
       createdAt: Timestamp.now(),
@@ -557,7 +654,7 @@ export async function createItem(item: Omit<Item, 'id' | 'userId' | 'placeId' | 
       voiceNoteUrl: item.voiceNoteUrl
     });
 
-    // Log activity on the item itself
+    // Log activity on the item itself (plaintext name)
     await logActivity('created', 'item', docRef.id, item.name, {
       placeId: container.placeId,
       containerId: item.containerId,
@@ -587,10 +684,23 @@ export async function getContainerItems(containerId: string): Promise<Item[]> {
       where('containerId', '==', containerId)
     )
     const snapshot = await getDocs(q)
-    return snapshot.docs.map((doc) => {
+    const items = snapshot.docs.map((doc) => {
       const raw = { id: doc.id, ...doc.data() }
       return ItemSchema.parse(raw)
     })
+    // Decrypt — all items in a container share the same placeId
+    if (items.length > 0) {
+      const placeId = items[0].placeId || (await getContainer(containerId))?.placeId
+      if (placeId) {
+        const key = await getPlaceKey(placeId)
+        if (key) {
+          return Promise.all(
+            items.map((item) => decryptFields(item, ['name', 'description', 'tags'], key))
+          )
+        }
+      }
+    }
+    return items
   } catch (error) {
     console.error('Error fetching items:', error)
     throw error
@@ -605,10 +715,14 @@ export async function getPlaceItems(placeId: string): Promise<Item[]> {
       where('placeId', '==', placeId)
     )
     const snapshot = await getDocs(q)
-    const itemsWithPlaceId = snapshot.docs.map((doc) => {
+    const key = await getPlaceKey(placeId)
+    const rawItems = snapshot.docs.map((doc) => {
       const raw = { id: doc.id, ...doc.data() }
       return ItemSchema.parse(raw)
     })
+    const itemsWithPlaceId = key
+      ? await Promise.all(rawItems.map((item) => decryptFields(item, ['name', 'description', 'tags'], key)))
+      : rawItems
 
     // TODO: Remove this backward compatibility code once all items have been migrated to include placeId
     // This handles legacy items created before placeId denormalization was added
@@ -684,7 +798,7 @@ export async function updateItem(itemId: string, updates: Partial<Item>) {
   try {
     const itemRef = doc(db, 'items', itemId)
 
-    // Get old data for activity log
+    // Get old data for activity log (already decrypted by getItem)
     const oldItem = await getItem(itemId);
     if (!oldItem) throw new Error("Item not found");
 
@@ -697,12 +811,26 @@ export async function updateItem(itemId: string, updates: Partial<Item>) {
         resolvedPlaceId = container.placeId
       }
     }
+
+    // Encrypt fields before write
+    let updatesToWrite = { ...sanitizedUpdates }
+    if (resolvedPlaceId) {
+      const key = await getPlaceKey(resolvedPlaceId)
+      if (key) {
+        updatesToWrite = await encryptFields(
+          updatesToWrite,
+          ['name', 'description', 'tags'],
+          key
+        )
+      }
+    }
+
     await updateDoc(itemRef, {
-      ...sanitizedUpdates,
+      ...updatesToWrite,
       updatedAt: Timestamp.now(),
     })
 
-    // Log activity
+    // Log activity (plaintext names)
     const changedFields = getChangedFields(updates, oldItem);
     const currentName = updates.name || oldItem.name;
 
@@ -897,7 +1025,14 @@ export async function getGroup(id: string): Promise<Group | undefined> {
   const docSnap = await getDoc(docRef)
   if (docSnap.exists()) {
     const raw = { id: docSnap.id, ...docSnap.data() }
-    return GroupSchema.parse(raw)
+    const group = GroupSchema.parse(raw)
+    if (group.placeId) {
+      const key = await getPlaceKey(group.placeId)
+      if (key) {
+        return decryptFields(group, ['name'], key)
+      }
+    }
+    return group
   }
   return undefined
 }
@@ -921,8 +1056,18 @@ export async function createGroup(group: Omit<Group, 'id' | 'userId' | 'createdA
       }
     }
 
+    // Encrypt group name if associated with a place
+    let nameToStore = group.name
+    if (resolvedPlaceId) {
+      const key = await getPlaceKey(resolvedPlaceId)
+      if (key) {
+        nameToStore = await encrypt(group.name, key)
+      }
+    }
+
     const sanitizedGroup = sanitizeUndefined({
       ...group,
+      name: nameToStore,
       placeId: resolvedPlaceId ?? null,
     })
     const docRef = await addDoc(collection(db, 'groups'), {
@@ -979,15 +1124,41 @@ export async function getAccessibleGroups(userId: string, placeIds: string[]): P
     groupMap.set(group.id, group)
   })
 
-  return Array.from(groupMap.values())
+  // Decrypt group names
+  const groups = Array.from(groupMap.values())
+  return Promise.all(
+    groups.map(async (group) => {
+      if (group.placeId) {
+        const key = await getPlaceKey(group.placeId)
+        if (key) {
+          return decryptFields(group, ['name'], key)
+        }
+      }
+      return group
+    })
+  )
 }
 
 export async function updateGroup(groupId: string, updates: Partial<Group>) {
   try {
     const groupRef = doc(db, 'groups', groupId)
     const sanitizedUpdates = sanitizeUndefined(updates)
+
+    // Encrypt name if updating it
+    const updatesToWrite = { ...sanitizedUpdates }
+    if (updates.name) {
+      // Need to fetch the group to find its placeId
+      const group = await getGroup(groupId)
+      if (group?.placeId) {
+        const key = await getPlaceKey(group.placeId)
+        if (key) {
+          updatesToWrite.name = await encrypt(updates.name, key)
+        }
+      }
+    }
+
     await updateDoc(groupRef, {
-      ...sanitizedUpdates,
+      ...updatesToWrite,
       updatedAt: Timestamp.now(),
     })
   } catch (error) {
@@ -1028,12 +1199,31 @@ export async function getObjectsByGroup(groupId: string, type: 'place' | 'contai
       where('groupId', '==', groupId)
     )
     const snapshot = await getDocs(q)
-    return snapshot.docs.map((doc) => {
+    const entities = snapshot.docs.map((doc) => {
       const raw = { id: doc.id, ...doc.data() }
-      if (type === 'place') return PlaceSchema.parse(raw)
-      if (type === 'container') return ContainerSchema.parse(raw)
-      return ItemSchema.parse(raw)
+      if (type === 'place') return PlaceSchema.parse(raw) as Place
+      if (type === 'container') return ContainerSchema.parse(raw) as Container
+      return ItemSchema.parse(raw) as Item
     })
+
+    // Decrypt
+    return Promise.all(
+      entities.map(async (entity) => {
+        let placeId: string | undefined
+        if (type === 'place') placeId = (entity as Place).id
+        else if (type === 'container') placeId = (entity as Container).placeId
+        else placeId = (entity as Item).placeId || (await getContainer((entity as Item).containerId))?.placeId
+
+        if (placeId) {
+          const key = await getPlaceKey(placeId)
+          if (key) {
+            const fields = type === 'item' ? ['name', 'description', 'tags'] : ['name']
+            return decryptFields(entity, fields, key)
+          }
+        }
+        return entity
+      })
+    )
   } catch (error) {
     console.error(`Error fetching ${type}s by group:`, error)
     throw error
@@ -1109,7 +1299,7 @@ export async function uploadImage(file: File, path: string): Promise<string> {
 
     // Add cache control metadata for browser caching
     const metadata = {
-      cacheControl: 'public, max-age=31536000', // Cache for 1 year
+      cacheControl: 'private, max-age=3600', // Private cache, re-validate after 1 hour
       contentType: file.type,
     }
 
@@ -1132,7 +1322,7 @@ export async function uploadAudio(file: File, path: string): Promise<string> {
 
     // Add cache control metadata
     const metadata = {
-      cacheControl: 'public, max-age=31536000', // Cache for 1 year
+      cacheControl: 'private, max-age=3600', // Private cache, re-validate after 1 hour
       contentType: file.type,
     }
 
@@ -1258,26 +1448,54 @@ export async function logActivity(
 ): Promise<void> {
   try {
     const userId = getCurrentUserId();
-    const actor = auth.currentUser;
+
+    // Encrypt entityName and metadata using the place's DEK
+    let encryptedEntityName = entityName
+    let encryptedMetadata: ActivityMetadata | null = (metadata as ActivityMetadata) || null
+    if (hierarchy.placeId) {
+      const key = await getPlaceKey(hierarchy.placeId)
+      if (key) {
+        encryptedEntityName = await encrypt(entityName, key)
+        if (metadata) {
+          encryptedMetadata = await encryptMetadata(metadata, key) ?? null
+        }
+      }
+    }
 
     await addDoc(collection(db, 'activity'), {
       userId,
-      actorName: actor?.displayName || null,
-      actorEmail: actor?.email || null,
-      actorPhotoURL: actor?.photoURL || null,
+      // PII removed — actor info resolved at display time from userId
       action,
       entityType,
       entityId,
-      entityName,
+      entityName: encryptedEntityName,
       placeId: hierarchy.placeId || null,
       containerId: hierarchy.containerId || null,
-      metadata: metadata || null,
+      metadata: encryptedMetadata,
       createdAt: Timestamp.now(),
     });
   } catch (error) {
     // Log but don't throw - activity logging shouldn't break main operations
     console.error('Error logging activity:', error);
   }
+}
+
+/**
+ * Helper to decrypt activity records (entityName + metadata)
+ */
+async function decryptActivities(activities: Activity[]): Promise<Activity[]> {
+  return Promise.all(
+    activities.map(async (activity) => {
+      if (!activity.placeId) return activity
+      const key = await getPlaceKey(activity.placeId)
+      if (!key) return activity
+      const result = await decryptFields(activity, ['entityName'], key)
+      if (result.metadata) {
+        result.metadata = await decryptMetadata(result.metadata, key) ?? undefined
+      }
+      return result
+    })
+  )
 }
 
 /**
@@ -1298,10 +1516,11 @@ export async function getEntityActivity(
     );
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((doc) => {
+    const activities = snapshot.docs.map((doc) => {
       const raw = { id: doc.id, ...doc.data() };
       return ActivitySchema.parse(raw);
     });
+    return decryptActivities(activities);
   } catch (error) {
     console.error('Error fetching entity activity:', error);
     throw error;
@@ -1324,10 +1543,11 @@ export async function getUserRecentActivity(
     );
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((doc) => {
+    const activities = snapshot.docs.map((doc) => {
       const raw = { id: doc.id, ...doc.data() };
       return ActivitySchema.parse(raw);
     });
+    return decryptActivities(activities);
   } catch (error) {
     console.error('Error fetching user activity:', error);
     throw error;
@@ -1385,9 +1605,10 @@ export async function getAccessibleRecentActivity(
       deduped.set(activity.id, activity)
     })
 
-    return Array.from(deduped.values())
+    const sorted = Array.from(deduped.values())
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, limitCount)
+    return decryptActivities(sorted)
   } catch (error) {
     console.error('Error fetching accessible activity:', error)
     throw error
@@ -1412,10 +1633,11 @@ export async function getActivityByType(
     );
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((doc) => {
+    const activities = snapshot.docs.map((doc) => {
       const raw = { id: doc.id, ...doc.data() };
       return ActivitySchema.parse(raw);
     });
+    return decryptActivities(activities);
   } catch (error) {
     console.error('Error fetching activity by type:', error);
     throw error;
@@ -1439,10 +1661,11 @@ export async function getPlaceAggregatedActivity(
     );
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((doc) => {
+    const activities = snapshot.docs.map((doc) => {
       const raw = { id: doc.id, ...doc.data() };
       return ActivitySchema.parse(raw);
     });
+    return decryptActivities(activities);
   } catch (error) {
     console.error('Error fetching place aggregated activity:', error);
     throw error;
@@ -1466,10 +1689,11 @@ export async function getContainerAggregatedActivity(
     );
 
     const snapshot = await getDocs(q);
-    return snapshot.docs.map((doc) => {
+    const activities = snapshot.docs.map((doc) => {
       const raw = { id: doc.id, ...doc.data() };
       return ActivitySchema.parse(raw);
     });
+    return decryptActivities(activities);
   } catch (error) {
     console.error('Error fetching container aggregated activity:', error);
     throw error;
@@ -1592,7 +1816,7 @@ export async function updateLastViewed(
 ) {
   try {
     const collectionName = entityType === 'place' ? 'places' :
-                           entityType === 'container' ? 'containers' : 'items';
+      entityType === 'container' ? 'containers' : 'items';
 
     await updateDoc(doc(db, collectionName, entityId), {
       lastViewedAt: Timestamp.now(),

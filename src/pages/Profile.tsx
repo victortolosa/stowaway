@@ -2,10 +2,11 @@ import { useNavigate } from 'react-router-dom'
 import { signOut } from 'firebase/auth'
 import { auth } from '@/lib/firebase'
 import { useAuthStore } from '@/store/auth'
+import { useOnboardingStore } from '@/store/useOnboardingStore'
 import { usePlaces } from '@/hooks/queries/usePlaces'
 import { useAllContainers } from '@/hooks/queries/useAllContainers'
 import { useAllItems } from '@/hooks/queries/useAllItems'
-import { User, LogOut, MapPin, Package, Box, WifiOff, Activity, ChevronRight } from 'lucide-react'
+import { User, LogOut, MapPin, Package, Box, WifiOff, Activity, ChevronRight, Play } from 'lucide-react'
 import { Card } from '@/components/ui'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
@@ -16,6 +17,7 @@ export function Profile() {
   const { data: places = [] } = usePlaces()
   const { data: containers = [] } = useAllContainers()
   const { data: items = [] } = useAllItems()
+  const { resetOnboarding } = useOnboardingStore()
 
   // Set global breadcrumbs
   useBreadcrumbs([{ label: 'Profile', categoryPath: '/profile' }])
@@ -105,6 +107,16 @@ export function Profile() {
           >
             <Activity size={20} className="text-accent-aqua" />
             <span className="font-body text-base text-text-primary font-medium flex-1">Activity Log</span>
+            <ChevronRight size={18} className="text-text-tertiary" />
+          </Card>
+
+          <Card
+            variant="interactive"
+            onClick={resetOnboarding}
+            className="flex items-center gap-3"
+          >
+            <Play size={20} className="text-accent-aqua" />
+            <span className="font-body text-base text-text-primary font-medium flex-1">Replay Onboarding</span>
             <ChevronRight size={18} className="text-text-tertiary" />
           </Card>
 

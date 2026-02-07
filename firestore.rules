@@ -76,6 +76,13 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // 1c. Rules for Place encryption keys
+    match /places/{placeId}/keys/{keyDoc} {
+      allow read: if isPlaceMember(placeId);
+      allow create: if isPlaceOwner(placeId);
+      allow update, delete: if isPlaceOwner(placeId);
+    }
+
     // 2. Rules for Places
     match /places/{placeId} {
       allow create: if
@@ -176,10 +183,6 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // 6. Catch-all rule (Maintaining your existing "Getting Started" rules)
-    // This is useful for development but should be locked down eventually.
-    match /{document=**} {
-      allow read, write: if request.time < timestamp.date(2026, 3, 1);
-    }
+    // 6. Catch-all rule removed — all collections now have explicit rules
   }
 }
