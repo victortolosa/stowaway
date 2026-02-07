@@ -89,18 +89,23 @@ export async function decrypt(
 ): Promise<string> {
   if (!value.startsWith(ENC_PREFIX)) return value
 
-  const data = Uint8Array.from(
-    atob(value.slice(ENC_PREFIX.length)),
-    (c) => c.charCodeAt(0)
-  )
-  const iv = data.slice(0, 12)
-  const ciphertext = data.slice(12)
-  const decrypted = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv },
-    key,
-    ciphertext
-  )
-  return new TextDecoder().decode(decrypted)
+  try {
+    const data = Uint8Array.from(
+      atob(value.slice(ENC_PREFIX.length)),
+      (c) => c.charCodeAt(0)
+    )
+    const iv = data.slice(0, 12)
+    const ciphertext = data.slice(12)
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv },
+      key,
+      ciphertext
+    )
+    return new TextDecoder().decode(decrypted)
+  } catch (err) {
+    console.warn('Failed to decrypt value, returning as-is:', err)
+    return value
+  }
 }
 
 /**
@@ -136,18 +141,23 @@ export async function decryptFields<T>(
   fields: string[],
   key: CryptoKey
 ): Promise<T> {
-  const result = { ...obj } as Record<string, unknown>
-  for (const field of fields) {
-    const value = result[field]
-    if (typeof value === 'string') {
-      result[field] = await decrypt(value, key)
-    } else if (Array.isArray(value)) {
-      result[field] = await Promise.all(
-        value.map((v: unknown) => (typeof v === 'string' ? decrypt(v, key) : v))
-      )
+  try {
+    const result = { ...obj } as Record<string, unknown>
+    for (const field of fields) {
+      const value = result[field]
+      if (typeof value === 'string') {
+        result[field] = await decrypt(value, key)
+      } else if (Array.isArray(value)) {
+        result[field] = await Promise.all(
+          value.map((v: unknown) => (typeof v === 'string' ? decrypt(v, key) : v))
+        )
+      }
     }
+    return result as T
+  } catch (err) {
+    console.warn('Failed to decrypt fields, returning original object:', err)
+    return obj
   }
-  return result as T
 }
 
 /**
@@ -190,26 +200,31 @@ export async function decryptMetadata<T>(
 ): Promise<T | null | undefined> {
   if (!metadata) return metadata
 
-  const result = { ...metadata } as Record<string, unknown>
-  const stringFields = [
-    'oldValue', 'newValue',
-    'childEntityName',
-    'fromContainerName', 'toContainerName',
-    'fromPlaceName', 'toPlaceName',
-    'groupName',
-  ]
-  for (const field of stringFields) {
-    if (typeof result[field] === 'string') {
-      result[field] = await decrypt(result[field] as string, key)
+  try {
+    const result = { ...metadata } as Record<string, unknown>
+    const stringFields = [
+      'oldValue', 'newValue',
+      'childEntityName',
+      'fromContainerName', 'toContainerName',
+      'fromPlaceName', 'toPlaceName',
+      'groupName',
+    ]
+    for (const field of stringFields) {
+      if (typeof result[field] === 'string') {
+        result[field] = await decrypt(result[field] as string, key)
+      }
     }
+    // Decrypt itemNames array
+    if (Array.isArray(result.itemNames)) {
+      result.itemNames = await Promise.all(
+        (result.itemNames as string[]).map((name) => decrypt(name, key))
+      )
+    }
+    return result as T
+  } catch (err) {
+    console.warn('Failed to decrypt metadata, returning original:', err)
+    return metadata
   }
-  // Decrypt itemNames array
-  if (Array.isArray(result.itemNames)) {
-    result.itemNames = await Promise.all(
-      (result.itemNames as string[]).map((name) => decrypt(name, key))
-    )
-  }
-  return result as T
 }
 
 // Clear key cache on auth state changes (logout)
