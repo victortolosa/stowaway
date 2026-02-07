@@ -108,11 +108,11 @@ export function PlaceDetail() {
         { label: place?.name || '...', category: 'PLACES', categoryPath: '/places', groupId: place?.groupId || undefined, type: 'place' }
     ])
 
-    if (!user || !id) {
-        return <LoadingState />
+    if (!id) {
+        return <div>Invalid URL — no place ID provided</div>
     }
 
-    if (isLoading) {
+    if (!user || isLoading) {
         return <LoadingState message="Loading place..." />
     }
 

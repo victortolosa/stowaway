@@ -99,11 +99,11 @@ export function Container() {
     { label: container?.name || '...', category: 'CONTAINERS', categoryPath: '/containers', groupId: container?.groupId || undefined, type: 'container' }
   ])
 
-  if (!user || !id) {
-    return <LoadingState />
+  if (!id) {
+    return <div>Invalid URL — no container ID provided</div>
   }
 
-  if (isLoading) {
+  if (!user || isLoading) {
     return <LoadingState message="Loading container..." />
   }
 

@@ -81,10 +81,10 @@ export function Places() {
   const queryClient = useQueryClient()
 
   const { data: places = [], isLoading: isPlacesLoading } = usePlaces()
-  const { data: containers = [] } = useAllContainers()
-  const { data: groups = [] } = useGroups()
+  const { data: containers = [], isLoading: isContainersLoading } = useAllContainers()
+  const { data: groups = [], isLoading: isGroupsLoading } = useGroups()
 
-  const isLoading = isPlacesLoading
+  const isLoading = isPlacesLoading || isContainersLoading || isGroupsLoading
 
   const refresh = async () => {
     if (!user?.uid) return

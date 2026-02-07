@@ -26,6 +26,7 @@ export function useGroups() {
 }
 
 export function useGroup(id: string | undefined) {
+    const user = useAuthStore((state) => state.user)
     return useQuery({
         queryKey: id ? GROUP_KEYS.detail(id) : ['groups', 'disabled'],
         queryFn: async () => {
@@ -34,6 +35,6 @@ export function useGroup(id: string | undefined) {
             if (!group) throw new Error('Group not found')
             return group
         },
-        enabled: !!id,
+        enabled: !!id && !!user?.uid,
     })
 }

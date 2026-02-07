@@ -28,10 +28,10 @@ export function ContainersList() {
   const queryClient = useQueryClient()
   const { data: containers = [], isLoading: isContainersLoading } = useAllContainers()
   const { data: items = [] } = useAllItems()
-  const { data: places = [] } = usePlaces()
-  const { data: groups = [] } = useGroups()
+  const { data: places = [], isLoading: isPlacesLoading } = usePlaces()
+  const { data: groups = [], isLoading: isGroupsLoading } = useGroups()
 
-  const isLoading = isContainersLoading
+  const isLoading = isContainersLoading || isPlacesLoading || isGroupsLoading
   const [searchQuery, setSearchQuery] = useState('')
   const [isMultiStepCreateOpen, setIsMultiStepCreateOpen] = useState(false)
   const [sortBy, setSortBy] = useState<SortOption>('recently-modified')

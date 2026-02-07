@@ -28,13 +28,13 @@ export function Item() {
 
   const { data: item, isLoading: isItemLoading } = useItem(id!)
   // Fetch container to get placeId and for navigation
-  const { data: container } = useContainer(item?.containerId || '')
-  const { data: place } = usePlace(container?.placeId || '')
+  const { data: container, isLoading: isContainerLoading } = useContainer(item?.containerId || '')
+  const { data: place, isLoading: isPlaceLoading } = usePlace(container?.placeId || '')
   const { data: allContainers = [] } = useAllContainers()
   const { data: groups = [] } = useGroups()
   const { data: allPlaces = [] } = usePlaces()
 
-  const isLoading = isItemLoading
+  const isLoading = isItemLoading || isContainerLoading || isPlaceLoading
   const canEdit = place ? canEditPlace(place, user?.uid) : false
   const editablePlaces = allPlaces.filter((p) => canEditPlace(p, user?.uid))
   const editablePlaceIds = new Set(editablePlaces.map((p) => p.id))
@@ -92,11 +92,11 @@ export function Item() {
     { label: item?.name || '...', category: 'ITEMS', categoryPath: '/items', groupId: item?.groupId || undefined, type: 'item' }
   ])
 
-  if (!user || !id) {
-    return <LoadingState />
+  if (!id) {
+    return <div>Invalid URL — no item ID provided</div>
   }
 
-  if (isLoading) {
+  if (!user || isLoading) {
     return <LoadingState message="Loading item..." />
   }
 
