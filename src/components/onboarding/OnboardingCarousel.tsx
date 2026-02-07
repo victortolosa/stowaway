@@ -64,7 +64,7 @@ export const OnboardingCarousel: React.FC<OnboardingCarouselProps> = ({
             </div>
 
             {/* Navigation Buttons */}
-            <div className="flex justify-between items-center px-4 pt-4 border-t border-border-standard">
+            <div className="flex justify-between items-center px-4 pt-4 pb-4 border-t border-border-standard">
                 {/* Left: Skip or Back */}
                 {currentIndex === 0 ? (
                     <Button

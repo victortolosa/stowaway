@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -63,6 +63,7 @@ export function CreateItemModal({
     // Audio state
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
     const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null)
+    const audioPreviewUrlRef = useRef<string | null>(null)
     const [existingAudioUrl, setExistingAudioUrl] = useState<string | null>(null)
     const [wasAudioDeleted, setWasAudioDeleted] = useState(false)
     const [showAudioRecorder, setShowAudioRecorder] = useState(false)
@@ -115,7 +116,10 @@ export function CreateItemModal({
             setAudioBlob(null)
             setExistingAudioUrl(initialData.voiceNoteUrl || null)
             setWasAudioDeleted(false)
-            if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
+            if (audioPreviewUrlRef.current) {
+                URL.revokeObjectURL(audioPreviewUrlRef.current)
+                audioPreviewUrlRef.current = null
+            }
             setAudioPreviewUrl(null)
             setShowAudioRecorder(false)
             setSelectedEmoji(initialData.icon || '')
@@ -140,7 +144,10 @@ export function CreateItemModal({
             setAudioBlob(null)
             setExistingAudioUrl(null)
             setWasAudioDeleted(false)
-            if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
+            if (audioPreviewUrlRef.current) {
+                URL.revokeObjectURL(audioPreviewUrlRef.current)
+                audioPreviewUrlRef.current = null
+            }
             setAudioPreviewUrl(null)
             setShowAudioRecorder(false)
             setSelectedEmoji('')
@@ -155,13 +162,13 @@ export function CreateItemModal({
             setShowQuantitySection(false)
             setShowTagsSection(false)
         }
-    }, [isOpen, editMode, initialData, reset, audioPreviewUrl, preselectedGroupId])
+    }, [isOpen, editMode, initialData, reset, preselectedGroupId])
 
     useEffect(() => {
         return () => {
-            if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
+            if (audioPreviewUrlRef.current) URL.revokeObjectURL(audioPreviewUrlRef.current)
         }
-    }, [audioPreviewUrl])
+    }, [])
 
     // Detect which sections were toggled off but had data
     const getToggledOffSectionsWithData = (): string[] => {
@@ -305,7 +312,10 @@ export function CreateItemModal({
             setImages([])
             setTags([])
             setAudioBlob(null)
-            if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
+            if (audioPreviewUrlRef.current) {
+                URL.revokeObjectURL(audioPreviewUrlRef.current)
+                audioPreviewUrlRef.current = null
+            }
             setAudioPreviewUrl(null)
             setShowAudioRecorder(false)
             onItemCreated()
@@ -334,10 +344,13 @@ export function CreateItemModal({
             const trimmedBlob = await trimSilence(audioBlob)
 
             if (trimmedBlob.size !== audioBlob.size) {
-                if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
+                if (audioPreviewUrlRef.current) {
+                    URL.revokeObjectURL(audioPreviewUrlRef.current)
+                }
                 const newUrl = URL.createObjectURL(trimmedBlob)
                 setAudioBlob(trimmedBlob)
                 setAudioPreviewUrl(newUrl)
+                audioPreviewUrlRef.current = newUrl
             }
         } catch (error) {
             console.error('Failed to trim audio:', error)
@@ -534,8 +547,12 @@ export function CreateItemModal({
                             <AudioRecorder
                                 onRecordingComplete={(blob) => {
                                     setAudioBlob(blob)
+                                    if (audioPreviewUrlRef.current) {
+                                        URL.revokeObjectURL(audioPreviewUrlRef.current)
+                                    }
                                     const url = URL.createObjectURL(blob)
                                     setAudioPreviewUrl(url)
+                                    audioPreviewUrlRef.current = url
                                     setShowAudioRecorder(false)
                                     setExistingAudioUrl(null)
                                 }}
@@ -555,7 +572,10 @@ export function CreateItemModal({
                                         onClick={() => {
                                             if (audioBlob) {
                                                 setAudioBlob(null)
-                                                if (audioPreviewUrl) URL.revokeObjectURL(audioPreviewUrl)
+                                                if (audioPreviewUrlRef.current) {
+                                                    URL.revokeObjectURL(audioPreviewUrlRef.current)
+                                                    audioPreviewUrlRef.current = null
+                                                }
                                                 setAudioPreviewUrl(null)
                                             } else {
                                                 setExistingAudioUrl(null)

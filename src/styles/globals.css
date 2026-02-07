@@ -108,6 +108,16 @@ body,
   -moz-osx-font-smoothing: grayscale;
 }
 
+html,
+body {
+  overscroll-behavior-y: none;
+}
+
+#root {
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+
 /* Remove tap highlight on mobile for better UX */
 * {
   -webkit-tap-highlight-color: transparent;
