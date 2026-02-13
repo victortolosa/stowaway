@@ -69,10 +69,17 @@ service cloud.firestore {
         (resource.data.placeId == null && isOwner(resource.data.userId));
     }
 
-    // 1b. Rules for Users (profiles for sharing by email)
+    // 1b. Rules for Users (own profile only)
     match /users/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && request.auth.uid == userId;
       allow create, update: if isAuthenticated() && request.auth.uid == userId;
+      allow delete: if false;
+    }
+
+    // 1b2. Public profiles (for sharing/lookup by email)
+    match /publicProfiles/{uid} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && request.auth.uid == uid;
       allow delete: if false;
     }
 

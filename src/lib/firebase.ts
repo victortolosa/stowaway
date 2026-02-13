@@ -24,9 +24,8 @@ const firebaseConfig = {
 const requiredKeys = ['apiKey', 'authDomain', 'projectId', 'appId'] as const;
 const missingKeys = requiredKeys.filter(key => !firebaseConfig[key]);
 
-// Safely log configuration state for debugging
-// eslint-disable-next-line no-constant-condition
-if (import.meta.env.PROD || true) {
+// Safely log configuration state for debugging (dev only)
+if (import.meta.env.DEV) {
   console.group('Firebase Configuration Diagnostics');
   console.log('Status:', missingKeys.length === 0 ? 'VALID' : 'INVALID');
   if (missingKeys.length > 0) {

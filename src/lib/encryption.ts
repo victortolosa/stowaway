@@ -50,7 +50,7 @@ export async function getPlaceKey(placeId: string): Promise<CryptoKey | null> {
 /**
  * Import a base64-encoded raw key into a CryptoKey
  */
-async function importKey(base64Key: string): Promise<CryptoKey> {
+export async function importKey(base64Key: string): Promise<CryptoKey> {
   const raw = Uint8Array.from(atob(base64Key), (c) => c.charCodeAt(0))
   return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, [
     'encrypt',

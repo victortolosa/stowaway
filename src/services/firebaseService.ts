@@ -1,7 +1,6 @@
 import {
   collection,
   addDoc,
-  setDoc,
   updateDoc,
   deleteDoc,
   query,
@@ -12,6 +11,7 @@ import {
   orderBy,
   limit,
   Timestamp,
+  writeBatch,
 } from 'firebase/firestore'
 import {
   ref,
@@ -26,8 +26,8 @@ import { sanitizeUndefined, getChangedFields } from '@/utils/data'
 import { PlaceSchema, ContainerSchema, ItemSchema, GroupSchema, ActivitySchema, UserProfileSchema } from '@/schemas/firestore'
 import {
   generatePlaceKey,
-  storePlaceKey,
   getPlaceKey,
+  importKey,
   encrypt,
   encryptFields,
   decryptFields,
@@ -75,6 +75,7 @@ export async function upsertUserProfile(profile: {
   photoURL?: string | null
 }) {
   const userRef = doc(db, 'users', profile.uid)
+  const publicRef = doc(db, 'publicProfiles', profile.uid)
   const existing = await getDoc(userRef)
   const now = Timestamp.now()
   const data = {
@@ -85,7 +86,17 @@ export async function upsertUserProfile(profile: {
     updatedAt: now,
     createdAt: existing.exists() ? (existing.data().createdAt || now) : now,
   }
-  await setDoc(userRef, data, { merge: true })
+  // Atomically write to both users (private) and publicProfiles (for lookups)
+  const batch = writeBatch(db)
+  batch.set(userRef, data, { merge: true })
+  batch.set(publicRef, {
+    uid: profile.uid,
+    email: normalizeEmail(profile.email),
+    displayName: profile.displayName ?? null,
+    photoURL: profile.photoURL ?? null,
+    updatedAt: now,
+  }, { merge: true })
+  await batch.commit()
 }
 
 export async function getUserProfile(uid: string): Promise<UserProfile | undefined> {
@@ -100,7 +111,7 @@ export async function getUserProfile(uid: string): Promise<UserProfile | undefin
 
 export async function getUserByEmail(email: string): Promise<UserProfile | undefined> {
   const normalized = normalizeEmail(email)
-  const q = query(collection(db, 'users'), where('email', '==', normalized))
+  const q = query(collection(db, 'publicProfiles'), where('email', '==', normalized))
   const snapshot = await getDocs(q)
   const docSnap = snapshot.docs[0]
   if (!docSnap) return undefined
@@ -113,12 +124,18 @@ export async function getUserProfilesByIds(uids: string[]): Promise<UserProfile[
   const chunks = chunkArray(uids, 10)
   const results = await Promise.all(
     chunks.map(async (chunk) => {
-      const q = query(collection(db, 'users'), where('uid', 'in', chunk))
+      const q = query(collection(db, 'publicProfiles'), where('uid', 'in', chunk))
       const snapshot = await getDocs(q)
-      return snapshot.docs.map((docSnap) => {
+      return snapshot.docs.reduce<UserProfile[]>((acc, docSnap) => {
         const raw = { uid: docSnap.id, ...docSnap.data() }
-        return UserProfileSchema.parse(raw)
-      })
+        const result = UserProfileSchema.safeParse(raw)
+        if (result.success) {
+          acc.push(result.data)
+        } else {
+          console.warn(`Invalid ${docSnap.ref.path}:`, result.error.message)
+        }
+        return acc
+      }, [])
     })
   )
   return results.flat()
@@ -147,46 +164,50 @@ export async function createPlace(place: Omit<Place, 'id' | 'userId' | 'createdA
     const userId = getCurrentUserId();
     if (!userId) throw new Error("User must be logged in to create a place");
 
-    // Generate encryption key for this place
+    // Generate encryption key and import it locally
     const dekBase64 = await generatePlaceKey()
+    const cryptoKey = await importKey(dekBase64)
+
+    // Pre-generate doc ref to get ID without writing
+    const placeRef = doc(collection(db, 'places'))
+    const placeId = placeRef.id
+
+    // Encrypt name before any write — no plaintext window
+    const encryptedName = await encrypt(place.name, cryptoKey)
 
     const sanitizedPlace = sanitizeUndefined(place)
     const ownerId = userId
     const memberIds = [ownerId]
     const memberRoles = { [ownerId]: 'owner' as PlaceRole }
+    const now = Timestamp.now()
 
-    // Create the place doc first to get the ID
-    const docRef = await addDoc(collection(db, 'places'), {
+    // Atomically write the place doc + DEK in a single batch
+    const batch = writeBatch(db)
+    batch.set(placeRef, {
       ...sanitizedPlace,
+      name: encryptedName,
       userId,
       ownerId,
       memberIds,
       memberRoles,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
+      createdAt: now,
+      updatedAt: now,
     })
-
-    // Store the DEK in the keys subcollection
-    await storePlaceKey(docRef.id, dekBase64)
-
-    // Now encrypt the name field and update the doc
-    const key = await getPlaceKey(docRef.id)
-    if (key) {
-      const encryptedName = await encrypt(place.name, key)
-      await updateDoc(doc(db, 'places', docRef.id), { name: encryptedName })
-    }
+    const keyRef = doc(db, 'places', placeId, 'keys', 'dek')
+    batch.set(keyRef, { key: dekBase64 })
+    await batch.commit()
 
     // Link pending uploads to this new document
-    await linkPendingUploads(docRef.id, 'places', {
+    await linkPendingUploads(placeId, 'places', {
       photos: place.photos
     });
 
     // Log activity
-    await logActivity('created', 'place', docRef.id, place.name, {
-      placeId: docRef.id,
+    await logActivity('created', 'place', placeId, place.name, {
+      placeId,
     });
 
-    return docRef.id
+    return placeId
   } catch (error) {
     console.error('FirebaseService: Error creating place:', error)
     throw error
@@ -201,16 +222,24 @@ export async function getUserPlaces(userId: string): Promise<Place[]> {
     const memberSnapshot = await getDocs(memberQuery)
     memberSnapshot.docs.forEach((docSnap) => {
       const raw = { id: docSnap.id, ...docSnap.data() }
-      const place = PlaceSchema.parse(raw)
-      placeMap.set(place.id, place)
+      const result = PlaceSchema.safeParse(raw)
+      if (result.success) {
+        placeMap.set(result.data.id, result.data)
+      } else {
+        console.warn(`Invalid ${docSnap.ref.path}:`, result.error.message)
+      }
     })
 
     const ownerQuery = query(collection(db, 'places'), where('userId', '==', userId))
     const ownerSnapshot = await getDocs(ownerQuery)
     ownerSnapshot.docs.forEach((docSnap) => {
       const raw = { id: docSnap.id, ...docSnap.data() }
-      const place = PlaceSchema.parse(raw)
-      placeMap.set(place.id, place)
+      const result = PlaceSchema.safeParse(raw)
+      if (result.success) {
+        placeMap.set(result.data.id, result.data)
+      } else {
+        console.warn(`Invalid ${docSnap.ref.path}:`, result.error.message)
+      }
     })
 
     // Decrypt all places
@@ -433,10 +462,16 @@ export async function getPlaceContainers(placeId: string): Promise<Container[]> 
       where('placeId', '==', placeId)
     )
     const snapshot = await getDocs(q)
-    const containers = snapshot.docs.map((doc) => {
-      const raw = { id: doc.id, ...doc.data() }
-      return ContainerSchema.parse(raw)
-    })
+    const containers = snapshot.docs.reduce<Container[]>((acc, d) => {
+      const raw = { id: d.id, ...d.data() }
+      const result = ContainerSchema.safeParse(raw)
+      if (result.success) {
+        acc.push(result.data)
+      } else {
+        console.warn(`Invalid ${d.ref.path}:`, result.error.message)
+      }
+      return acc
+    }, [])
     const key = await getPlaceKey(placeId)
     if (key) {
       return Promise.all(
@@ -468,10 +503,16 @@ export async function getAccessibleContainers(placeIds: string[]): Promise<Conta
     chunks.map(async (chunk) => {
       const q = query(collection(db, 'containers'), where('placeId', 'in', chunk))
       const snapshot = await getDocs(q)
-      return snapshot.docs.map((doc) => {
-        const raw = { id: doc.id, ...doc.data() }
-        return ContainerSchema.parse(raw)
-      })
+      return snapshot.docs.reduce<Container[]>((acc, d) => {
+        const raw = { id: d.id, ...d.data() }
+        const result = ContainerSchema.safeParse(raw)
+        if (result.success) {
+          acc.push(result.data)
+        } else {
+          console.warn(`Invalid ${d.ref.path}:`, result.error.message)
+        }
+        return acc
+      }, [])
     })
   )
   const containers = results.flat()
@@ -684,10 +725,16 @@ export async function getContainerItems(containerId: string): Promise<Item[]> {
       where('containerId', '==', containerId)
     )
     const snapshot = await getDocs(q)
-    const items = snapshot.docs.map((doc) => {
-      const raw = { id: doc.id, ...doc.data() }
-      return ItemSchema.parse(raw)
-    })
+    const items = snapshot.docs.reduce<Item[]>((acc, d) => {
+      const raw = { id: d.id, ...d.data() }
+      const result = ItemSchema.safeParse(raw)
+      if (result.success) {
+        acc.push(result.data)
+      } else {
+        console.warn(`Invalid ${d.ref.path}:`, result.error.message)
+      }
+      return acc
+    }, [])
     // Decrypt — all items in a container share the same placeId
     if (items.length > 0) {
       const placeId = items[0].placeId || (await getContainer(containerId))?.placeId
@@ -716,10 +763,16 @@ export async function getPlaceItems(placeId: string): Promise<Item[]> {
     )
     const snapshot = await getDocs(q)
     const key = await getPlaceKey(placeId)
-    const rawItems = snapshot.docs.map((doc) => {
-      const raw = { id: doc.id, ...doc.data() }
-      return ItemSchema.parse(raw)
-    })
+    const rawItems = snapshot.docs.reduce<Item[]>((acc, d) => {
+      const raw = { id: d.id, ...d.data() }
+      const result = ItemSchema.safeParse(raw)
+      if (result.success) {
+        acc.push(result.data)
+      } else {
+        console.warn(`Invalid ${d.ref.path}:`, result.error.message)
+      }
+      return acc
+    }, [])
     const itemsWithPlaceId = key
       ? await Promise.all(rawItems.map((item) => decryptFields(item, ['name', 'description', 'tags'], key)))
       : rawItems
@@ -965,21 +1018,22 @@ export async function moveContainer(containerId: string, newPlaceId: string) {
     if (!newPlace) throw new Error("Destination place not found");
 
     const oldPlaceId = container.placeId;
+    const now = Timestamp.now();
 
-    // Update the container's placeId
-    await updateDoc(doc(db, 'containers', containerId), {
-      placeId: newPlaceId,
-      updatedAt: Timestamp.now(),
-    });
-
-    // Also update all items in this container to the new placeId
+    // Atomically update container + all its items in a single batch
     const items = await getContainerItems(containerId);
+    const batch = writeBatch(db);
+    batch.update(doc(db, 'containers', containerId), {
+      placeId: newPlaceId,
+      updatedAt: now,
+    });
     for (const item of items) {
-      await updateDoc(doc(db, 'items', item.id), {
+      batch.update(doc(db, 'items', item.id), {
         placeId: newPlaceId,
-        updatedAt: Timestamp.now(),
+        updatedAt: now,
       });
     }
+    await batch.commit();
 
     // Log 'moved' activity on the container
     await logActivity('moved', 'container', containerId, container.name, {
@@ -1103,10 +1157,16 @@ export async function getAccessibleGroups(userId: string, placeIds: string[]): P
       chunks.map(async (chunk) => {
         const q = query(collection(db, 'groups'), where('placeId', 'in', chunk))
         const snapshot = await getDocs(q)
-        return snapshot.docs.map((docSnap) => {
+        return snapshot.docs.reduce<Group[]>((acc, docSnap) => {
           const raw = { id: docSnap.id, ...docSnap.data() }
-          return GroupSchema.parse(raw)
-        })
+          const result = GroupSchema.safeParse(raw)
+          if (result.success) {
+            acc.push(result.data)
+          } else {
+            console.warn(`Invalid ${docSnap.ref.path}:`, result.error.message)
+          }
+          return acc
+        }, [])
       })
     )
     results.flat().forEach((group) => groupMap.set(group.id, group))
@@ -1120,8 +1180,12 @@ export async function getAccessibleGroups(userId: string, placeIds: string[]): P
   const placeGroupsSnapshot = await getDocs(placeGroupsQuery)
   placeGroupsSnapshot.docs.forEach((docSnap) => {
     const raw = { id: docSnap.id, ...docSnap.data() }
-    const group = GroupSchema.parse(raw)
-    groupMap.set(group.id, group)
+    const result = GroupSchema.safeParse(raw)
+    if (result.success) {
+      groupMap.set(result.data.id, result.data)
+    } else {
+      console.warn(`Invalid ${docSnap.ref.path}:`, result.error.message)
+    }
   })
 
   // Decrypt group names
@@ -1173,18 +1237,32 @@ export async function deleteGroup(groupId: string, type: 'place' | 'container' |
     const collectionName = type === 'place' ? 'places' : type === 'container' ? 'containers' : 'items'
     const q = query(collection(db, collectionName), where('groupId', '==', groupId))
     const snapshot = await getDocs(q)
+    const now = Timestamp.now()
 
-    // Batch updates would be better but simple loops for now as per project style
-    const updatePromises = snapshot.docs.map(d =>
-      updateDoc(doc(db, collectionName, d.id), {
-        groupId: null,
-        updatedAt: Timestamp.now()
-      })
-    )
-    await Promise.all(updatePromises)
+    // 2. Atomically ungroup all entities + delete the group in batches
+    // Firestore batches have a 500-operation limit, reserve 1 slot for the group delete
+    const MAX_OPS_PER_BATCH = 499
+    const docChunks = chunkArray(snapshot.docs, MAX_OPS_PER_BATCH)
 
-    // 2. Delete the group itself
-    await deleteDoc(doc(db, 'groups', groupId))
+    for (let i = 0; i < docChunks.length; i++) {
+      const batch = writeBatch(db)
+      for (const d of docChunks[i]) {
+        batch.update(doc(db, collectionName, d.id), {
+          groupId: null,
+          updatedAt: now,
+        })
+      }
+      // Include the group delete in the last batch
+      if (i === docChunks.length - 1) {
+        batch.delete(doc(db, 'groups', groupId))
+      }
+      await batch.commit()
+    }
+
+    // If there were no entities, still delete the group
+    if (docChunks.length === 0) {
+      await deleteDoc(doc(db, 'groups', groupId))
+    }
   } catch (error) {
     console.error('Error deleting group:', error)
     throw error
@@ -1199,12 +1277,17 @@ export async function getObjectsByGroup(groupId: string, type: 'place' | 'contai
       where('groupId', '==', groupId)
     )
     const snapshot = await getDocs(q)
-    const entities = snapshot.docs.map((doc) => {
-      const raw = { id: doc.id, ...doc.data() }
-      if (type === 'place') return PlaceSchema.parse(raw) as Place
-      if (type === 'container') return ContainerSchema.parse(raw) as Container
-      return ItemSchema.parse(raw) as Item
-    })
+    const entities = snapshot.docs.reduce<(Place | Container | Item)[]>((acc, d) => {
+      const raw = { id: d.id, ...d.data() }
+      const schema = type === 'place' ? PlaceSchema : type === 'container' ? ContainerSchema : ItemSchema
+      const result = schema.safeParse(raw)
+      if (result.success) {
+        acc.push(result.data as Place | Container | Item)
+      } else {
+        console.warn(`Invalid ${d.ref.path}:`, result.error.message)
+      }
+      return acc
+    }, [])
 
     // Decrypt
     return Promise.all(
@@ -1516,10 +1599,16 @@ export async function getEntityActivity(
     );
 
     const snapshot = await getDocs(q);
-    const activities = snapshot.docs.map((doc) => {
-      const raw = { id: doc.id, ...doc.data() };
-      return ActivitySchema.parse(raw);
-    });
+    const activities = snapshot.docs.reduce<Activity[]>((acc, d) => {
+      const raw = { id: d.id, ...d.data() };
+      const result = ActivitySchema.safeParse(raw);
+      if (result.success) {
+        acc.push(result.data)
+      } else {
+        console.warn(`Invalid ${d.ref.path}:`, result.error.message)
+      }
+      return acc
+    }, []);
     return decryptActivities(activities);
   } catch (error) {
     console.error('Error fetching entity activity:', error);
@@ -1543,10 +1632,16 @@ export async function getUserRecentActivity(
     );
 
     const snapshot = await getDocs(q);
-    const activities = snapshot.docs.map((doc) => {
-      const raw = { id: doc.id, ...doc.data() };
-      return ActivitySchema.parse(raw);
-    });
+    const activities = snapshot.docs.reduce<Activity[]>((acc, d) => {
+      const raw = { id: d.id, ...d.data() };
+      const result = ActivitySchema.safeParse(raw);
+      if (result.success) {
+        acc.push(result.data)
+      } else {
+        console.warn(`Invalid ${d.ref.path}:`, result.error.message)
+      }
+      return acc
+    }, []);
     return decryptActivities(activities);
   } catch (error) {
     console.error('Error fetching user activity:', error);
@@ -1579,10 +1674,16 @@ export async function getAccessibleRecentActivity(
           limit(limitCount)
         )
         const snapshot = await getDocs(q)
-        return snapshot.docs.map((doc) => {
-          const raw = { id: doc.id, ...doc.data() }
-          return ActivitySchema.parse(raw)
-        })
+        return snapshot.docs.reduce<Activity[]>((acc, d) => {
+          const raw = { id: d.id, ...d.data() }
+          const result = ActivitySchema.safeParse(raw)
+          if (result.success) {
+            acc.push(result.data)
+          } else {
+            console.warn(`Invalid ${d.ref.path}:`, result.error.message)
+          }
+          return acc
+        }, [])
       })
     )
 
@@ -1599,10 +1700,14 @@ export async function getAccessibleRecentActivity(
       limit(limitCount)
     )
     const legacySnapshot = await getDocs(legacyQuery)
-    legacySnapshot.docs.forEach((doc) => {
-      const raw = { id: doc.id, ...doc.data() }
-      const activity = ActivitySchema.parse(raw)
-      deduped.set(activity.id, activity)
+    legacySnapshot.docs.forEach((d) => {
+      const raw = { id: d.id, ...d.data() }
+      const result = ActivitySchema.safeParse(raw)
+      if (result.success) {
+        deduped.set(result.data.id, result.data)
+      } else {
+        console.warn(`Invalid ${d.ref.path}:`, result.error.message)
+      }
     })
 
     const sorted = Array.from(deduped.values())
@@ -1633,10 +1738,16 @@ export async function getActivityByType(
     );
 
     const snapshot = await getDocs(q);
-    const activities = snapshot.docs.map((doc) => {
-      const raw = { id: doc.id, ...doc.data() };
-      return ActivitySchema.parse(raw);
-    });
+    const activities = snapshot.docs.reduce<Activity[]>((acc, d) => {
+      const raw = { id: d.id, ...d.data() };
+      const result = ActivitySchema.safeParse(raw);
+      if (result.success) {
+        acc.push(result.data)
+      } else {
+        console.warn(`Invalid ${d.ref.path}:`, result.error.message)
+      }
+      return acc
+    }, []);
     return decryptActivities(activities);
   } catch (error) {
     console.error('Error fetching activity by type:', error);
@@ -1661,10 +1772,16 @@ export async function getPlaceAggregatedActivity(
     );
 
     const snapshot = await getDocs(q);
-    const activities = snapshot.docs.map((doc) => {
-      const raw = { id: doc.id, ...doc.data() };
-      return ActivitySchema.parse(raw);
-    });
+    const activities = snapshot.docs.reduce<Activity[]>((acc, d) => {
+      const raw = { id: d.id, ...d.data() };
+      const result = ActivitySchema.safeParse(raw);
+      if (result.success) {
+        acc.push(result.data)
+      } else {
+        console.warn(`Invalid ${d.ref.path}:`, result.error.message)
+      }
+      return acc
+    }, []);
     return decryptActivities(activities);
   } catch (error) {
     console.error('Error fetching place aggregated activity:', error);
@@ -1689,10 +1806,16 @@ export async function getContainerAggregatedActivity(
     );
 
     const snapshot = await getDocs(q);
-    const activities = snapshot.docs.map((doc) => {
-      const raw = { id: doc.id, ...doc.data() };
-      return ActivitySchema.parse(raw);
-    });
+    const activities = snapshot.docs.reduce<Activity[]>((acc, d) => {
+      const raw = { id: d.id, ...d.data() };
+      const result = ActivitySchema.safeParse(raw);
+      if (result.success) {
+        acc.push(result.data)
+      } else {
+        console.warn(`Invalid ${d.ref.path}:`, result.error.message)
+      }
+      return acc
+    }, []);
     return decryptActivities(activities);
   } catch (error) {
     console.error('Error fetching container aggregated activity:', error);
