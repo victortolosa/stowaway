@@ -3,6 +3,7 @@ import { getAccessibleContainers } from '@/services/firebaseService'
 import { useAuthStore } from '@/store/auth'
 import { usePlaces } from '@/hooks/queries/usePlaces'
 import { useMemo } from 'react'
+import { withTimeout } from '@/lib/async'
 
 export const ALL_CONTAINERS_KEYS = {
     all: ['containers', 'all'] as const,
@@ -18,8 +19,13 @@ export function useAllContainers() {
         queryKey: user?.uid ? [...ALL_CONTAINERS_KEYS.list(user.uid), placeIds] : ['containers', 'disabled'],
         queryFn: () => {
             if (!user?.uid) throw new Error('User not authenticated')
-            return getAccessibleContainers(placeIds)
+            return withTimeout(
+                getAccessibleContainers(placeIds),
+                15_000,
+                'Loading containers timed out.',
+            )
         },
         enabled: !!user?.uid && !isPlacesLoading,
+        retry: false,
     })
 }

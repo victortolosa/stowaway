@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { getAccessiblePlaces, getPlace } from '@/services/firebaseService'
 import { useAuthStore } from '@/store/auth'
+import { withTimeout } from '@/lib/async'
 
 export const PLACE_KEYS = {
     all: ['places'] as const,
@@ -17,9 +18,14 @@ export function usePlaces() {
         queryKey: user?.uid ? PLACE_KEYS.list(user.uid) : ['places', 'disabled'],
         queryFn: () => {
             if (!user?.uid) throw new Error('User not authenticated')
-            return getAccessiblePlaces(user.uid)
+            return withTimeout(
+                getAccessiblePlaces(user.uid),
+                15_000,
+                'Loading places timed out.',
+            )
         },
         enabled: !!user?.uid,
+        retry: false,
     })
 }
 

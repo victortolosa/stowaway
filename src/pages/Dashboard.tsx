@@ -19,11 +19,15 @@ export function Dashboard() {
   const navigate = useNavigate()
   const user = useAuthStore((state) => state.user)
 
-  const { data: places = [], isLoading: isPlacesLoading } = usePlaces()
-  const { data: containers = [], isLoading: isContainersLoading } = useAllContainers()
-  const { data: allItems = [], isLoading: isAllItemsLoading } = useAllItems()
+  const placesQuery = usePlaces()
+  const containersQuery = useAllContainers()
+  const itemsQuery = useAllItems()
+  const { data: places = [], isLoading: isPlacesLoading } = placesQuery
+  const { data: containers = [], isLoading: isContainersLoading } = containersQuery
+  const { data: allItems = [], isLoading: isAllItemsLoading } = itemsQuery
 
   const isLoading = isPlacesLoading || isContainersLoading || isAllItemsLoading
+  const loadError = placesQuery.error || containersQuery.error || itemsQuery.error
 
 
   const [placesFilter, setPlacesFilter] = useState<'all' | 'shared'>('all')
@@ -71,6 +75,32 @@ export function Dashboard() {
 
   if (isLoading) {
     return <LoadingState message="Loading your inventory..." />
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center px-6">
+        <div className="w-full max-w-md text-center">
+          <h1 className="font-heading text-xl text-text-primary">Inventory unavailable</h1>
+          <p className="mt-2 font-body text-sm text-text-secondary">
+            Stowaway could not load your inventory. Check your connection and try again.
+          </p>
+          <p className="mt-3 break-words font-mono text-xs text-text-secondary">
+            {loadError instanceof Error ? loadError.message : String(loadError)}
+          </p>
+          <Button
+            className="mt-5"
+            onClick={() => {
+              void placesQuery.refetch()
+              void containersQuery.refetch()
+              void itemsQuery.refetch()
+            }}
+          >
+            Try again
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (

@@ -3,6 +3,7 @@ import { getAccessibleItems, getRecentItems } from '@/services/firebaseService'
 import { useAuthStore } from '@/store/auth'
 import { usePlaces } from '@/hooks/queries/usePlaces'
 import { useMemo } from 'react'
+import { withTimeout } from '@/lib/async'
 
 export const ALL_ITEMS_KEYS = {
     all: ['items', 'all'] as const,
@@ -19,9 +20,14 @@ export function useAllItems() {
         queryKey: user?.uid ? [...ALL_ITEMS_KEYS.list(user.uid), placeIds] : ['items', 'disabled'],
         queryFn: () => {
             if (!user?.uid) throw new Error('User not authenticated')
-            return getAccessibleItems(placeIds)
+            return withTimeout(
+                getAccessibleItems(placeIds),
+                20_000,
+                'Loading items timed out.',
+            )
         },
         enabled: !!user?.uid && !isPlacesLoading,
+        retry: false,
     })
 }
 
