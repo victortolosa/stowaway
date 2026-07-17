@@ -27,7 +27,13 @@ export function Dashboard() {
   const { data: allItems = [], isLoading: isAllItemsLoading } = itemsQuery
 
   const isLoading = isPlacesLoading || isContainersLoading || isAllItemsLoading
-  const loadError = placesQuery.error || containersQuery.error || itemsQuery.error
+  const failedQuery = placesQuery.error
+    ? { label: 'Places', error: placesQuery.error }
+    : containersQuery.error
+      ? { label: 'Containers', error: containersQuery.error }
+      : itemsQuery.error
+        ? { label: 'Items', error: itemsQuery.error }
+        : null
 
 
   const [placesFilter, setPlacesFilter] = useState<'all' | 'shared'>('all')
@@ -77,7 +83,7 @@ export function Dashboard() {
     return <LoadingState message="Loading your inventory..." />
   }
 
-  if (loadError) {
+  if (failedQuery) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center px-6">
         <div className="w-full max-w-md text-center">
@@ -86,7 +92,9 @@ export function Dashboard() {
             Stowaway could not load your inventory. Check your connection and try again.
           </p>
           <p className="mt-3 break-words font-mono text-xs text-text-secondary">
-            {loadError instanceof Error ? loadError.message : String(loadError)}
+            {failedQuery.label}: {failedQuery.error instanceof Error
+              ? failedQuery.error.message
+              : String(failedQuery.error)}
           </p>
           <Button
             className="mt-5"
