@@ -680,12 +680,9 @@ export async function getItem(id: string): Promise<Item | undefined> {
   if (docSnap.exists()) {
     const raw = { id: docSnap.id, ...docSnap.data() }
     const item = ItemSchema.parse(raw)
-    const placeId = item.placeId || (await getContainer(item.containerId))?.placeId
-    if (placeId) {
-      const key = await getPlaceKey(placeId)
-      if (key) {
-        return decryptFields(item, ['name', 'description', 'tags'], key)
-      }
+    const key = await getPlaceKey(item.placeId)
+    if (key) {
+      return decryptFields(item, ['name', 'description', 'tags'], key)
     }
     return item
   }
@@ -919,7 +916,7 @@ export async function deleteItem(itemId: string) {
     if (!item) throw new Error("Item not found");
 
     const container = await getContainer(item.containerId);
-    const resolvedPlaceId = item.placeId || container?.placeId;
+    const resolvedPlaceId = item.placeId;
 
     await deleteDoc(doc(db, 'items', itemId))
 
@@ -959,7 +956,7 @@ export async function moveItem(itemId: string, newContainerId: string) {
     if (!newContainer) throw new Error("Destination container not found");
 
     const oldContainerId = item.containerId;
-    const oldPlaceId = item.placeId || oldContainer?.placeId;
+    const oldPlaceId = item.placeId;
 
     // Update the item's containerId (and placeId if container is in different place)
     await updateDoc(doc(db, 'items', itemId), {
@@ -1297,7 +1294,7 @@ export async function getObjectsByGroup(groupId: string, type: 'place' | 'contai
         let placeId: string | undefined
         if (type === 'place') placeId = (entity as Place).id
         else if (type === 'container') placeId = (entity as Container).placeId
-        else placeId = (entity as Item).placeId || (await getContainer((entity as Item).containerId))?.placeId
+        else placeId = (entity as Item).placeId
 
         if (placeId) {
           const key = await getPlaceKey(placeId)
@@ -1889,12 +1886,7 @@ export async function trackEntityView(
       const item = await getItem(entityId);
       if (!item) return;
       entityName = item.name;
-      let placeId = item.placeId;
-      if (!placeId) {
-        const container = await getContainer(item.containerId);
-        placeId = container?.placeId;
-      }
-      hierarchy = { placeId, containerId: item.containerId };
+      hierarchy = { placeId: item.placeId, containerId: item.containerId };
     }
 
     await logActivity('viewed', entityType, entityId, entityName, hierarchy);

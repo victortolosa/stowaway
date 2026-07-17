@@ -62,9 +62,10 @@ export const ItemSchema = z.object({
   id: z.string(),
   userId: z.string().optional(),
   containerId: z.string(),
-  // placeId is optional for backward compatibility with existing items
-  // New items will have placeId set automatically by createItem
-  placeId: z.string().optional(),
+  // placeId is denormalized onto every item (backfilled 2026-07-17) and set by
+  // createItem. Required so an item that somehow loses it fails validation loudly
+  // rather than silently dropping out of place-scoped queries.
+  placeId: z.string(),
   name: z.string(),
   description: z.string().optional(),
   photos: z.array(z.string()),

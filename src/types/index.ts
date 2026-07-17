@@ -50,7 +50,7 @@ export interface Item {
   id: string
   userId?: string
   containerId: string
-  placeId?: string // Optional for backward compatibility with existing items
+  placeId: string // Denormalized from the item's container; always present
   name: string
   description?: string
   photos: string[]

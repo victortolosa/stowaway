@@ -22,7 +22,15 @@ Implemented this pass:
 - **Test harness**: Vitest + Firebase emulator (`@firebase/rules-unit-testing`). `npm test` runs unit tests; `npm run test:rules` runs the emulator suite (rules boundary + legacy-item migration). Requires a local JRE for the emulator; CI provides one.
 - **Migration made testable**: `scripts/backfill-shared-data.mjs` refactored to export its functions and guard the CLI bootstrap; covered by `tests/rules/migration.test.ts`.
 
-Still owner-run (needs production credentials): the legacy-item migration below.
+Migration executed 2026-07-17 against production (`stowaway-eb942`): 6 places + 7 groups normalized, **0 items needed a `placeId`** (every item already had one), so there was never any orphaning risk. Re-run dry-run reported 0/0/0.
+
+Follow-ups now applied:
+
+- `ItemSchema.placeId` and the `Item` type are **required** (`z.string()`), so an item missing `placeId` fails validation loudly instead of silently dropping out of place-scoped queries.
+- The item `placeId == null` branches were removed from `firestore.rules` (and the `getItemPlaceId`/`getContainerPlaceId` helpers deleted); create now requires `placeId is string`.
+- The dead `item.placeId || getContainer(...)` fallbacks were removed from the service (`getItem`, `deleteItem`, `moveItem`, `getObjectsByGroup`, view tracking).
+
+Still open (nice-to-have): a data-integrity check reporting any item whose `placeId` disagrees with its container's `placeId`.
 
 ## Priority 1: Migrate legacy items
 

@@ -153,6 +153,15 @@ describeRules('firestore.rules', () => {
         })
       )
     })
+
+    it('denies creating an item without a placeId (now required)', async () => {
+      await assertFails(
+        setDoc(doc(ctxFor(EDITOR), 'items', 'item-4'), {
+          containerId: CONTAINER_ID,
+          name: 'enc:new',
+        })
+      )
+    })
   })
 
   describe('publicProfiles (bandaid lockdown)', () => {
