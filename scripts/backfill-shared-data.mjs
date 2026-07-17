@@ -113,6 +113,49 @@ export async function backfillGroups(db, containerPlaceMap, { dryRun } = {}) {
   return updated
 }
 
+/**
+ * Report items whose denormalized placeId disagrees with their container's
+ * placeId (or is missing / points at an unknown container). Read-only.
+ */
+export async function checkIntegrity(db) {
+  const containerPlaceMap = await warmContainers(db)
+  const problems = { missingPlaceId: [], badContainerRef: [], mismatch: [] }
+
+  await forEachDoc(db, 'items', async (docSnap) => {
+    const data = docSnap.data()
+    const id = docSnap.id
+    const containerPlaceId = data.containerId ? containerPlaceMap.get(data.containerId) : undefined
+
+    if (containerPlaceId === undefined) {
+      problems.badContainerRef.push({ id, containerId: data.containerId ?? null })
+      return
+    }
+    if (!data.placeId) {
+      problems.missingPlaceId.push({ id, expected: containerPlaceId })
+      return
+    }
+    if (data.placeId !== containerPlaceId) {
+      problems.mismatch.push({ id, itemPlaceId: data.placeId, containerPlaceId })
+    }
+  })
+
+  const total = problems.missingPlaceId.length + problems.badContainerRef.length + problems.mismatch.length
+  console.log(`Integrity check: ${total} problem item(s)`)
+  console.log(`  placeId != container placeId: ${problems.mismatch.length}`)
+  console.log(`  missing placeId:              ${problems.missingPlaceId.length}`)
+  console.log(`  unknown/missing container:    ${problems.badContainerRef.length}`)
+  for (const p of problems.mismatch) {
+    console.warn(`  MISMATCH item ${p.id}: item.placeId=${p.itemPlaceId} container.placeId=${p.containerPlaceId}`)
+  }
+  for (const p of problems.missingPlaceId) {
+    console.warn(`  MISSING placeId item ${p.id} (container placeId=${p.expected})`)
+  }
+  for (const p of problems.badContainerRef) {
+    console.warn(`  BAD container ref item ${p.id} (containerId=${p.containerId})`)
+  }
+  return problems
+}
+
 export async function runBackfill(db, { dryRun } = {}) {
   const containerPlaceMap = await warmContainers(db)
   const places = await backfillPlaces(db, { dryRun })
@@ -138,6 +181,12 @@ async function main() {
   }
   if (!admin.apps.length) {
     admin.initializeApp({ credential: admin.credential.applicationDefault(), projectId })
+  }
+
+  // `--check` is a read-only integrity report; otherwise run the backfill.
+  if (process.argv.includes('--check')) {
+    await checkIntegrity(admin.firestore())
+    return
   }
   await runBackfill(admin.firestore(), { dryRun })
 }

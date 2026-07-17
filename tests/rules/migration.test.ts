@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest'
 import admin from 'firebase-admin'
-import { runBackfill, backfillItems, warmContainers } from '../../scripts/backfill-shared-data.mjs'
+import { runBackfill, backfillItems, warmContainers, checkIntegrity } from '../../scripts/backfill-shared-data.mjs'
 import { emulatorAvailable } from './helpers'
 
 const PROJECT_ID = 'stowaway-migration-test'
@@ -78,5 +78,19 @@ describeMigration('backfill-shared-data (legacy item migration)', () => {
     await runBackfill(db, { dryRun: false })
     const second = await runBackfill(db, { dryRun: true })
     expect(second.items).toBe(0)
+  })
+
+  it('checkIntegrity flags items whose placeId disagrees with their container', async () => {
+    await db.collection('containers').doc('c1').set({ placeId: 'p1', name: 'enc:box' })
+    await db.collection('items').doc('good').set({ containerId: 'c1', placeId: 'p1', name: 'enc:ok' })
+    await db.collection('items').doc('bad').set({ containerId: 'c1', placeId: 'pWRONG', name: 'enc:bad' })
+    await db.collection('items').doc('missing').set({ containerId: 'c1', name: 'enc:nope' })
+    await db.collection('items').doc('orphan').set({ containerId: 'gone', placeId: 'p1', name: 'enc:orphan' })
+
+    const problems = await checkIntegrity(db)
+
+    expect(problems.mismatch.map((p: { id: string }) => p.id)).toEqual(['bad'])
+    expect(problems.missingPlaceId.map((p: { id: string }) => p.id)).toEqual(['missing'])
+    expect(problems.badContainerRef.map((p: { id: string }) => p.id)).toEqual(['orphan'])
   })
 })

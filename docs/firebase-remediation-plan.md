@@ -30,7 +30,7 @@ Follow-ups now applied:
 - The item `placeId == null` branches were removed from `firestore.rules` (and the `getItemPlaceId`/`getContainerPlaceId` helpers deleted); create now requires `placeId is string`.
 - The dead `item.placeId || getContainer(...)` fallbacks were removed from the service (`getItem`, `deleteItem`, `moveItem`, `getObjectsByGroup`, view tracking).
 
-Still open (nice-to-have): a data-integrity check reporting any item whose `placeId` disagrees with its container's `placeId`.
+Data-integrity check added: `node scripts/backfill-shared-data.mjs --check` (read-only) reports any item whose `placeId` disagrees with its container's, is missing, or points at an unknown container.
 
 ## Priority 1: Migrate legacy items
 
