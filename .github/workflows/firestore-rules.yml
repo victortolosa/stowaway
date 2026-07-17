@@ -69,9 +69,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy Firestore rules, indexes, and Storage rules
+      # Storage rules are intentionally NOT deployed here: this service account
+      # (the Hosting deployer) lacks permission on firebasestorage.googleapis.com,
+      # and storage.rules is not part of this workflow's scope. To automate storage
+      # rules too, grant the SA serviceusage + firebaserules access and add
+      # `storage` back to --only.
+      - name: Deploy Firestore rules and indexes
         uses: w9jds/firebase-action@v13.13.1
         with:
-          args: deploy --only firestore:rules,firestore:indexes,storage --project stowaway-eb942 --non-interactive
+          args: deploy --only firestore:rules,firestore:indexes --project stowaway-eb942 --non-interactive
         env:
           GCP_SA_KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_STOWAWAY_EB942 }}
