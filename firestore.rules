@@ -54,11 +54,6 @@ service cloud.firestore {
       return isPlaceOwner(placeId) || placeRole(placeId) == 'editor';
     }
 
-    // Helper to validate URLs (allows standard https URLs OR our offline placeholders)
-    function isValidUrlOrPlaceholder(url) {
-      return url.matches('^https://.*') || url.matches('^urn:stowaway:pending:.*');
-    }
-
     // 1. Rules for the new Groups collection
     match /groups/{groupId} {
       allow create: if
@@ -124,7 +119,10 @@ service cloud.firestore {
           isPlaceEditor(placeId) &&
           request.resource.data.memberIds == resource.data.memberIds &&
           request.resource.data.memberRoles == resource.data.memberRoles &&
-          request.resource.data.ownerId == resource.data.ownerId
+          request.resource.data.ownerId == resource.data.ownerId &&
+          // userId is also an owner-identifying field (see isPlaceOwner); if an
+          // editor could change it they would become owner on the next request.
+          request.resource.data.userId == resource.data.userId
         );
       allow delete: if isPlaceOwner(placeId);
     }
