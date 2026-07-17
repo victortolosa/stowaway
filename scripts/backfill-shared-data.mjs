@@ -1,32 +1,11 @@
 import admin from 'firebase-admin'
+import { pathToFileURL } from 'node:url'
 
-const projectId = process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT
-const dryRun = process.argv.includes('--dry-run')
 const pageSize = Number(process.env.PAGE_SIZE || 500)
-
-if (!projectId) {
-  console.error('Missing FIREBASE_PROJECT_ID or GCLOUD_PROJECT')
-  process.exit(1)
-}
-
-if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-  console.error('GOOGLE_APPLICATION_CREDENTIALS is required (path to service account JSON)')
-  process.exit(1)
-}
-
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.applicationDefault(),
-    projectId,
-  })
-}
-
-const db = admin.firestore()
-const containerPlaceMap = new Map()
 
 const unique = (values) => Array.from(new Set(values.filter(Boolean)))
 
-async function forEachDoc(collectionName, handler) {
+async function forEachDoc(db, collectionName, handler) {
   let lastDoc = null
   while (true) {
     let query = db.collection(collectionName).orderBy(admin.firestore.FieldPath.documentId()).limit(pageSize)
@@ -40,22 +19,24 @@ async function forEachDoc(collectionName, handler) {
   }
 }
 
-async function warmContainers() {
+export async function warmContainers(db) {
+  const containerPlaceMap = new Map()
   console.log('Loading containers...')
-  await forEachDoc('containers', async (docSnap) => {
+  await forEachDoc(db, 'containers', async (docSnap) => {
     const data = docSnap.data()
     if (data && data.placeId) {
       containerPlaceMap.set(docSnap.id, data.placeId)
     }
   })
   console.log(`Loaded ${containerPlaceMap.size} container placeIds`)
+  return containerPlaceMap
 }
 
-async function backfillPlaces() {
+export async function backfillPlaces(db, { dryRun } = {}) {
   console.log('Backfilling places...')
   const writer = db.bulkWriter()
   let updated = 0
-  await forEachDoc('places', async (docSnap) => {
+  await forEachDoc(db, 'places', async (docSnap) => {
     const data = docSnap.data()
     const ownerId = data.ownerId || data.userId
     if (!ownerId) return
@@ -81,13 +62,14 @@ async function backfillPlaces() {
   })
   if (!dryRun) await writer.close()
   console.log(`Places updated: ${updated}${dryRun ? ' (dry run)' : ''}`)
+  return updated
 }
 
-async function backfillItems() {
+export async function backfillItems(db, containerPlaceMap, { dryRun } = {}) {
   console.log('Backfilling items...')
   const writer = db.bulkWriter()
   let updated = 0
-  await forEachDoc('items', async (docSnap) => {
+  await forEachDoc(db, 'items', async (docSnap) => {
     const data = docSnap.data()
     if (data.placeId) return
     const containerId = data.containerId
@@ -99,13 +81,14 @@ async function backfillItems() {
   })
   if (!dryRun) await writer.close()
   console.log(`Items updated: ${updated}${dryRun ? ' (dry run)' : ''}`)
+  return updated
 }
 
-async function backfillGroups() {
+export async function backfillGroups(db, containerPlaceMap, { dryRun } = {}) {
   console.log('Backfilling groups...')
   const writer = db.bulkWriter()
   let updated = 0
-  await forEachDoc('groups', async (docSnap) => {
+  await forEachDoc(db, 'groups', async (docSnap) => {
     const data = docSnap.data()
     const type = data.type
     if (!type) return
@@ -127,17 +110,41 @@ async function backfillGroups() {
   })
   if (!dryRun) await writer.close()
   console.log(`Groups updated: ${updated}${dryRun ? ' (dry run)' : ''}`)
+  return updated
 }
 
-async function run() {
-  await warmContainers()
-  await backfillPlaces()
-  await backfillItems()
-  await backfillGroups()
+export async function runBackfill(db, { dryRun } = {}) {
+  const containerPlaceMap = await warmContainers(db)
+  const places = await backfillPlaces(db, { dryRun })
+  const items = await backfillItems(db, containerPlaceMap, { dryRun })
+  const groups = await backfillGroups(db, containerPlaceMap, { dryRun })
   console.log('Backfill complete')
+  return { places, items, groups }
 }
 
-run().catch((err) => {
-  console.error('Backfill failed:', err)
-  process.exit(1)
-})
+// CLI entrypoint — only runs when invoked directly (`node scripts/backfill-shared-data.mjs`),
+// not when imported by tests. Keeps admin bootstrap + credentials out of imports.
+async function main() {
+  const projectId = process.env.FIREBASE_PROJECT_ID || process.env.GCLOUD_PROJECT
+  const dryRun = process.argv.includes('--dry-run')
+
+  if (!projectId) {
+    console.error('Missing FIREBASE_PROJECT_ID or GCLOUD_PROJECT')
+    process.exit(1)
+  }
+  if (!process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    console.error('GOOGLE_APPLICATION_CREDENTIALS is required (path to service account JSON)')
+    process.exit(1)
+  }
+  if (!admin.apps.length) {
+    admin.initializeApp({ credential: admin.credential.applicationDefault(), projectId })
+  }
+  await runBackfill(admin.firestore(), { dryRun })
+}
+
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((err) => {
+    console.error('Backfill failed:', err)
+    process.exit(1)
+  })
+}

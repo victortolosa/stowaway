@@ -88,8 +88,14 @@ service cloud.firestore {
     }
 
     // 1b2. Public profiles (for sharing/lookup by email)
+    // BANDAID (2026-07-17): reads restricted to the owner's own doc to stop any
+    // authenticated user from enumerating every user's email/name/photo.
+    // Trade-off: share-by-email lookup and cross-member profile display are
+    // disabled until a trusted server path is added. Proper fix: a callable
+    // Cloud Function that resolves email->uid server-side, after which this can
+    // relax to whatever that flow needs. See docs/firebase-remediation-plan.md.
     match /publicProfiles/{uid} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && request.auth.uid == uid;
       allow create, update: if isAuthenticated() && request.auth.uid == uid;
       allow delete: if false;
     }

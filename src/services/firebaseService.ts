@@ -109,14 +109,35 @@ export async function getUserProfile(uid: string): Promise<UserProfile | undefin
   return undefined
 }
 
+// NOTE: `publicProfiles` reads are locked to the caller's own doc (see
+// firestore.rules bandaid, 2026-07-17), so these cross-user lookups now return
+// permission-denied. They degrade to "no match" rather than throwing until the
+// email->uid resolution is moved to a callable Cloud Function.
+function isPermissionDenied(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error as { code?: string }).code === 'permission-denied'
+  )
+}
+
 export async function getUserByEmail(email: string): Promise<UserProfile | undefined> {
   const normalized = normalizeEmail(email)
-  const q = query(collection(db, 'publicProfiles'), where('email', '==', normalized))
-  const snapshot = await getDocs(q)
-  const docSnap = snapshot.docs[0]
-  if (!docSnap) return undefined
-  const raw = { uid: docSnap.id, ...docSnap.data() }
-  return UserProfileSchema.parse(raw)
+  try {
+    const q = query(collection(db, 'publicProfiles'), where('email', '==', normalized))
+    const snapshot = await getDocs(q)
+    const docSnap = snapshot.docs[0]
+    if (!docSnap) return undefined
+    const raw = { uid: docSnap.id, ...docSnap.data() }
+    return UserProfileSchema.parse(raw)
+  } catch (error) {
+    if (isPermissionDenied(error)) {
+      console.warn('getUserByEmail: publicProfiles lookup is disabled (bandaid); returning no match')
+      return undefined
+    }
+    throw error
+  }
 }
 
 export async function getUserProfilesByIds(uids: string[]): Promise<UserProfile[]> {
@@ -124,18 +145,26 @@ export async function getUserProfilesByIds(uids: string[]): Promise<UserProfile[
   const chunks = chunkArray(uids, 10)
   const results = await Promise.all(
     chunks.map(async (chunk) => {
-      const q = query(collection(db, 'publicProfiles'), where('uid', 'in', chunk))
-      const snapshot = await getDocs(q)
-      return snapshot.docs.reduce<UserProfile[]>((acc, docSnap) => {
-        const raw = { uid: docSnap.id, ...docSnap.data() }
-        const result = UserProfileSchema.safeParse(raw)
-        if (result.success) {
-          acc.push(result.data)
-        } else {
-          console.warn(`Invalid ${docSnap.ref.path}:`, result.error.message)
+      try {
+        const q = query(collection(db, 'publicProfiles'), where('uid', 'in', chunk))
+        const snapshot = await getDocs(q)
+        return snapshot.docs.reduce<UserProfile[]>((acc, docSnap) => {
+          const raw = { uid: docSnap.id, ...docSnap.data() }
+          const result = UserProfileSchema.safeParse(raw)
+          if (result.success) {
+            acc.push(result.data)
+          } else {
+            console.warn(`Invalid ${docSnap.ref.path}:`, result.error.message)
+          }
+          return acc
+        }, [])
+      } catch (error) {
+        if (isPermissionDenied(error)) {
+          console.warn('getUserProfilesByIds: publicProfiles lookup is disabled (bandaid); returning no profiles')
+          return []
         }
-        return acc
-      }, [])
+        throw error
+      }
     })
   )
   return results.flat()
@@ -720,9 +749,13 @@ export async function createItem(item: Omit<Item, 'id' | 'userId' | 'placeId' | 
 
 export async function getContainerItems(containerId: string): Promise<Item[]> {
   try {
+    const container = await getContainer(containerId)
+    if (!container) return []
+
     const q = query(
       collection(db, 'items'),
-      where('containerId', '==', containerId)
+      where('containerId', '==', containerId),
+      where('placeId', '==', container.placeId)
     )
     const snapshot = await getDocs(q)
     const items = snapshot.docs.reduce<Item[]>((acc, d) => {
@@ -735,16 +768,13 @@ export async function getContainerItems(containerId: string): Promise<Item[]> {
       }
       return acc
     }, [])
-    // Decrypt — all items in a container share the same placeId
+    // Decrypt — all items in a container share the same placeId.
     if (items.length > 0) {
-      const placeId = items[0].placeId || (await getContainer(containerId))?.placeId
-      if (placeId) {
-        const key = await getPlaceKey(placeId)
-        if (key) {
-          return Promise.all(
-            items.map((item) => decryptFields(item, ['name', 'description', 'tags'], key))
-          )
-        }
+      const key = await getPlaceKey(container.placeId)
+      if (key) {
+        return Promise.all(
+          items.map((item) => decryptFields(item, ['name', 'description', 'tags'], key))
+        )
       }
     }
     return items
@@ -773,37 +803,9 @@ export async function getPlaceItems(placeId: string): Promise<Item[]> {
       }
       return acc
     }, [])
-    const itemsWithPlaceId = key
+    return key
       ? await Promise.all(rawItems.map((item) => decryptFields(item, ['name', 'description', 'tags'], key)))
       : rawItems
-
-    // TODO: Remove this backward compatibility code once all items have been migrated to include placeId
-    // This handles legacy items created before placeId denormalization was added
-    // Get containers to check for legacy items without placeId
-    const containers = await getPlaceContainers(placeId)
-    if (containers.length === 0) {
-      return itemsWithPlaceId
-    }
-
-    // Fetch items by container (N+1 query for legacy items without placeId)
-    const itemsPromises = containers.map(c => getContainerItems(c.id))
-    const results = await Promise.all(itemsPromises)
-    const itemsByContainer = results.flat()
-
-    // Deduplicate: combine both result sets by ID
-    const itemMap = new Map<string, Item>()
-
-    // Add items from direct query
-    itemsWithPlaceId.forEach(item => itemMap.set(item.id, item))
-
-    // Add items from container queries (only if not already present)
-    itemsByContainer.forEach(item => {
-      if (!itemMap.has(item.id)) {
-        itemMap.set(item.id, item)
-      }
-    })
-
-    return Array.from(itemMap.values())
   } catch (error) {
     console.error('Error fetching place items:', error)
     throw error
