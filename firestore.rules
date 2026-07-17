@@ -96,9 +96,7 @@ service cloud.firestore {
 
     // 1c. Rules for Place encryption keys
     match /places/{placeId}/keys/{keyDoc} {
-      // Use resource fields directly so list queries constrained by userId or
-      // memberIds can be proven safe by Firestore's query rules engine.
-      allow read: if isPlaceResourceMember(resource.data);
+      allow read: if isPlaceMember(placeId);
       allow create: if isPlaceOwner(placeId);
       allow update, delete: if isPlaceOwner(placeId);
     }
@@ -119,7 +117,9 @@ service cloud.firestore {
           !('memberRoles' in request.resource.data) ||
           request.resource.data.memberRoles[request.auth.uid] == 'owner'
         );
-      allow read: if isPlaceMember(placeId);
+      // Use place fields directly so list queries constrained by userId or
+      // memberIds can be proven safe by Firestore's query rules engine.
+      allow read: if isPlaceResourceMember(resource.data);
       allow update: if
         isPlaceOwner(placeId) ||
         (
