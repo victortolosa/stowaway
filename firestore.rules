@@ -54,14 +54,6 @@ service cloud.firestore {
       return isPlaceOwner(placeId) || placeRole(placeId) == 'editor';
     }
 
-    function getContainerPlaceId(containerId) {
-      return get(/databases/$(database)/documents/containers/$(containerId)).data.placeId;
-    }
-
-    function getItemPlaceId(data) {
-      return data.placeId != null ? data.placeId : getContainerPlaceId(data.containerId);
-    }
-
     // Helper to validate URLs (allows standard https URLs OR our offline placeholders)
     function isValidUrlOrPlaceholder(url) {
       return url.matches('^https://.*') || url.matches('^urn:stowaway:pending:.*');
@@ -88,8 +80,14 @@ service cloud.firestore {
     }
 
     // 1b2. Public profiles (for sharing/lookup by email)
+    // BANDAID (2026-07-17): reads restricted to the owner's own doc to stop any
+    // authenticated user from enumerating every user's email/name/photo.
+    // Trade-off: share-by-email lookup and cross-member profile display are
+    // disabled until a trusted server path is added. Proper fix: a callable
+    // Cloud Function that resolves email->uid server-side, after which this can
+    // relax to whatever that flow needs. See docs/firebase-remediation-plan.md.
     match /publicProfiles/{uid} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && request.auth.uid == uid;
       allow create, update: if isAuthenticated() && request.auth.uid == uid;
       allow delete: if false;
     }
@@ -145,40 +143,20 @@ service cloud.firestore {
     }
 
     // 4. Rules for Items
+    // placeId is required and denormalized from the item's container (backfilled
+    // 2026-07-17). The legacy placeId == null branches were removed.
     match /items/{itemId} {
       allow create: if
-        (
-          request.resource.data.placeId != null &&
-          isPlaceEditor(request.resource.data.placeId)
-        ) ||
-        (
-          request.resource.data.placeId == null &&
-          isPlaceEditor(get(/databases/$(database)/documents/containers/$(request.resource.data.containerId)).data.placeId)
-        )
-        // Optional: Add specific validation for photos/voiceNoteUrl here if needed
-        // && (
-        //   !('photos' in request.resource.data) ||
-        //   request.resource.data.photos.size() == 0 ||
-        //   isValidUrlOrPlaceholder(request.resource.data.photos[0])
-        // )
-        ;
-      allow read: if
-        (
-          resource.data.placeId != null &&
-          isPlaceMember(resource.data.placeId)
-        ) ||
-        (
-          resource.data.placeId == null &&
-          isPlaceMember(get(/databases/$(database)/documents/containers/$(resource.data.containerId)).data.placeId)
-        );
+        request.resource.data.placeId is string &&
+        isPlaceEditor(request.resource.data.placeId);
+      allow read: if isPlaceMember(resource.data.placeId);
       allow update: if
-        isPlaceEditor(getItemPlaceId(resource.data)) &&
+        isPlaceEditor(resource.data.placeId) &&
         (
-          getItemPlaceId(resource.data) == getItemPlaceId(request.resource.data) ||
-          isPlaceEditor(getItemPlaceId(request.resource.data))
+          request.resource.data.placeId == resource.data.placeId ||
+          isPlaceEditor(request.resource.data.placeId)
         );
-      allow delete: if
-        isPlaceEditor(getItemPlaceId(resource.data));
+      allow delete: if isPlaceEditor(resource.data.placeId);
     }
 
     // 5. Rules for Activity Logs
