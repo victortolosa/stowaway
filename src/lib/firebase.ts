@@ -61,6 +61,7 @@ let auth!: Auth;
 let db!: Firestore;
 let storage!: FirebaseStorage;
 let analytics: Analytics | null = null;
+let firebaseInitializationError: Error | null = null;
 
 try {
   app = initializeApp(firebaseConfig);
@@ -84,7 +85,8 @@ try {
     });
   }
 } catch (e) {
-  const errorMsg = `FIREBASE_CRITICAL_ERROR: ${e instanceof Error ? e.message : String(e)}`;
+  firebaseInitializationError = e instanceof Error ? e : new Error(String(e));
+  const errorMsg = `FIREBASE_CRITICAL_ERROR: ${firebaseInitializationError.message}`;
   console.error(errorMsg, e);
   if (typeof window !== 'undefined') {
     window.FIREBASE_INIT_ERROR = (window.FIREBASE_INIT_ERROR || '') + '\n' + errorMsg;
@@ -107,4 +109,4 @@ if (!auth) {
 if (!db) db = {} as Firestore;
 if (!storage) storage = {} as FirebaseStorage;
 
-export { auth, db, storage, analytics };
+export { auth, db, storage, analytics, firebaseInitializationError };

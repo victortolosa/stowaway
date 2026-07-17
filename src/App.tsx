@@ -1,9 +1,9 @@
-import { useEffect, lazy, Suspense } from 'react'
+import { useEffect, lazy, Suspense, useState } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from '@/lib/react-query'
 import { onAuthStateChanged } from 'firebase/auth'
-import { auth } from '@/lib/firebase'
+import { auth, firebaseInitializationError } from '@/lib/firebase'
 import { useAuthStore } from '@/store/auth'
 import { upsertUserProfile } from '@/services/firebaseService'
 import { ProtectedRoute, Layout, RootErrorBoundary } from '@/components'
@@ -30,14 +30,30 @@ const Activity = lazy(() => import('@/pages/Activity').then(m => ({ default: m.A
 function App() {
   const { setUser, setLoading } = useAuthStore()
   const user = useAuthStore((state) => state.user)
+  const [authError, setAuthError] = useState<Error | null>(firebaseInitializationError)
 
   useEffect(() => {
+    if (firebaseInitializationError) {
+      setLoading(false)
+      return
+    }
+
+    const timeout = window.setTimeout(() => {
+      setAuthError(new Error('Firebase Authentication did not finish initializing.'))
+      setLoading(false)
+    }, 15_000)
+
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      window.clearTimeout(timeout)
+      setAuthError(null)
       setUser(user)
       setLoading(false)
     })
 
-    return unsubscribe
+    return () => {
+      window.clearTimeout(timeout)
+      unsubscribe()
+    }
   }, [setUser, setLoading])
 
   useEffect(() => {
@@ -51,6 +67,31 @@ function App() {
       console.error('Failed to upsert user profile:', error)
     })
   }, [user])
+
+  if (authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-bg-page px-6">
+        <div className="w-full max-w-md rounded-2xl border border-border bg-bg-card p-6 text-center shadow-lg">
+          <h1 className="font-heading text-xl text-text-primary">Unable to connect</h1>
+          <p className="mt-2 font-body text-sm text-text-secondary">
+            Stowaway could not initialize authentication. Check your connection and try again.
+          </p>
+          {import.meta.env.DEV && (
+            <p className="mt-3 break-words font-mono text-xs text-text-secondary">
+              {authError.message}
+            </p>
+          )}
+          <button
+            type="button"
+            className="mt-5 rounded-lg bg-brand-primary px-4 py-2 font-body text-sm font-medium text-white hover:bg-brand-primary/90"
+            onClick={() => window.location.reload()}
+          >
+            Try again
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <RootErrorBoundary>
