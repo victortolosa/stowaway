@@ -183,12 +183,12 @@ export function Item() {
       />
 
       {/* Hero Image */}
-      <div className={`relative ${item.photos && item.photos.length > 0 ? 'h-[280px]' : 'h-[160px]'} bg-bg-elevated rounded-2xl overflow-hidden mx-4 shadow-sm border border-border-light`}>
+      <div className={`relative ${item.photos && item.photos.length > 0 ? 'min-h-[200px] max-h-[75vh]' : 'h-[160px]'} bg-bg-elevated rounded-2xl overflow-hidden mx-4 shadow-sm border border-border-light`}>
         {item.photos && item.photos.length > 0 ? (
           <ImageCarousel
             images={item.photos}
             alt={item.name}
-            className="h-full"
+            adaptiveHeight
             onImageClick={() => setShowGallery(true)}
           />
         ) : (

@@ -7,6 +7,12 @@ interface ImageCarouselProps {
     alt?: string
     className?: string
     onImageClick?: (index: number) => void
+    /**
+     * When true, the carousel sizes its height to the first image's natural
+     * aspect ratio instead of filling its parent. Use when the image asset
+     * should dictate the height (e.g. item hero).
+     */
+    adaptiveHeight?: boolean
 }
 
 export function ImageCarousel({
@@ -14,8 +20,10 @@ export function ImageCarousel({
     alt = 'Image',
     className,
     onImageClick,
+    adaptiveHeight = false,
 }: ImageCarouselProps) {
     const [activeIndex, setActiveIndex] = useState(0)
+    const [aspectRatio, setAspectRatio] = useState<number | null>(null)
     const scrollRef = useRef<HTMLDivElement>(null)
 
     // Handle scroll events to update active index
@@ -43,7 +51,10 @@ export function ImageCarousel({
     }
 
     return (
-        <div className={cn("relative group w-full", className)}>
+        <div
+            className={cn("relative group w-full", className)}
+            style={adaptiveHeight && aspectRatio ? { aspectRatio } : undefined}
+        >
             {/* Scroll Container */}
             <div
                 ref={scrollRef}
@@ -59,8 +70,18 @@ export function ImageCarousel({
                         <img
                             src={src}
                             alt={`${alt} ${index + 1}`}
-                            className="w-full h-full object-cover"
+                            className={cn("w-full h-full", adaptiveHeight ? "object-contain" : "object-cover")}
                             loading={index === 0 ? 'eager' : 'lazy'}
+                            onLoad={
+                                adaptiveHeight && index === 0
+                                    ? (e) => {
+                                        const img = e.currentTarget
+                                        if (img.naturalWidth && img.naturalHeight) {
+                                            setAspectRatio(img.naturalWidth / img.naturalHeight)
+                                        }
+                                    }
+                                    : undefined
+                            }
                         />
                     </div>
                 ))}
