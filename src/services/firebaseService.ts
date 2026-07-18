@@ -19,7 +19,8 @@ import {
   getDownloadURL,
   deleteObject,
 } from 'firebase/storage'
-import { db, storage, auth } from '@/lib/firebase'
+import { httpsCallable } from 'firebase/functions'
+import { db, storage, auth, functions } from '@/lib/firebase'
 import { Place, PlaceRole, Container, Item, Group, Activity, ActivityAction, ActivityEntityType, ActivityMetadata, UserProfile } from '@/types'
 import { offlineStorage } from '@/lib/offlineStorage'
 import { sanitizeUndefined, getChangedFields } from '@/utils/data'
@@ -109,65 +110,50 @@ export async function getUserProfile(uid: string): Promise<UserProfile | undefin
   return undefined
 }
 
-// NOTE: `publicProfiles` reads are locked to the caller's own doc (see
-// firestore.rules bandaid, 2026-07-17), so these cross-user lookups now return
-// permission-denied. They degrade to "no match" rather than throwing until the
-// email->uid resolution is moved to a callable Cloud Function.
-function isPermissionDenied(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'code' in error &&
-    (error as { code?: string }).code === 'permission-denied'
-  )
+// `publicProfiles` reads are locked to the caller's own doc in firestore.rules
+// to prevent email/profile enumeration. Cross-user lookups instead go through
+// Admin-SDK callable Cloud Functions (see functions/src/index.ts), which enforce
+// their own authorization: resolveUserByEmail does an exact-email lookup for
+// invites, and getPlaceMemberProfiles returns member profiles to place members.
+interface CallableProfile {
+  uid: string
+  email: string
+  displayName?: string | null
+  photoURL?: string | null
+  updatedAt?: number | null
 }
 
-export async function getUserByEmail(email: string): Promise<UserProfile | undefined> {
-  const normalized = normalizeEmail(email)
-  try {
-    const q = query(collection(db, 'publicProfiles'), where('email', '==', normalized))
-    const snapshot = await getDocs(q)
-    const docSnap = snapshot.docs[0]
-    if (!docSnap) return undefined
-    const raw = { uid: docSnap.id, ...docSnap.data() }
-    return UserProfileSchema.parse(raw)
-  } catch (error) {
-    if (isPermissionDenied(error)) {
-      console.warn('getUserByEmail: publicProfiles lookup is disabled (bandaid); returning no match')
-      return undefined
-    }
-    throw error
+// The callables return a minimal profile without createdAt; the timestamps are
+// only used for display sorting and are not meaningful for these lookups, so we
+// derive both dates from updatedAt (falling back to now).
+const toUserProfile = (profile: CallableProfile): UserProfile => {
+  const stamp = profile.updatedAt ? new Date(profile.updatedAt) : new Date()
+  return {
+    uid: profile.uid,
+    email: profile.email,
+    displayName: profile.displayName ?? null,
+    photoURL: profile.photoURL ?? null,
+    createdAt: stamp,
+    updatedAt: stamp,
   }
 }
 
-export async function getUserProfilesByIds(uids: string[]): Promise<UserProfile[]> {
-  if (uids.length === 0) return []
-  const chunks = chunkArray(uids, 10)
-  const results = await Promise.all(
-    chunks.map(async (chunk) => {
-      try {
-        const q = query(collection(db, 'publicProfiles'), where('uid', 'in', chunk))
-        const snapshot = await getDocs(q)
-        return snapshot.docs.reduce<UserProfile[]>((acc, docSnap) => {
-          const raw = { uid: docSnap.id, ...docSnap.data() }
-          const result = UserProfileSchema.safeParse(raw)
-          if (result.success) {
-            acc.push(result.data)
-          } else {
-            console.warn(`Invalid ${docSnap.ref.path}:`, result.error.message)
-          }
-          return acc
-        }, [])
-      } catch (error) {
-        if (isPermissionDenied(error)) {
-          console.warn('getUserProfilesByIds: publicProfiles lookup is disabled (bandaid); returning no profiles')
-          return []
-        }
-        throw error
-      }
-    })
+export async function getUserByEmail(email: string): Promise<UserProfile | undefined> {
+  const callable = httpsCallable<{ email: string }, { user: CallableProfile | null }>(
+    functions,
+    'resolveUserByEmail'
   )
-  return results.flat()
+  const { data } = await callable({ email: normalizeEmail(email) })
+  return data.user ? toUserProfile(data.user) : undefined
+}
+
+export async function getPlaceMemberProfiles(placeId: string): Promise<UserProfile[]> {
+  const callable = httpsCallable<{ placeId: string }, { profiles: CallableProfile[] }>(
+    functions,
+    'getPlaceMemberProfiles'
+  )
+  const { data } = await callable({ placeId })
+  return data.profiles.map(toUserProfile)
 }
 
 /**

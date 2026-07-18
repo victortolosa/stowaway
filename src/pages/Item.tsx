@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/store/auth'
 import { CreateItemModal, ConfirmDeleteModal, AudioPlayer } from '@/components'
-import { useItem } from '@/hooks/queries/useItems'
+import { useItem, useContainerItems } from '@/hooks/queries/useItems'
 import { useContainer } from '@/hooks/queries/useContainers'
 import { useAllContainers } from '@/hooks/queries/useAllContainers'
 import { usePlace, usePlaces } from '@/hooks/queries/usePlaces'
@@ -11,7 +11,7 @@ import { useQueryClient, useQuery } from '@tanstack/react-query'
 import { ITEM_KEYS } from '@/hooks/queries/useItems'
 import { CONTAINER_KEYS } from '@/hooks/queries/useContainers'
 import { deleteItem, updateItem, createContainer, createGroup } from '@/services/firebaseService'
-import { Plus, Activity, MoreVertical } from 'lucide-react'
+import { Plus, Activity, MoreVertical, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button, Badge, LoadingState, NavigationHeader, ImageCarousel, Modal, GalleryEditor, ImageGrid, EmojiPicker, Select, FormField, Input, IconOrEmoji } from '@/components/ui'
 import { ActivityFeed } from '@/components/ActivityFeed'
 import { useBreadcrumbs } from '@/contexts/BreadcrumbContext'
@@ -33,6 +33,8 @@ export function Item() {
   const { data: allContainers = [] } = useAllContainers()
   const { data: groups = [] } = useGroups()
   const { data: allPlaces = [] } = usePlaces()
+  // Sibling items in the same container, for prev/next pagination (matches container order)
+  const { data: siblingItems = [] } = useContainerItems(item?.containerId || '')
 
   const isLoading = isItemLoading || isContainerLoading || isPlaceLoading
   const canEdit = place ? canEditPlace(place, user?.uid) : false
@@ -208,6 +210,41 @@ export function Item() {
           </div>
         )}
       </div>
+
+      {/* Sibling Pagination — only when the container holds more than one item */}
+      {(() => {
+        if (siblingItems.length <= 1) return null
+        const currentIndex = siblingItems.findIndex((i) => i.id === item.id)
+        if (currentIndex === -1) return null
+        const prevItem = currentIndex > 0 ? siblingItems[currentIndex - 1] : undefined
+        const nextItem = currentIndex < siblingItems.length - 1 ? siblingItems[currentIndex + 1] : undefined
+
+        return (
+          <div className="flex items-center justify-between gap-3 px-4 mt-4">
+            <Button
+              variant="secondary"
+              size="sm"
+              leftIcon={ChevronLeft}
+              disabled={!prevItem}
+              onClick={() => prevItem && navigate(`/items/${prevItem.id}`)}
+            >
+              Prev
+            </Button>
+            <span className="font-body text-sm text-text-tertiary tabular-nums">
+              {currentIndex + 1} of {siblingItems.length}
+            </span>
+            <Button
+              variant="secondary"
+              size="sm"
+              rightIcon={ChevronRight}
+              disabled={!nextItem}
+              onClick={() => nextItem && navigate(`/items/${nextItem.id}`)}
+            >
+              Next
+            </Button>
+          </div>
+        )
+      })()}
 
       {/* Content */}
       <div className="pt-6 space-y-6">
