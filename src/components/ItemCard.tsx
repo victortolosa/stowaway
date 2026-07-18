@@ -32,12 +32,12 @@ export function ItemCard({
             onClick={onClick}
         >
             {/* Left Side: Image or Icon (Square) */}
-            <div className="h-full aspect-square relative flex-shrink-0 border-r border-border-light/50">
+            <div className="h-full aspect-square relative flex-shrink-0 border-r border-border-light/50 bg-bg-surface-alt">
                 {hasPhoto ? (
                     <img
                         src={item.photos![0]}
                         alt={item.name}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
                     />
                 ) : (
                     <div className="w-full h-full bg-bg-surface-alt flex items-center justify-center">

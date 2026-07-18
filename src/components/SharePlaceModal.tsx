@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Modal, Button, Input, Select } from '@/components/ui'
 import { Place, PlaceRole, UserProfile } from '@/types'
-import { addPlaceMember, removePlaceMember, updatePlaceMemberRole, getUserByEmail, getUserProfilesByIds, getPlaceOwnerId } from '@/services/firebaseService'
+import { addPlaceMember, removePlaceMember, updatePlaceMemberRole, getUserByEmail, getPlaceMemberProfiles, getPlaceOwnerId } from '@/services/firebaseService'
 import { useAuthStore } from '@/store/auth'
 
 interface SharePlaceModalProps {
@@ -45,7 +45,7 @@ export function SharePlaceModal({ isOpen, onClose, place, onUpdated }: SharePlac
     setRole('viewer')
     setError(null)
 
-    getUserProfilesByIds(nextMemberIds)
+    getPlaceMemberProfiles(place.id)
       .then((profilesList) => {
         const nextProfiles: Record<string, UserProfile> = {}
         profilesList.forEach((profile) => {

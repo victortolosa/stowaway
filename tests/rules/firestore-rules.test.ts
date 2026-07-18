@@ -84,6 +84,20 @@ describeRules('firestore.rules', () => {
       await assertSucceeds(updateDoc(doc(ctxFor(EDITOR), 'places', PLACE_ID), { name: 'enc:home2' }))
     })
 
+    it('denies an editor reassigning userId (owner-takeover vector)', async () => {
+      // userId is an owner-identifying field in isPlaceOwner. If an editor could
+      // rewrite it to their own uid they would become owner on the next request.
+      await assertFails(
+        updateDoc(doc(ctxFor(EDITOR), 'places', PLACE_ID), { userId: EDITOR })
+      )
+    })
+
+    it('denies an editor reassigning ownerId', async () => {
+      await assertFails(
+        updateDoc(doc(ctxFor(EDITOR), 'places', PLACE_ID), { ownerId: EDITOR })
+      )
+    })
+
     it('denies an editor deleting the place (owner-only)', async () => {
       await assertFails(deleteDoc(doc(ctxFor(EDITOR), 'places', PLACE_ID)))
     })
