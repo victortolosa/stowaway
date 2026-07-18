@@ -183,7 +183,10 @@ export function Item() {
       />
 
       {/* Hero Image */}
-      <div className={`relative ${item.photos && item.photos.length > 0 ? 'min-h-[200px] max-h-[75vh]' : 'h-[160px]'} bg-bg-elevated rounded-2xl overflow-hidden mx-4 shadow-sm border border-border-light`}>
+      {/* Photos: height follows the image's natural aspect ratio (no crop). On
+          desktop the width is capped and centered so tall portrait images can't
+          make the page excessively long. */}
+      <div className={`relative ${item.photos && item.photos.length > 0 ? 'min-h-[200px] md:max-w-md md:mx-auto' : 'h-[160px]'} bg-bg-elevated rounded-2xl overflow-hidden mx-4 shadow-sm border border-border-light`}>
         {item.photos && item.photos.length > 0 ? (
           <ImageCarousel
             images={item.photos}
