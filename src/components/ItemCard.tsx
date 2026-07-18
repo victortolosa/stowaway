@@ -1,5 +1,5 @@
 import { Mic } from 'lucide-react'
-import { Card, IconOrEmoji } from '@/components/ui'
+import { Card, IconOrEmoji, IconOverlayBadge } from '@/components/ui'
 import { Item } from '@/types'
 import { formatTimeAgo } from '@/utils/date'
 import { getItemIcon } from '@/utils/colorUtils'
@@ -34,11 +34,20 @@ export function ItemCard({
             {/* Left Side: Image or Icon (Square) */}
             <div className="h-full aspect-square relative flex-shrink-0 border-r border-border-light/50 bg-bg-surface-alt">
                 {hasPhoto ? (
-                    <img
-                        src={item.photos![0]}
-                        alt={item.name}
-                        className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
-                    />
+                    <>
+                        <img
+                            src={item.photos![0]}
+                            alt={item.name}
+                            className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+                        />
+                        {/* Icon badge overlay — keeps the intuitive icon cue while showing the photo */}
+                        <IconOverlayBadge
+                            iconValue={item.icon}
+                            defaultIcon={getItemIcon()}
+                            color={item.color || '#3B82F6'}
+                            className="absolute bottom-1.5 right-1.5"
+                        />
+                    </>
                 ) : (
                     <div className="w-full h-full bg-bg-surface-alt flex items-center justify-center">
                         <IconOrEmoji

@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { Card, IconOrEmoji, EmptyState } from '@/components/ui'
+import { Card, EntityThumbnail, EmptyState } from '@/components/ui'
 import { QrCode, ChevronRight, Pencil } from 'lucide-react'
 import { Container, Group, Item } from '@/types'
 import { Timestamp } from 'firebase/firestore'
@@ -106,15 +106,13 @@ export function ContainerList({
                                                         onClick={() => navigate(`/containers/${container.id}`)}
                                                         className="flex items-center gap-[14px]"
                                                     >
-                                                        {container.photos && container.photos[0] ? (
-                                                            <img
-                                                                src={container.photos[0]}
-                                                                alt={container.name}
-                                                                className="w-12 h-12 rounded-xl object-contain flex-shrink-0 bg-bg-surface-alt border border-border-light/50"
-                                                            />
-                                                        ) : (
-                                                            <IconOrEmoji iconValue={container.icon} defaultIcon={getContainerIcon()} color={containerColor} />
-                                                        )}
+                                                        <EntityThumbnail
+                                                            photo={container.photos?.[0]}
+                                                            name={container.name}
+                                                            iconValue={container.icon}
+                                                            defaultIcon={getContainerIcon()}
+                                                            color={containerColor}
+                                                        />
                                                         <div className="flex-1 min-w-0 flex flex-col gap-1">
                                                             <div className="flex items-center gap-2">
                                                                 <h3 className="font-body text-[16px] font-semibold text-text-primary">
@@ -164,15 +162,13 @@ export function ContainerList({
                                 onClick={() => navigate(`/containers/${container.id}`)}
                                 className="flex items-center gap-[14px]"
                             >
-                                {container.photos && container.photos[0] ? (
-                                    <img
-                                        src={container.photos[0]}
-                                        alt={container.name}
-                                        className="w-12 h-12 rounded-xl object-contain flex-shrink-0 bg-bg-surface-alt border border-border-light/50"
-                                    />
-                                ) : (
-                                    <IconOrEmoji iconValue={container.icon} defaultIcon={getContainerIcon()} color={containerColor} />
-                                )}
+                                <EntityThumbnail
+                                    photo={container.photos?.[0]}
+                                    name={container.name}
+                                    iconValue={container.icon}
+                                    defaultIcon={getContainerIcon()}
+                                    color={containerColor}
+                                />
                                 <div className="flex-1 min-w-0 flex flex-col gap-1">
                                     <div className="flex items-center gap-2">
                                         <h3 className="font-body text-[16px] font-semibold text-text-primary">
