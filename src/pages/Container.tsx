@@ -231,10 +231,14 @@ export function Container() {
       {/* Container Hero */}
       {container.photos && container.photos.length > 0 ? (
         <div className="mb-6">
-          <div className="rounded-2xl overflow-hidden aspect-[21/9] mb-6 shadow-sm border border-border-light bg-bg-surface">
+          {/* Height follows the image's natural aspect ratio (no crop). On
+              desktop the width is capped and centered so tall portrait images
+              can't make the page excessively long. */}
+          <div className="rounded-2xl overflow-hidden min-h-[200px] md:max-w-md md:mx-auto mb-6 shadow-sm border border-border-light bg-bg-surface">
             <ImageCarousel
               images={container.photos}
               alt={container.name}
+              adaptiveHeight
               onImageClick={() => setShowGallery(true)}
             />
           </div>
